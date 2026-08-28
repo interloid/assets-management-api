@@ -13,6 +13,7 @@ dependencies = [
     "pyjwt>=2.13.0",
     "ruff>=0.16.4",
     "sqlalchemy>=2.0.52",
+    "uuid6>=2025.0.1",
     "uvicorn>=0.52.4",
 ]
 
