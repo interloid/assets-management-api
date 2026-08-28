@@ -1,3 +1,4 @@
+import os
 from logging.config import fileConfig
 
 from sqlalchemy import pool
@@ -13,9 +14,11 @@ from app.db.base import Base
 # access to the values within the .ini file in use.
 config = context.config
 
+database_url = os.getenv("ALEMBIC_DATABASE_URL", settings.database_url)
+
 config.set_main_option(
     "sqlalchemy.url",
-    settings.database_url,
+    database_url,
 )
 
 # Interpret the config file for Python logging.
