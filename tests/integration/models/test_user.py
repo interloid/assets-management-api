@@ -1,6 +1,7 @@
 from uuid import UUID
 
 import pytest
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.enums import UserRole
@@ -43,9 +44,6 @@ async def test_user_default_values(
 
     assert user.role == UserRole.USER
     assert user.is_active is True
-
-
-from sqlalchemy.exc import IntegrityError
 
 
 @pytest.mark.asyncio

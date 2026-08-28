@@ -1,3 +1,5 @@
+from collections.abc import AsyncGenerator
+
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
@@ -10,7 +12,7 @@ from app.models.user import User
 
 
 @pytest_asyncio.fixture
-async def db_session() -> AsyncSession:
+async def db_session() -> AsyncGenerator[AsyncSession, None]:
     engine = create_async_engine(
         settings.test_database_url,
         echo=False,
