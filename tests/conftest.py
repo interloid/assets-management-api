@@ -33,7 +33,12 @@ def user():
 
 
 
-
+@pytest.fixture
+def login_payload() -> LoginRequest:
+    return LoginRequest(
+        email="user@example.com",
+        password="Password123",
+    )
 
 @pytest.fixture
 def register_request(user_payload: dict[str, str]) -> RegisterRequest:
