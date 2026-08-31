@@ -19,6 +19,8 @@ down_revision: str | Sequence[str] | None = None
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
+NOW = sa.text("now()")
+
 
 def upgrade() -> None:
     """Upgrade schema."""
@@ -42,13 +44,13 @@ def upgrade() -> None:
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
-            server_default=sa.text("now()"),
+            server_default=NOW,
             nullable=False,
         ),
         sa.Column(
             "updated_at",
             sa.DateTime(timezone=True),
-            server_default=sa.text("now()"),
+            server_default=NOW,
             nullable=False,
         ),
         sa.PrimaryKeyConstraint("id"),
@@ -77,13 +79,13 @@ def upgrade() -> None:
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
-            server_default=sa.text("now()"),
+            server_default=NOW,
             nullable=False,
         ),
         sa.Column(
             "updated_at",
             sa.DateTime(timezone=True),
-            server_default=sa.text("now()"),
+            server_default=NOW,
             nullable=False,
         ),
         sa.CheckConstraint(
@@ -112,7 +114,7 @@ def upgrade() -> None:
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
-            server_default=sa.text("now()"),
+            server_default=NOW,
             nullable=False,
         ),
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
