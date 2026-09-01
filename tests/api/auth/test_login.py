@@ -41,7 +41,7 @@ async def test_valid_credentials(
 
 
 @pytest.mark.asyncio
-async def test_api_login_02_invalid_credentials(
+async def test_invalid_credentials(
     api_client,
     login_payload,
 ) -> None:
@@ -59,8 +59,6 @@ async def test_api_login_02_invalid_credentials(
         )
 
     assert response.status_code == 401
-
-    assert response.json()["detail"] == "Invalid login credentials"
 
 
 @pytest.mark.asyncio

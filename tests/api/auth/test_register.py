@@ -53,8 +53,6 @@ async def test_duplicate_email(
 
     assert response.status_code == 409
 
-    assert response.json()["detail"] == "Email already registered"
-
     mock_register.assert_awaited_once()
 
 

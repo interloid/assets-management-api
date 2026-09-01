@@ -1,9 +1,13 @@
-from fastapi import APIRouter, HTTPException, Response, status
+from fastapi import APIRouter, Response, status
 
 from app.core.config import settings
-from app.dependencies.types import DBSession
-from app.exceptions.auth import EmailAlreadyRegisteredError, InvalidCredentialsError
-from app.schemas.auth import LoginRequest, LoginResponse, RegisterRequest, UserResponse
+from app.dependencies.types import DBSession, RefreshToken
+from app.schemas.auth import (
+    LoginRequest,
+    LoginResponse,
+    RegisterRequest,
+    UserResponse,
+)
 from app.services.auth import AuthService
 
 router = APIRouter(
@@ -20,16 +24,10 @@ async def register(
     data: RegisterRequest,
     session: DBSession,
 ) -> UserResponse:
+
     service = AuthService(session)
 
-    try:
-        user = await service.register(data)
-
-    except EmailAlreadyRegisteredError:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Email already registered",
-        )
+    user = await service.register(data)
 
     return UserResponse.model_validate(user)
 
@@ -43,27 +41,48 @@ async def login(
     response: Response,
     session: DBSession,
 ) -> LoginResponse:
-    try:
-        service = AuthService(session)
+    service = AuthService(session)
 
-        result = await service.login(payload)
+    result = await service.login(payload)
 
-        response.set_cookie(
-            key="refresh_token",
-            value=result.refresh_token,
-            httponly=True,
-            secure=True,
-            samesite="lax",
-            max_age=settings.refresh_token_expiry_days * 24 * 60 * 60,
-        )
+    response.set_cookie(
+        key="refresh_token",
+        value=result.refresh_token,
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        max_age=settings.refresh_token_expiry_days * 24 * 60 * 60,
+    )
 
-        return LoginResponse(
-            access_token=result.access_token,
-            token_type="bearer",
-        )
+    return LoginResponse(
+        access_token=result.access_token,
+        token_type="bearer",
+    )
 
-    except InvalidCredentialsError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid login credentials",
-        )
+
+@router.post(
+    "/refresh",
+    status_code=status.HTTP_200_OK,
+)
+async def refresh(
+    response: Response,
+    session: DBSession,
+    refresh_token: RefreshToken = None,
+) -> LoginResponse:
+    service = AuthService(session)
+
+    result = await service.refresh(refresh_token)
+
+    response.set_cookie(
+        key="refresh_token",
+        value=result.refresh_token,
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        max_age=settings.refresh_token_expiry_days * 24 * 60 * 60,
+    )
+
+    return LoginResponse(
+        access_token=result.access_token,
+        token_type="bearer",
+    )

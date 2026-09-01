@@ -16,6 +16,7 @@ def user_payload() -> dict[str, str]:
         "full_name": "Test User",
     }
 
+
 @pytest.fixture
 def user():
     now = datetime.now(timezone.utc)
@@ -32,7 +33,6 @@ def user():
     )
 
 
-
 @pytest.fixture
 def login_payload() -> LoginRequest:
     return LoginRequest(
@@ -40,9 +40,6 @@ def login_payload() -> LoginRequest:
         password="Password123",
     )
 
-@pytest.fixture
-def register_request(user_payload: dict[str, str]) -> RegisterRequest:
-    return RegisterRequest(**user_payload)
 
 @pytest.fixture
 def created_user(register_request: RegisterRequest) -> User:
@@ -53,12 +50,3 @@ def created_user(register_request: RegisterRequest) -> User:
         role=UserRole.USER,
         is_active=True,
     )
-
-
-
-
-
-
-
-
-
