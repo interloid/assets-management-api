@@ -21,7 +21,7 @@ from app.models.user import User
 async def integration_client(
     db_session: AsyncSession,
 ) -> AsyncGenerator[AsyncClient, None]:
-    async def override_get_db():
+    async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
         yield db_session
 
     app.dependency_overrides[get_db] = override_get_db
@@ -53,10 +53,8 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
         try:
             yield session
         finally:
-            # Reset the session if the test caused an IntegrityError.
             await session.rollback()
 
-            # Clean all test data.
             await session.execute(
                 text(
                     """
@@ -78,9 +76,11 @@ async def create_test_user(
     db_session: AsyncSession,
 ) -> User:
     user = User(
-        email="asset-owner@example.com",
+        email=f"asset-owner-{uuid7()}@example.com",
         password_hash="hashed-password",
         full_name="Asset Owner",
+        role=UserRole.USER,
+        is_active=True,
     )
 
     db_session.add(user)

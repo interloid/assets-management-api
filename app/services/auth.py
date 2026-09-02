@@ -187,3 +187,42 @@ class AuthService:
             access_token=access_token,
             refresh_token=new_refresh_token,
         )
+
+    async def logout(
+        self,
+        refresh_token: str,
+    ):
+        if not refresh_token:
+            raise InvalidTokenError()
+
+        token_hash = hash_refresh_token(refresh_token)
+
+        stored_token = await self.refresh_token_repository.get_by_hash(
+            token_hash,
+            for_update=True,
+        )
+
+        if stored_token is None:
+            raise InvalidTokenError()
+
+        await self.refresh_token_repository.revoke(stored_token.id)
+
+        await self.session.commit()
+
+    async def logout_all(
+        self,
+        refresh_token: str,
+    ):
+        if not refresh_token:
+            raise InvalidTokenError()
+
+        token_hash = hash_refresh_token(refresh_token)
+
+        stored_token = await self.refresh_token_repository.get_by_hash(token_hash)
+
+        if stored_token is None:
+            raise InvalidTokenError()
+
+        await self.refresh_token_repository.revoke_user(stored_token.user_id)
+
+        await self.session.commit()

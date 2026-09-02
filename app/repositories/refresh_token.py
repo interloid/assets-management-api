@@ -84,3 +84,22 @@ class RefreshTokenRepository:
         await self.session.execute(stmt)
 
         await self.session.flush()
+
+    async def revoke_user(
+        self,
+        user_id: UUID,
+    ):
+        now = datetime.now(timezone.utc)
+
+        stmt = (
+            update(RefreshToken)
+            .where(
+                RefreshToken.user_id == user_id,
+                RefreshToken.revoked_at.is_(None),
+            )
+            .values(revoked_at=now)
+        )
+
+        await self.session.execute(stmt)
+
+        await self.session.flush()

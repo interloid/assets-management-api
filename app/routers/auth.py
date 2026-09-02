@@ -86,3 +86,35 @@ async def refresh(
         access_token=result.access_token,
         token_type="bearer",
     )
+
+
+@router.post(
+    "/logout",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def logout(
+    response: Response, session: DBSession, refresh_token: RefreshToken = None
+):
+    service = AuthService(session)
+
+    await service.logout(refresh_token)
+
+    response.delete_cookie(
+        key="refresh_token", httponly=True, secure=True, samesite="lax"
+    )
+
+
+@router.post(
+    "/logout-all",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def logout_all(
+    response: Response, session: DBSession, refresh_token: RefreshToken = None
+):
+    service = AuthService(session)
+
+    await service.logout_all(refresh_token)
+
+    response.delete_cookie(
+        key="refresh_token", httponly=True, secure=True, samesite="lax"
+    )

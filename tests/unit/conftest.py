@@ -3,32 +3,34 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
+from uuid6 import uuid7
 
+from app.models.refresh_token import RefreshToken
 from app.schemas.auth import LoginRequest, RegisterRequest
 from app.services.auth import AuthService
 
 
 @pytest.fixture
-def mock_session():
+def mock_session() -> AsyncMock:
     return AsyncMock()
 
 
 @pytest.fixture
-def user_repository():
+def user_repository() -> AsyncMock:
     return AsyncMock()
 
 
 @pytest.fixture
-def refresh_token_repository():
+def refresh_token_repository() -> AsyncMock:
     return AsyncMock()
 
 
 @pytest.fixture
 def auth_service(
-    mock_session,
-    user_repository,
-    refresh_token_repository,
-):
+    mock_session: AsyncMock,
+    user_repository: AsyncMock,
+    refresh_token_repository: AsyncMock,
+) -> AuthService:
     service = AuthService(session=mock_session)
 
     service.user_repository = user_repository
@@ -55,7 +57,7 @@ def login_payload() -> LoginRequest:
 
 
 @pytest.fixture
-def active_user():
+def active_user() -> SimpleNamespace:
     return SimpleNamespace(
         id="user-123",
         password_hash="hashed-password",
@@ -65,7 +67,7 @@ def active_user():
 
 
 @pytest.fixture
-def inactive_user():
+def inactive_user() -> SimpleNamespace:
     return SimpleNamespace(
         id="user-123",
         password_hash="hashed-password",
@@ -75,12 +77,12 @@ def inactive_user():
 
 
 @pytest.fixture
-def refresh_token():
+def refresh_token() -> str:
     return "old-refresh-token"
 
 
 @pytest.fixture
-def valid_stored_token():
+def valid_stored_token() -> SimpleNamespace:
     return SimpleNamespace(
         id="token-123",
         user_id="user-123",
@@ -92,7 +94,7 @@ def valid_stored_token():
 
 
 @pytest.fixture
-def expired_stored_token():
+def expired_stored_token() -> SimpleNamespace:
     return SimpleNamespace(
         id="token-123",
         user_id="user-123",
@@ -104,7 +106,7 @@ def expired_stored_token():
 
 
 @pytest.fixture
-def revoked_stored_token():
+def revoked_stored_token() -> SimpleNamespace:
     return SimpleNamespace(
         id="token-123",
         user_id="user-123",
@@ -116,7 +118,7 @@ def revoked_stored_token():
 
 
 @pytest.fixture
-def created_user():
+def created_user() -> SimpleNamespace:
     return SimpleNamespace(
         id="user-123",
         email="test@example.com",
@@ -124,4 +126,16 @@ def created_user():
         full_name="Test User",
         role=SimpleNamespace(value="user"),
         is_active=True,
+    )
+
+
+@pytest.fixture
+def created_refresh_token() -> RefreshToken:
+    return RefreshToken(
+        id=uuid7(),
+        user_id=uuid7(),
+        token_hash="hashed_refresh_token",
+        family_id=uuid7(),
+        expires_at=datetime.now(timezone.utc) + timedelta(days=7),
+        revoked_at=None,
     )
