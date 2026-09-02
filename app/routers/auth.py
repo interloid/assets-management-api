@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Response, status
 
 from app.core.config import settings
-from app.dependencies.types import DBSession, RefreshToken
+from app.dependencies.types import CurrentUser, DBSession, RefreshToken
 from app.schemas.auth import (
     LoginRequest,
     LoginResponse,
@@ -118,3 +118,13 @@ async def logout_all(
     response.delete_cookie(
         key="refresh_token", httponly=True, secure=True, samesite="lax"
     )
+
+
+@router.get(
+    "/me",
+    status_code=status.HTTP_200_OK,
+)
+async def get_me(
+    current_user: CurrentUser,
+) -> UserResponse:
+    return UserResponse.model_validate(current_user)
