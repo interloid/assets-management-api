@@ -3,8 +3,10 @@ from fastapi import APIRouter, Response, status
 from app.core.config import settings
 from app.dependencies.types import CurrentUser, DBSession, RefreshToken
 from app.schemas.auth import (
+    ChangePasswordRequest,
     LoginRequest,
     LoginResponse,
+    MessageResponse,
     RegisterRequest,
     UserResponse,
 )
@@ -128,3 +130,26 @@ async def get_me(
     current_user: CurrentUser,
 ) -> UserResponse:
     return UserResponse.model_validate(current_user)
+
+
+
+@router.post(
+    "/change-password",
+    status_code=status.HTTP_200_OK,
+)
+async def change_password(
+    data: ChangePasswordRequest,
+    current_user: CurrentUser,
+    session: DBSession,
+) -> MessageResponse:
+    service = AuthService(session)
+
+    await service.change_password(
+        user=current_user,
+        current_password=data.current_password,
+        new_password=data.new_password,
+    )
+
+    return MessageResponse(
+        message="Password changed successfully",
+    )

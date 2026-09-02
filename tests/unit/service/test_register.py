@@ -159,3 +159,6 @@ async def test_missing_refresh_token(
 
     mock_session.commit.assert_not_awaited()
     mock_session.rollback.assert_not_awaited()
+
+
+

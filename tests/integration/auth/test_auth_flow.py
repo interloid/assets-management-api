@@ -80,7 +80,7 @@ async def test_flow_02_login_then_refresh(
     db_session: AsyncSession,
     user_payload,
 ) -> None:
-    # Register user
+
     register_response = await integration_client.post(
         "/auth/register",
         json=user_payload,
@@ -88,7 +88,6 @@ async def test_flow_02_login_then_refresh(
 
     assert register_response.status_code == 201
 
-    # Login
     login_response = await integration_client.post(
         "/auth/login",
         json={
@@ -104,12 +103,10 @@ async def test_flow_02_login_then_refresh(
     assert login_body["access_token"]
     assert login_body["token_type"] == "bearer"
 
-    # Refresh token is stored in cookie
     assert "refresh_token" in login_response.cookies
 
     old_refresh_token = login_response.cookies["refresh_token"]
 
-    # Get persisted refresh token
     result = await db_session.execute(select(RefreshToken))
 
     stored_tokens = result.scalars().all()
@@ -122,13 +119,11 @@ async def test_flow_02_login_then_refresh(
     assert old_token_record.token_hash != old_refresh_token
     assert old_token_record.family_id is not None
 
-    # Put refresh token into client's cookie jar
     integration_client.cookies.set(
         "refresh_token",
         old_refresh_token,
     )
 
-    # Refresh
     refresh_response = await integration_client.post(
         "/auth/refresh",
     )
@@ -140,10 +135,8 @@ async def test_flow_02_login_then_refresh(
     assert refresh_body["access_token"]
     assert refresh_body["token_type"] == "bearer"
 
-    # Refresh token must NOT be returned in JSON
     assert "refresh_token" not in refresh_body
 
-    # New refresh token must be returned as cookie
     assert "refresh_token" in refresh_response.cookies
 
     new_refresh_token = refresh_response.cookies["refresh_token"]
@@ -151,7 +144,6 @@ async def test_flow_02_login_then_refresh(
     assert new_refresh_token
     assert new_refresh_token != old_refresh_token
 
-    # Verify database rotation
     result = await db_session.execute(
         select(RefreshToken).where(RefreshToken.user_id == old_token_record.user_id)
     )
@@ -168,16 +160,12 @@ async def test_flow_02_login_then_refresh(
         token for token in tokens if token.token_hash != old_token_record.token_hash
     )
 
-    # Old token is revoked
     assert old_token.revoked_at is not None
 
-    # New token belongs to the same family
     assert new_token.family_id == old_token.family_id
 
-    # New token is active
     assert new_token.revoked_at is None
 
-    # Stored token is hashed
     assert new_token.token_hash != new_refresh_token
 
 
@@ -187,7 +175,6 @@ async def test_flow_03_refresh_token_reuse_revokes_family(
     db_session: AsyncSession,
     user_payload,
 ) -> None:
-    # Register user
     register_response = await integration_client.post(
         "/auth/register",
         json=user_payload,
@@ -197,7 +184,6 @@ async def test_flow_03_refresh_token_reuse_revokes_family(
 
     user_id = register_response.json()["id"]
 
-    # Login
     login_response = await integration_client.post(
         "/auth/login",
         json={
@@ -210,7 +196,6 @@ async def test_flow_03_refresh_token_reuse_revokes_family(
 
     old_refresh_token = login_response.cookies["refresh_token"]
 
-    # Get the original token record for this user
     result = await db_session.execute(
         select(RefreshToken).where(
             RefreshToken.user_id == user_id,
@@ -221,7 +206,6 @@ async def test_flow_03_refresh_token_reuse_revokes_family(
 
     family_id = original_token.family_id
 
-    # First refresh → rotates the token
     integration_client.cookies.set(
         "refresh_token",
         old_refresh_token,
@@ -237,7 +221,6 @@ async def test_flow_03_refresh_token_reuse_revokes_family(
 
     assert new_refresh_token != old_refresh_token
 
-    # Verify family now contains old + new token
     result = await db_session.execute(
         select(RefreshToken).where(
             RefreshToken.family_id == family_id,
@@ -251,7 +234,6 @@ async def test_flow_03_refresh_token_reuse_revokes_family(
     assert any(token.revoked_at is not None for token in family_tokens)
     assert any(token.revoked_at is None for token in family_tokens)
 
-    # Reuse the OLD refresh token
     integration_client.cookies.set(
         "refresh_token",
         old_refresh_token,
@@ -267,7 +249,6 @@ async def test_flow_03_refresh_token_reuse_revokes_family(
 
     assert body["error"]["code"] == "REFRESH_TOKEN_REUSE"
 
-    # Verify entire family is revoked
     result = await db_session.execute(
         select(RefreshToken).where(
             RefreshToken.family_id == family_id,
@@ -346,7 +327,7 @@ async def test_flow_05_logout_all_all_sessions_rejected(
     db_session: AsyncSession,
     user_payload,
 ) -> None:
-    # Register user
+
     register_response = await integration_client.post(
         "/auth/register",
         json=user_payload,
@@ -356,7 +337,6 @@ async def test_flow_05_logout_all_all_sessions_rejected(
 
     user_id = register_response.json()["id"]
 
-    # Login - Session 1
     login_response_1 = await integration_client.post(
         "/auth/login",
         json={
@@ -369,7 +349,6 @@ async def test_flow_05_logout_all_all_sessions_rejected(
 
     refresh_token_1 = login_response_1.cookies["refresh_token"]
 
-    # Login - Session 2
     login_response_2 = await integration_client.post(
         "/auth/login",
         json={
@@ -382,21 +361,18 @@ async def test_flow_05_logout_all_all_sessions_rejected(
 
     refresh_token_2 = login_response_2.cookies["refresh_token"]
 
-    # Logout all sessions
-    # Set the current refresh token explicitly
+
     integration_client.cookies.set(
         "refresh_token",
         refresh_token_2,
     )
 
-    # Logout all sessions
     logout_all_response = await integration_client.post(
         "/auth/logout-all",
     )
 
     assert logout_all_response.status_code == 204
 
-    # Verify both sessions are revoked in the database
     result = await db_session.execute(
         select(RefreshToken).where(
             RefreshToken.user_id == user_id,
@@ -410,7 +386,6 @@ async def test_flow_05_logout_all_all_sessions_rejected(
     for token in tokens:
         assert token.revoked_at is not None
 
-    # Session 1 refresh must fail
     integration_client.cookies.set(
         "refresh_token",
         refresh_token_1,
@@ -422,7 +397,98 @@ async def test_flow_05_logout_all_all_sessions_rejected(
 
     assert refresh_response_1.status_code == 401
 
-    # Session 2 refresh must also fail
+    integration_client.cookies.set(
+        "refresh_token",
+        refresh_token_2,
+    )
+
+    refresh_response_2 = await integration_client.post(
+        "/auth/refresh",
+    )
+
+    assert refresh_response_2.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_flow_06_change_password_revokes_all_sessions(
+    integration_client,
+    db_session: AsyncSession,
+    user_payload,
+) -> None:
+    register_response = await integration_client.post(
+        "/auth/register",
+        json=user_payload,
+    )
+
+    assert register_response.status_code == 201
+
+    user_id = register_response.json()["id"]
+
+    login_response_1 = await integration_client.post(
+        "/auth/login",
+        json={
+            "email": user_payload["email"],
+            "password": user_payload["password"],
+        },
+    )
+
+    assert login_response_1.status_code == 200
+
+    refresh_token_1 = login_response_1.cookies["refresh_token"]
+
+    login_response_2 = await integration_client.post(
+        "/auth/login",
+        json={
+            "email": user_payload["email"],
+            "password": user_payload["password"],
+        },
+    )
+
+    assert login_response_2.status_code == 200
+
+    refresh_token_2 = login_response_2.cookies["refresh_token"]
+
+    access_token = login_response_2.json()["access_token"]
+
+    change_password_response = await integration_client.post(
+        "/auth/change-password",
+        json={
+            "current_password": user_payload["password"],
+            "new_password": "NewPassword123",
+        },
+        headers={
+            "Authorization": f"Bearer {access_token}",
+        },
+    )
+
+    assert change_password_response.status_code == 200
+
+    result = await db_session.execute(
+        select(RefreshToken).where(
+            RefreshToken.user_id == user_id,
+        )
+    )
+
+    tokens = result.scalars().all()
+
+    assert len(tokens) == 2
+
+    assert all(
+        token.revoked_at is not None
+        for token in tokens
+    )
+
+    integration_client.cookies.set(
+        "refresh_token",
+        refresh_token_1,
+    )
+
+    refresh_response_1 = await integration_client.post(
+        "/auth/refresh",
+    )
+
+    assert refresh_response_1.status_code == 401
+
     integration_client.cookies.set(
         "refresh_token",
         refresh_token_2,

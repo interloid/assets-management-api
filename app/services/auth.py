@@ -226,3 +226,28 @@ class AuthService:
         await self.refresh_token_repository.revoke_user(stored_token.user_id)
 
         await self.session.commit()
+
+    async def change_password(
+            self,
+            user: User,
+            current_password: str,
+            new_password: str,
+    ) -> None:
+        if not verify_password(
+            current_password,
+            user.password_hash,
+        ):
+            raise InvalidCredentialsError
+
+        new_password_hash = hash_password(new_password)
+
+        await self.user_repository.update_password(
+            user,
+            new_password_hash,
+        )
+
+        await self.refresh_token_repository.revoke_user(
+            user.id
+        )
+
+        await self.session.commit()
