@@ -40,9 +40,9 @@ class UserRepository:
         return user
 
     async def update_password(
-            self,
-            user: User,
-            password_hash: str,
+        self,
+        user: User,
+        password_hash: str,
     ) -> User:
         user.password_hash = password_hash
 

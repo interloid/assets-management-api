@@ -13,7 +13,7 @@ def validate_full_name(value: str) -> str:
     if len(value) > 100:
         raise ValueError("Full name must not exceed 100 characters")
 
-    if not re.match(r"^[A-Za-z]", value):
+    if not value[0].isalpha():
         raise ValueError("Full name must start with a letter")
 
     if "  " in value:

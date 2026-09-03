@@ -4,11 +4,11 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import jwt
-from fastapi import HTTPException, status
 from pwdlib import PasswordHash
 from uuid6 import uuid7
 
 from app.core.config import settings
+from app.exceptions.auth import InvalidTokenError
 
 password_hash = PasswordHash.recommended()
 
@@ -68,21 +68,9 @@ def decode_access_token(token: str) -> dict[str, Any]:
         )
 
     except jwt.ExpiredSignatureError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token has expired",
-            headers={
-                "WWW-Authenticate": "Bearer",
-            },
-        ) from exc
+        raise InvalidTokenError() from exc
 
     except jwt.InvalidTokenError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token",
-            headers={
-                "WWW-Authenticate": "Bearer",
-            },
-        ) from exc
+        raise InvalidTokenError() from exc
 
     return payload

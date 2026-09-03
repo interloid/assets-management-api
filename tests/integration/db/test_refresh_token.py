@@ -15,7 +15,6 @@ async def test_refresh_token_persisted(
     db_session: AsyncSession,
     integration_user: User,
 ) -> None:
-
     repository = RefreshTokenRepository(db_session)
 
     token_hash = "hashed-refresh-token"
@@ -74,7 +73,7 @@ async def test_refresh_token_hash_stored(
 
 
 @pytest.mark.asyncio
-async def test_refresh_token_seven_day_expiry(
+async def test_refresh_token_expiry_stored(
     db_session: AsyncSession,
     integration_user: User,
 ) -> None:
@@ -108,7 +107,6 @@ async def test_refresh_token_family_id_created(
     db_session: AsyncSession,
     integration_user: User,
 ) -> None:
-
     repository = RefreshTokenRepository(db_session)
 
     family_id = uuid7()
@@ -132,7 +130,6 @@ async def test_refresh_token_family_id_created(
 
     assert stored_family_id == family_id
     assert stored_family_id is not None
-
 
 
 @pytest.mark.asyncio
@@ -181,11 +178,7 @@ async def test_old_refresh_token_revoked(
 
     assert len(tokens) == 2
 
-    revoked_tokens = [
-        token
-        for token in tokens
-        if token.revoked_at is not None
-    ]
+    revoked_tokens = [token for token in tokens if token.revoked_at is not None]
 
     assert len(revoked_tokens) == 1
 
@@ -281,8 +274,6 @@ async def test_refresh_token_reuse_revokes_family(
 
     assert refresh_response.status_code == 200
 
-    new_token = refresh_response.cookies["refresh_token"]
-
     integration_client.cookies.set(
         "refresh_token",
         old_token,
@@ -304,15 +295,7 @@ async def test_refresh_token_reuse_revokes_family(
 
     assert len(tokens) == 2
 
-    assert all(
-        token.revoked_at is not None
-        for token in tokens
-    )
-
-    integration_client.cookies.set(
-        "refresh_token",
-        new_token,
-    )
+    assert all(token.revoked_at is not None for token in tokens)
 
 
 @pytest.mark.asyncio
@@ -321,7 +304,6 @@ async def test_change_password_revokes_all_refresh_tokens(
     db_session: AsyncSession,
     user_payload,
 ) -> None:
-
     register_response = await integration_client.post(
         "/auth/register",
         json=user_payload,
@@ -341,7 +323,6 @@ async def test_change_password_revokes_all_refresh_tokens(
 
     assert login_response_1.status_code == 200
 
-
     login_response_2 = await integration_client.post(
         "/auth/login",
         json={
@@ -351,7 +332,6 @@ async def test_change_password_revokes_all_refresh_tokens(
     )
 
     assert login_response_2.status_code == 200
-
 
     access_token = login_response_2.json()["access_token"]
 
@@ -378,7 +358,4 @@ async def test_change_password_revokes_all_refresh_tokens(
 
     assert len(tokens) == 2
 
-    assert all(
-        token.revoked_at is not None
-        for token in tokens
-    )
+    assert all(token.revoked_at is not None for token in tokens)

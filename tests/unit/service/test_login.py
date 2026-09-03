@@ -12,8 +12,6 @@ async def test_valid_credentials(
     login_payload,
     active_user,
 ) -> None:
-    """AUTH-LOGIN-01: Valid credentials return access and refresh tokens."""
-
     auth_service.user_repository.get_by_email = AsyncMock(return_value=active_user)
 
     auth_service.refresh_token_repository.create = AsyncMock()
@@ -70,7 +68,6 @@ async def test_unknown_email(
     mock_session,
     login_payload,
 ) -> None:
-    """AUTH-LOGIN-02: Unknown email is rejected."""
 
     auth_service.user_repository.get_by_email = AsyncMock(return_value=None)
 
@@ -102,7 +99,6 @@ async def test_incorrect_password(
     login_payload,
     active_user,
 ) -> None:
-    """AUTH-LOGIN-03: Incorrect password is rejected."""
 
     auth_service.user_repository.get_by_email = AsyncMock(return_value=active_user)
 
@@ -137,7 +133,6 @@ async def test_inactive_user(
     login_payload,
     inactive_user,
 ) -> None:
-    """AUTH-LOGIN-04: Inactive user is rejected."""
 
     auth_service.user_repository.get_by_email = AsyncMock(return_value=inactive_user)
 
@@ -172,7 +167,6 @@ async def test_refresh_token_created(
     login_payload,
     active_user,
 ) -> None:
-    """AUTH-LOGIN-05: Refresh token is generated, hashed, and persisted."""
 
     auth_service.user_repository.get_by_email = AsyncMock(return_value=active_user)
 

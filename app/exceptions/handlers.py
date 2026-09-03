@@ -14,12 +14,7 @@ def app_exception_handler(
 ) -> JSONResponse:
     return JSONResponse(
         status_code=exc.status_code,
-        content={
-            "error": {
-                "code": exc.code,
-                "message": exc.message,
-            }
-        },
+        content={"detail": exc.message},
         headers=exc.headers,
     )
 
@@ -35,10 +30,5 @@ def unexpected_exception_handler(
 
     return JSONResponse(
         status_code=500,
-        content={
-            "error": {
-                "code": "INTERNAL_SERVER_ERROR",
-                "message": "An unexpected error occurred",
-            }
-        },
+        content={"detail": "Internal server error"},
     )

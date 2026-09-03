@@ -2,7 +2,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.dependencies.auth import get_current_user
+from app.dependencies.authentication import get_current_user
 from app.exceptions.auth import InvalidCredentialsError
 from app.main import app
 
@@ -31,7 +31,6 @@ async def test_change_password_success(
                 "/auth/change-password",
                 json=payload,
             )
-
     finally:
         app.dependency_overrides.pop(
             get_current_user,
@@ -66,13 +65,12 @@ async def test_change_password_wrong_current_password(
         with patch(
             "app.routers.auth.AuthService.change_password",
             new_callable=AsyncMock,
-            side_effect=InvalidCredentialsError,
-        ):
+            side_effect=InvalidCredentialsError(),
+        ) as mock_change_password:
             response = await api_client.post(
                 "/auth/change-password",
                 json=payload,
             )
-
     finally:
         app.dependency_overrides.pop(
             get_current_user,
@@ -80,6 +78,16 @@ async def test_change_password_wrong_current_password(
         )
 
     assert response.status_code == 401
+
+    mock_change_password.assert_awaited_once_with(
+        user=user,
+        current_password=payload["current_password"],
+        new_password=payload["new_password"],
+    )
+
+    body = response.json()
+
+    assert body["detail"] == "Invalid email or password"
 
 
 @pytest.mark.asyncio
@@ -106,7 +114,6 @@ async def test_change_password_invalid_new_password(
                 "/auth/change-password",
                 json=payload,
             )
-
     finally:
         app.dependency_overrides.pop(
             get_current_user,

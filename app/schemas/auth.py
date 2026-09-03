@@ -43,12 +43,13 @@ class LoginResult(BaseModel):
     access_token: str
     refresh_token: str
 
+
 class ChangePasswordRequest(BaseModel):
     current_password: str
     new_password: str
 
     _validate_new_password = field_validator("new_password")(validate_password)
 
+
 class MessageResponse(BaseModel):
     message: str
-

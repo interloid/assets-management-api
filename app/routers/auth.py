@@ -69,7 +69,7 @@ async def login(
 async def refresh(
     response: Response,
     session: DBSession,
-    refresh_token: RefreshToken = None,
+    refresh_token: RefreshToken,
 ) -> LoginResponse:
     service = AuthService(session)
 
@@ -95,7 +95,9 @@ async def refresh(
     status_code=status.HTTP_204_NO_CONTENT,
 )
 async def logout(
-    response: Response, session: DBSession, refresh_token: RefreshToken = None
+    response: Response,
+    session: DBSession,
+    refresh_token: RefreshToken,
 ):
     service = AuthService(session)
 
@@ -111,7 +113,9 @@ async def logout(
     status_code=status.HTTP_204_NO_CONTENT,
 )
 async def logout_all(
-    response: Response, session: DBSession, refresh_token: RefreshToken = None
+    response: Response,
+    session: DBSession,
+    refresh_token: RefreshToken,
 ):
     service = AuthService(session)
 
@@ -130,7 +134,6 @@ async def get_me(
     current_user: CurrentUser,
 ) -> UserResponse:
     return UserResponse.model_validate(current_user)
-
 
 
 @router.post(

@@ -61,10 +61,6 @@ async def test_incorrect_current_password(
     current_password = "WrongPassword123"
     new_password = "NewPassword123"
 
-    auth_service.user_repository.get_by_id = AsyncMock(
-        return_value=created_user,
-    )
-
     auth_service.user_repository.update_password = AsyncMock()
 
     auth_service.refresh_token_repository.revoke_user = AsyncMock()
@@ -92,7 +88,7 @@ async def test_incorrect_current_password(
 
     auth_service.user_repository.update_password.assert_not_awaited()
 
-    auth_service.refresh_token_repository.revoke_all_for_user.assert_not_awaited()
+    auth_service.refresh_token_repository.revoke_user.assert_not_awaited()
 
     mock_session.commit.assert_not_awaited()
     mock_session.rollback.assert_not_awaited()
@@ -106,10 +102,6 @@ async def test_new_password_hashed(
 ) -> None:
     current_password = "OldPassword123"
     new_password = "NewPassword123"
-
-    auth_service.user_repository.get_by_id = AsyncMock(
-        return_value=created_user,
-    )
 
     auth_service.user_repository.update_password = AsyncMock()
 
@@ -150,10 +142,6 @@ async def test_revoke_all_refresh_tokens(
     current_password = "OldPassword123"
     new_password = "NewPassword123"
 
-    auth_service.user_repository.get_by_id = AsyncMock(
-        return_value=created_user,
-    )
-
     auth_service.user_repository.update_password = AsyncMock()
 
     auth_service.refresh_token_repository.revoke_user = AsyncMock()
@@ -177,4 +165,3 @@ async def test_revoke_all_refresh_tokens(
     )
 
     mock_session.commit.assert_awaited_once()
-

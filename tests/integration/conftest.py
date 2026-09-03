@@ -33,7 +33,7 @@ async def integration_client(
         ) as client:
             yield client
     finally:
-        app.dependency_overrides.clear()
+        app.dependency_overrides.pop(get_db, None)
 
 
 @pytest_asyncio.fixture

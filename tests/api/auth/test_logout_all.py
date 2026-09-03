@@ -17,11 +17,12 @@ async def test_logout_all_success(
     with patch(
         "app.routers.auth.AuthService.logout_all",
         new_callable=AsyncMock,
-    ) as mock_refresh:
+    ) as mock_logout_all:
         response = await api_client.post("/auth/logout-all")
 
-        assert response.status_code == 204
+    assert response.status_code == 204
+    assert response.content == b""
 
-        mock_refresh.assert_awaited_once_with(
-            refresh_token,
-        )
+    mock_logout_all.assert_awaited_once_with(
+        refresh_token,
+    )

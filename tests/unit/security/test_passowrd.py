@@ -1,7 +1,7 @@
 from app.core.security import hash_password, verify_password
 
 
-def test__password_is_argon_hashed() -> None:
+def test_password_is_argon_hashed() -> None:
     password = "Password123"
 
     password_hash = hash_password(password)

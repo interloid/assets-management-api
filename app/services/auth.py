@@ -55,7 +55,7 @@ class AuthService:
         except IntegrityError as exc:
             await self.session.rollback()
 
-            raise EmailAlreadyRegisteredError from exc
+            raise EmailAlreadyRegisteredError() from exc
 
         return user
 
@@ -178,7 +178,7 @@ class AuthService:
 
         access_token = create_access_token(
             user_id=str(user.id),
-            role=(user.role.value if hasattr(user.role, "value") else str(user.role)),
+            role=user.role.value,
         )
 
         await self.session.commit()
@@ -191,7 +191,7 @@ class AuthService:
     async def logout(
         self,
         refresh_token: str,
-    ):
+    ) -> None:
         if not refresh_token:
             raise InvalidTokenError()
 
@@ -212,7 +212,7 @@ class AuthService:
     async def logout_all(
         self,
         refresh_token: str,
-    ):
+    ) -> None:
         if not refresh_token:
             raise InvalidTokenError()
 
@@ -228,16 +228,16 @@ class AuthService:
         await self.session.commit()
 
     async def change_password(
-            self,
-            user: User,
-            current_password: str,
-            new_password: str,
+        self,
+        user: User,
+        current_password: str,
+        new_password: str,
     ) -> None:
         if not verify_password(
             current_password,
             user.password_hash,
         ):
-            raise InvalidCredentialsError
+            raise InvalidCredentialsError()
 
         new_password_hash = hash_password(new_password)
 
@@ -246,8 +246,6 @@ class AuthService:
             new_password_hash,
         )
 
-        await self.refresh_token_repository.revoke_user(
-            user.id
-        )
+        await self.refresh_token_repository.revoke_user(user.id)
 
         await self.session.commit()

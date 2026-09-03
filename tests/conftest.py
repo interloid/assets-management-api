@@ -9,16 +9,7 @@ from app.schemas.auth import LoginRequest, RegisterRequest
 
 
 @pytest.fixture
-def user_payload() -> dict[str, str]:
-    return {
-        "email": "test@example.com",
-        "password": "Password123",
-        "full_name": "Test User",
-    }
-
-
-@pytest.fixture
-def user():
+def user() -> User:
     now = datetime.now(timezone.utc)
 
     return User(
@@ -34,19 +25,26 @@ def user():
 
 
 @pytest.fixture
+def register_user_payload() -> RegisterRequest:
+    return RegisterRequest(
+        email="test@example.com",
+        password="Password123",
+        full_name="Test User",
+    )
+
+
+@pytest.fixture
 def login_payload() -> LoginRequest:
     return LoginRequest(
-        email="user@example.com",
+        email="test@example.com",
         password="Password123",
     )
 
 
 @pytest.fixture
-def created_user(register_request: RegisterRequest) -> User:
-    return User(
-        email=str(register_request.email),
-        password_hash="hashed-password",
-        full_name=register_request.full_name,
-        role=UserRole.USER,
-        is_active=True,
-    )
+def user_payload() -> dict[str, str]:
+    return {
+        "email": "test@example.com",
+        "password": "Password123",
+        "full_name": "Test User",
+    }

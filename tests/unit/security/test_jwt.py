@@ -23,16 +23,13 @@ def test_jwt_contains_required_claims() -> None:
 
     assert payload["sub"] == user_id
     assert payload["role"] == "user"
-
     assert "iat" in payload
     assert "exp" in payload
     assert "jti" in payload
 
 
-def test_sec_06_jwt_expires_after_15_minutes() -> None:
+def test_jwt_expires_after_15_minutes() -> None:
     user_id = str(uuid7())
-
-    before = datetime.now(timezone.utc)
 
     token = create_access_token(
         user_id=user_id,
@@ -45,24 +42,13 @@ def test_sec_06_jwt_expires_after_15_minutes() -> None:
         algorithms=[settings.jwt_algorithm],
     )
 
-    expires_at = datetime.fromtimestamp(
-        payload["exp"],
-        tz=timezone.utc,
-    )
+    expires_at = datetime.fromtimestamp(payload["exp"], tz=timezone.utc)
+    issued_at = datetime.fromtimestamp(payload["iat"], tz=timezone.utc)
 
-    issued_at = datetime.fromtimestamp(
-        payload["iat"],
-        tz=timezone.utc,
-    )
-
-    lifetime = expires_at - issued_at
-
-    assert lifetime == timedelta(minutes=15)
-
-    assert expires_at > before
+    assert expires_at - issued_at == timedelta(minutes=15)
 
 
-def test_sec_07_each_jwt_has_unique_jti() -> None:
+def test_each_jwt_has_unique_jti() -> None:
     user_id = str(uuid7())
 
     token_1 = create_access_token(

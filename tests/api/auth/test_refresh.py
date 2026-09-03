@@ -10,7 +10,7 @@ from app.schemas.auth import LoginResult
 
 
 @pytest.mark.asyncio
-async def test_api_refresh_01_valid_refresh(
+async def test_valid_refresh(
     api_client,
 ) -> None:
     refresh_token = "valid-refresh-token"
@@ -20,7 +20,6 @@ async def test_api_refresh_01_valid_refresh(
         refresh_token="new-refresh-token",
     )
 
-    # Set refresh token in client's cookie jar
     api_client.cookies.set(
         "refresh_token",
         refresh_token,
@@ -43,15 +42,13 @@ async def test_api_refresh_01_valid_refresh(
 
     body = response.json()
 
-    # Access token is returned in response body
     assert body["access_token"] == "new-access-token"
 
-    # New refresh token is returned as a cookie
     assert response.cookies["refresh_token"] == "new-refresh-token"
 
 
 @pytest.mark.asyncio
-async def test_api_refresh_02_invalid_token(
+async def test_invalid_token(
     api_client,
 ) -> None:
     refresh_token = "invalid-refresh-token"
@@ -78,40 +75,7 @@ async def test_api_refresh_02_invalid_token(
 
     body = response.json()
 
-    assert body["error"]["code"] == "INVALID_TOKEN"
-    assert body["error"]["message"] == "Invalid or expired token"
-
-
-@pytest.mark.asyncio
-async def test_api_refresh_03_expired_token(
-    api_client,
-) -> None:
-    refresh_token = "expired-refresh-token"
-
-    api_client.cookies.set(
-        "refresh_token",
-        refresh_token,
-    )
-
-    with patch(
-        "app.routers.auth.AuthService.refresh",
-        new_callable=AsyncMock,
-        side_effect=InvalidTokenError(),
-    ) as mock_refresh:
-        response = await api_client.post(
-            "/auth/refresh",
-        )
-
-    assert response.status_code == 401
-
-    mock_refresh.assert_awaited_once_with(
-        refresh_token,
-    )
-
-    body = response.json()
-
-    assert body["error"]["code"] == "INVALID_TOKEN"
-    assert body["error"]["message"] == "Invalid or expired token"
+    assert body["detail"] == "Invalid or expired token"
 
 
 @pytest.mark.asyncio
@@ -142,4 +106,4 @@ async def test_api_refresh_04_reuse_detection(
 
     body = response.json()
 
-    assert body["error"]["code"] == "REFRESH_TOKEN_REUSE"
+    assert body["detail"] == "Refresh token has already been used"

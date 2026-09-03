@@ -44,7 +44,7 @@ async def test_duplicate_email(
     with patch(
         "app.routers.auth.AuthService.register",
         new_callable=AsyncMock,
-        side_effect=EmailAlreadyRegisteredError,
+        side_effect=EmailAlreadyRegisteredError(),
     ) as mock_register:
         response = await api_client.post(
             "/auth/register",
@@ -52,6 +52,10 @@ async def test_duplicate_email(
         )
 
     assert response.status_code == 409
+
+    body = response.json()
+
+    assert body["detail"] == "Email is already registered"
 
     mock_register.assert_awaited_once()
 

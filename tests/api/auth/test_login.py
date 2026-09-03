@@ -7,11 +7,10 @@ from app.schemas.auth import LoginResult
 
 
 @pytest.mark.asyncio
-async def test_valid_credentials(
+async def test_login_success(
     api_client,
     login_payload,
 ) -> None:
-
     login_result = LoginResult(
         access_token="access-token",
         refresh_token="refresh-token",
@@ -35,13 +34,13 @@ async def test_valid_credentials(
 
     assert body["access_token"] == "access-token"
     assert body["token_type"] == "bearer"
-
     assert "refresh_token" not in body
+
     assert response.cookies["refresh_token"] == "refresh-token"
 
 
 @pytest.mark.asyncio
-async def test_invalid_credentials(
+async def test_login_invalid_credentials(
     api_client,
     login_payload,
 ) -> None:
@@ -51,8 +50,8 @@ async def test_invalid_credentials(
     with patch(
         "app.routers.auth.AuthService.login",
         new_callable=AsyncMock,
-        side_effect=InvalidCredentialsError,
-    ):
+        side_effect=InvalidCredentialsError(),
+    ) as mock_login:
         response = await api_client.post(
             "/auth/login",
             json=payload,
@@ -60,9 +59,15 @@ async def test_invalid_credentials(
 
     assert response.status_code == 401
 
+    mock_login.assert_awaited_once()
+
+    body = response.json()
+
+    assert body["detail"] == "Invalid email or password"
+
 
 @pytest.mark.asyncio
-async def test_invalid_email(
+async def test_login_invalid_email(
     api_client,
     login_payload,
 ) -> None:
@@ -84,7 +89,7 @@ async def test_invalid_email(
 
 
 @pytest.mark.asyncio
-async def test_missing_password(
+async def test_login_missing_password(
     api_client,
     login_payload,
 ) -> None:

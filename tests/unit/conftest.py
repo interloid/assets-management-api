@@ -6,7 +6,6 @@ import pytest
 from uuid6 import uuid7
 
 from app.models.refresh_token import RefreshToken
-from app.schemas.auth import LoginRequest, RegisterRequest
 from app.services.auth import AuthService
 
 
@@ -39,21 +38,12 @@ def auth_service(
     return service
 
 
-@pytest.fixture
-def user_payload() -> RegisterRequest:
-    return RegisterRequest(
-        email="test@example.com",
-        password="Password123",
-        full_name="Test User",
-    )
-
-
-@pytest.fixture
-def login_payload() -> LoginRequest:
-    return LoginRequest(
-        email="user@example.com",
-        password="Password123",
-    )
+# @pytest.fixture
+# def login_payload() -> LoginRequest:
+#     return LoginRequest(
+#         email="test@example.com",
+#         password="Password123",
+#     )
 
 
 @pytest.fixture

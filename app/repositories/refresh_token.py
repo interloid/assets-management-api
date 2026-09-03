@@ -29,9 +29,9 @@ class RefreshTokenRepository:
     async def create(
         self,
         *,
-        user_id,
+        user_id: UUID,
         token_hash: str,
-        family_id,
+        family_id: UUID,
         expires_at: datetime,
     ) -> RefreshToken:
 
@@ -64,7 +64,7 @@ class RefreshTokenRepository:
 
         await self.session.execute(stmt)
 
-        await self.session.flush()
+        # await self.session.flush()
 
     async def revoke_family(
         self,
@@ -83,12 +83,12 @@ class RefreshTokenRepository:
 
         await self.session.execute(stmt)
 
-        await self.session.flush()
+        # await self.session.flush()
 
     async def revoke_user(
         self,
         user_id: UUID,
-    ):
+    ) -> None:
         now = datetime.now(timezone.utc)
 
         stmt = (
@@ -102,4 +102,4 @@ class RefreshTokenRepository:
 
         await self.session.execute(stmt)
 
-        await self.session.flush()
+        # await self.session.flush()

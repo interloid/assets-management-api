@@ -2,7 +2,7 @@ from unittest.mock import patch
 
 import pytest
 
-from app.dependencies.auth import get_current_user
+from app.dependencies.authentication import get_current_user
 from app.exceptions.auth import InvalidTokenError
 from app.main import app
 
@@ -19,7 +19,7 @@ async def test_me_success(
 
     try:
         response = await api_client.get(
-            "auth/me",
+            "/auth/me",
         )
 
     finally:
@@ -35,7 +35,7 @@ async def test_me_success(
     assert body["id"] == str(user.id)
     assert body["email"] == user.email
     assert body["full_name"] == user.full_name
-    assert body["role"] == user.role
+    assert body["role"] == user.role.value
     assert "created_at" in body
 
 
@@ -49,14 +49,17 @@ async def test_me_missing_jwt(
 
     assert response.status_code == 401
 
+    body = response.json()
+    assert body["detail"] == "Not authenticated"
+
 
 @pytest.mark.asyncio
 async def test_me_invalid_jwt(
     api_client,
 ) -> None:
     with patch(
-        "app.dependencies.auth.decode_access_token",
-        side_effect=InvalidTokenError,
+        "app.dependencies.authentication.decode_access_token",
+        side_effect=InvalidTokenError(),
     ):
         response = await api_client.get(
             "/auth/me",
@@ -66,3 +69,6 @@ async def test_me_invalid_jwt(
         )
 
     assert response.status_code == 401
+
+    body = response.json()
+    assert body["detail"] == "Invalid or expired token"

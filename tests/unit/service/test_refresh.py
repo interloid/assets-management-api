@@ -17,7 +17,7 @@ async def test_valid_refresh(
     refresh_token,
     valid_stored_token,
     active_user,
-):
+) -> None:
     refresh_token_repository.get_by_hash.return_value = valid_stored_token
     user_repository.get_by_id.return_value = active_user
 
@@ -80,7 +80,7 @@ async def test_refresh_token_rotation(
     refresh_token,
     valid_stored_token,
     active_user,
-):
+) -> None:
     refresh_token_repository.get_by_hash.return_value = valid_stored_token
     user_repository.get_by_id.return_value = active_user
 
@@ -125,7 +125,7 @@ async def test_refresh_family_preserved(
     refresh_token,
     valid_stored_token,
     active_user,
-):
+) -> None:
     refresh_token_repository.get_by_hash.return_value = valid_stored_token
     user_repository.get_by_id.return_value = active_user
 
@@ -162,7 +162,7 @@ async def test_expired_refresh_token(
     mock_session,
     refresh_token,
     expired_stored_token,
-):
+) -> None:
 
     refresh_token_repository.get_by_hash.return_value = expired_stored_token
 
@@ -187,7 +187,7 @@ async def test_invalid_refresh_token(
     refresh_token_repository,
     mock_session,
     refresh_token,
-):
+) -> None:
 
     refresh_token_repository.get_by_hash.return_value = None
 
@@ -218,7 +218,7 @@ async def test_refresh_token_reuse_detection(
     mock_session,
     refresh_token,
     revoked_stored_token,
-):
+) -> None:
 
     refresh_token_repository.get_by_hash.return_value = revoked_stored_token
 

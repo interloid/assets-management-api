@@ -75,7 +75,7 @@ async def test_register_then_login(
 
 
 @pytest.mark.asyncio
-async def test_flow_02_login_then_refresh(
+async def test_login_then_refresh(
     integration_client,
     db_session: AsyncSession,
     user_payload,
@@ -170,7 +170,7 @@ async def test_flow_02_login_then_refresh(
 
 
 @pytest.mark.asyncio
-async def test_flow_03_refresh_token_reuse_revokes_family(
+async def test_refresh_token_reuse_revokes_family(
     integration_client,
     db_session: AsyncSession,
     user_payload,
@@ -247,8 +247,6 @@ async def test_flow_03_refresh_token_reuse_revokes_family(
 
     body = reuse_response.json()
 
-    assert body["error"]["code"] == "REFRESH_TOKEN_REUSE"
-
     result = await db_session.execute(
         select(RefreshToken).where(
             RefreshToken.family_id == family_id,
@@ -262,25 +260,27 @@ async def test_flow_03_refresh_token_reuse_revokes_family(
     for token in family_tokens:
         assert token.revoked_at is not None
 
+    assert body["detail"] == "Refresh token has already been used"
+
 
 @pytest.mark.asyncio
-async def test_flow_o4_logout_refresh_rejected(
+async def test_logout_refresh_rejected(
     integration_client,
     db_session: AsyncSession,
     user_payload,
 ) -> None:
 
-    register_reponse = await integration_client.post(
+    register_response = await integration_client.post(
         "/auth/register",
         json=user_payload,
     )
 
-    assert register_reponse.status_code == 201
+    assert register_response.status_code == 201
 
-    user_id = register_reponse.json()["id"]
+    user_id = register_response.json()["id"]
 
     login_response = await integration_client.post(
-        "auth/login",
+        "/auth/login",
         json={"email": user_payload["email"], "password": user_payload["password"]},
     )
 
@@ -314,15 +314,15 @@ async def test_flow_o4_logout_refresh_rejected(
         refresh_token,
     )
 
-    refresh_reponse = await integration_client.post(
+    refresh_response = await integration_client.post(
         "/auth/refresh",
     )
 
-    assert refresh_reponse.status_code == 401
+    assert refresh_response.status_code == 401
 
 
 @pytest.mark.asyncio
-async def test_flow_05_logout_all_all_sessions_rejected(
+async def test_logout_all_sessions_rejected(
     integration_client,
     db_session: AsyncSession,
     user_payload,
@@ -360,7 +360,6 @@ async def test_flow_05_logout_all_all_sessions_rejected(
     assert login_response_2.status_code == 200
 
     refresh_token_2 = login_response_2.cookies["refresh_token"]
-
 
     integration_client.cookies.set(
         "refresh_token",
@@ -410,7 +409,7 @@ async def test_flow_05_logout_all_all_sessions_rejected(
 
 
 @pytest.mark.asyncio
-async def test_flow_06_change_password_revokes_all_sessions(
+async def test_change_password_revokes_all_sessions(
     integration_client,
     db_session: AsyncSession,
     user_payload,
@@ -447,7 +446,6 @@ async def test_flow_06_change_password_revokes_all_sessions(
     assert login_response_2.status_code == 200
 
     refresh_token_2 = login_response_2.cookies["refresh_token"]
-
     access_token = login_response_2.json()["access_token"]
 
     change_password_response = await integration_client.post(
@@ -473,10 +471,7 @@ async def test_flow_06_change_password_revokes_all_sessions(
 
     assert len(tokens) == 2
 
-    assert all(
-        token.revoked_at is not None
-        for token in tokens
-    )
+    assert all(token.revoked_at is not None for token in tokens)
 
     integration_client.cookies.set(
         "refresh_token",
@@ -499,3 +494,28 @@ async def test_flow_06_change_password_revokes_all_sessions(
     )
 
     assert refresh_response_2.status_code == 401
+
+    new_login_response = await integration_client.post(
+        "/auth/login",
+        json={
+            "email": user_payload["email"],
+            "password": "NewPassword123",
+        },
+    )
+
+    assert new_login_response.status_code == 200
+
+    new_login_body = new_login_response.json()
+
+    assert new_login_body["access_token"]
+    assert new_login_body["token_type"] == "bearer"
+
+    old_login_response = await integration_client.post(
+        "/auth/login",
+        json={
+            "email": user_payload["email"],
+            "password": user_payload["password"],
+        },
+    )
+
+    assert old_login_response.status_code == 401

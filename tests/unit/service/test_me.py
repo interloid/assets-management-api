@@ -2,7 +2,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.dependencies.auth import get_current_user
+from app.dependencies.authentication import get_current_user
 
 
 @pytest.mark.asyncio
@@ -23,10 +23,13 @@ async def test_get_current_user_success(
 
     with (
         patch(
-            "app.dependencies.auth.decode_access_token",
+            "app.dependencies.authentication.decode_access_token",
             return_value={"sub": str(created_user.id)},
         ),
-        patch("app.dependencies.auth.UserRepository", return_value=mock_repository),
+        patch(
+            "app.dependencies.authentication.UserRepository",
+            return_value=mock_repository,
+        ),
     ):
         result = await get_current_user(
             credentials=mock_credentials,
