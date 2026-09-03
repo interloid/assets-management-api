@@ -69,7 +69,7 @@ async def login(
 async def refresh(
     response: Response,
     session: DBSession,
-    refresh_token: RefreshToken,
+    refresh_token: RefreshToken = None,
 ) -> LoginResponse:
     service = AuthService(session)
 
@@ -97,7 +97,7 @@ async def refresh(
 async def logout(
     response: Response,
     session: DBSession,
-    refresh_token: RefreshToken,
+    refresh_token: RefreshToken = None,
 ):
     service = AuthService(session)
 
@@ -115,7 +115,7 @@ async def logout(
 async def logout_all(
     response: Response,
     session: DBSession,
-    refresh_token: RefreshToken,
+    refresh_token: RefreshToken = None,
 ):
     service = AuthService(session)
 
