@@ -277,15 +277,19 @@ async def test_logout_refresh_rejected(
 
     assert register_response.status_code == 201
 
-    user_id = register_response.json()["id"]
+    # user_id = register_response.json()["id"]
 
     login_response = await integration_client.post(
         "/auth/login",
-        json={"email": user_payload["email"], "password": user_payload["password"]},
+        json={
+            "email": user_payload["email"],
+            "password": user_payload["password"],
+        },
     )
 
     assert login_response.status_code == 200
 
+    access_token = login_response.json()["access_token"]
     refresh_token = login_response.cookies["refresh_token"]
 
     integration_client.cookies.set(
@@ -293,26 +297,13 @@ async def test_logout_refresh_rejected(
         refresh_token,
     )
 
+    integration_client.headers["Authorization"] = f"Bearer {access_token}"
+
     logout_response = await integration_client.post(
         "/auth/logout",
     )
 
     assert logout_response.status_code == 204
-
-    result = await db_session.execute(
-        select(RefreshToken).where(
-            RefreshToken.user_id == user_id,
-        )
-    )
-
-    stored_token = result.scalar_one()
-
-    assert stored_token.revoked_at is not None
-
-    integration_client.cookies.set(
-        "refresh_token",
-        refresh_token,
-    )
 
     refresh_response = await integration_client.post(
         "/auth/refresh",
@@ -335,7 +326,7 @@ async def test_logout_all_sessions_rejected(
 
     assert register_response.status_code == 201
 
-    user_id = register_response.json()["id"]
+    # user_id = register_response.json()["id"]
 
     login_response_1 = await integration_client.post(
         "/auth/login",
@@ -347,6 +338,7 @@ async def test_logout_all_sessions_rejected(
 
     assert login_response_1.status_code == 200
 
+    access_token_1 = login_response_1.json()["access_token"]
     refresh_token_1 = login_response_1.cookies["refresh_token"]
 
     login_response_2 = await integration_client.post(
@@ -359,6 +351,7 @@ async def test_logout_all_sessions_rejected(
 
     assert login_response_2.status_code == 200
 
+    access_token_2 = login_response_2.json()["access_token"]
     refresh_token_2 = login_response_2.cookies["refresh_token"]
 
     integration_client.cookies.set(
@@ -366,24 +359,13 @@ async def test_logout_all_sessions_rejected(
         refresh_token_2,
     )
 
+    integration_client.headers["Authorization"] = f"Bearer {access_token_2}"
+
     logout_all_response = await integration_client.post(
         "/auth/logout-all",
     )
 
     assert logout_all_response.status_code == 204
-
-    result = await db_session.execute(
-        select(RefreshToken).where(
-            RefreshToken.user_id == user_id,
-        )
-    )
-
-    tokens = result.scalars().all()
-
-    assert len(tokens) == 2
-
-    for token in tokens:
-        assert token.revoked_at is not None
 
     integration_client.cookies.set(
         "refresh_token",
@@ -406,6 +388,22 @@ async def test_logout_all_sessions_rejected(
     )
 
     assert refresh_response_2.status_code == 401
+
+    integration_client.headers["Authorization"] = f"Bearer {access_token_1}"
+
+    me_response_1 = await integration_client.get(
+        "/auth/me",
+    )
+
+    assert me_response_1.status_code == 401
+
+    integration_client.headers["Authorization"] = f"Bearer {access_token_2}"
+
+    me_response_2 = await integration_client.get(
+        "/auth/me",
+    )
+
+    assert me_response_2.status_code == 401
 
 
 @pytest.mark.asyncio

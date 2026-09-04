@@ -1,6 +1,7 @@
 from collections.abc import AsyncGenerator
 
 import pytest_asyncio
+from asgi_lifespan import LifespanManager
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
@@ -16,30 +17,13 @@ from app.main import app
 from app.models.enums import UserRole
 from app.models.user import User
 
-
-@pytest_asyncio.fixture
-async def integration_client(
-    db_session: AsyncSession,
-) -> AsyncGenerator[AsyncClient, None]:
-    async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
-        yield db_session
-
-    app.dependency_overrides[get_db] = override_get_db
-
-    try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app),
-            base_url="http://test",
-        ) as client:
-            yield client
-    finally:
-        app.dependency_overrides.pop(get_db, None)
+from tests.config import test_settings
 
 
 @pytest_asyncio.fixture
 async def db_session() -> AsyncGenerator[AsyncSession, None]:
     engine = create_async_engine(
-        settings.test_database_url,
+        test_settings.test_database_url,
         echo=False,
     )
 
@@ -70,6 +54,27 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
             await session.commit()
 
     await engine.dispose()
+
+
+@pytest_asyncio.fixture
+async def integration_client(
+    db_session: AsyncSession,
+) -> AsyncGenerator[AsyncClient, None]:
+
+    async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
+        yield db_session
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    try:
+        async with LifespanManager(app):
+            async with AsyncClient(
+                transport=ASGITransport(app=app),
+                base_url="http://test",
+            ) as client:
+                yield client
+    finally:
+        app.dependency_overrides.pop(get_db, None)
 
 
 async def create_test_user(

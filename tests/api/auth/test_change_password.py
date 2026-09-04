@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from app.dependencies.authentication import get_current_user
+from app.dependencies.redis import get_redis
 from app.exceptions.auth import InvalidCredentialsError
 from app.main import app
 
@@ -17,10 +18,13 @@ async def test_change_password_success(
         "new_password": "NewPassword123",
     }
 
+    mock_redis = AsyncMock()
+
     async def mock_current_user():
         return user
 
     app.dependency_overrides[get_current_user] = mock_current_user
+    app.dependency_overrides[get_redis] = lambda: mock_redis
 
     try:
         with patch(
@@ -36,6 +40,10 @@ async def test_change_password_success(
             get_current_user,
             None,
         )
+        app.dependency_overrides.pop(
+            get_redis,
+            None,
+        )
 
     assert response.status_code == 200
 
@@ -43,6 +51,7 @@ async def test_change_password_success(
         user=user,
         current_password=payload["current_password"],
         new_password=payload["new_password"],
+        redis_client=mock_redis,
     )
 
 
@@ -56,10 +65,13 @@ async def test_change_password_wrong_current_password(
         "new_password": "NewPassword123",
     }
 
+    mock_redis = AsyncMock()
+
     async def mock_current_user():
         return user
 
     app.dependency_overrides[get_current_user] = mock_current_user
+    app.dependency_overrides[get_redis] = lambda: mock_redis
 
     try:
         with patch(
@@ -76,6 +88,10 @@ async def test_change_password_wrong_current_password(
             get_current_user,
             None,
         )
+        app.dependency_overrides.pop(
+            get_redis,
+            None,
+        )
 
     assert response.status_code == 401
 
@@ -83,6 +99,7 @@ async def test_change_password_wrong_current_password(
         user=user,
         current_password=payload["current_password"],
         new_password=payload["new_password"],
+        redis_client=mock_redis,
     )
 
     body = response.json()
@@ -100,10 +117,13 @@ async def test_change_password_invalid_new_password(
         "new_password": "short",
     }
 
+    mock_redis = AsyncMock()
+
     async def mock_current_user():
         return user
 
     app.dependency_overrides[get_current_user] = mock_current_user
+    app.dependency_overrides[get_redis] = lambda: mock_redis
 
     try:
         with patch(
@@ -117,6 +137,10 @@ async def test_change_password_invalid_new_password(
     finally:
         app.dependency_overrides.pop(
             get_current_user,
+            None,
+        )
+        app.dependency_overrides.pop(
+            get_redis,
             None,
         )
 

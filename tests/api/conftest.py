@@ -1,4 +1,4 @@
-from collections.abc import AsyncGenerator
+from unittest.mock import AsyncMock
 
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
@@ -7,11 +7,13 @@ from app.main import app
 
 
 @pytest_asyncio.fixture
-async def api_client() -> AsyncGenerator[AsyncClient, None]:
-    transport = ASGITransport(app=app)
+async def api_client():
+    app.state.redis = AsyncMock()
 
     async with AsyncClient(
-        transport=transport,
+        transport=ASGITransport(app=app),
         base_url="http://test",
     ) as client:
         yield client
+
+    del app.state.redis

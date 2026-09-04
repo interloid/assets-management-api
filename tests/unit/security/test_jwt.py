@@ -13,6 +13,7 @@ def test_jwt_contains_required_claims() -> None:
     token = create_access_token(
         user_id=user_id,
         role="user",
+        token_version=0,
     )
 
     payload = jwt.decode(
@@ -23,6 +24,7 @@ def test_jwt_contains_required_claims() -> None:
 
     assert payload["sub"] == user_id
     assert payload["role"] == "user"
+    assert payload["token_version"] == 0
     assert "iat" in payload
     assert "exp" in payload
     assert "jti" in payload
@@ -34,6 +36,7 @@ def test_jwt_expires_after_15_minutes() -> None:
     token = create_access_token(
         user_id=user_id,
         role="user",
+        token_version=0,
     )
 
     payload = jwt.decode(
@@ -54,11 +57,13 @@ def test_each_jwt_has_unique_jti() -> None:
     token_1 = create_access_token(
         user_id=user_id,
         role="user",
+        token_version=0,
     )
 
     token_2 = create_access_token(
         user_id=user_id,
         role="user",
+        token_version=0,
     )
 
     payload_1 = jwt.decode(

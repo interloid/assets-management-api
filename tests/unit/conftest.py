@@ -53,6 +53,7 @@ def active_user() -> SimpleNamespace:
         password_hash="hashed-password",
         role=SimpleNamespace(value="user"),
         is_active=True,
+        token_version=0,
     )
 
 
@@ -116,6 +117,7 @@ def created_user() -> SimpleNamespace:
         full_name="Test User",
         role=SimpleNamespace(value="user"),
         is_active=True,
+        token_version=0,
     )
 
 
