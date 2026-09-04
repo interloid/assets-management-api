@@ -1,22 +1,27 @@
 from datetime import datetime, timedelta, timezone
 
+from redis.asyncio import Redis
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid6 import uuid7
 
 from app.core.config import settings
 from app.core.security import (
+    TIMING_HASH,
     create_access_token,
     generate_refresh_token,
+    get_token_remaining_seconds,
     hash_password,
     hash_refresh_token,
     verify_password,
 )
+from app.db.redis import set_token_version
 from app.exceptions.auth import (
     EmailAlreadyRegisteredError,
     InvalidCredentialsError,
     InvalidTokenError,
     RefreshTokenReuseError,
+    SamePasswordError,
     UserInactiveError,
 )
 from app.models.user import User
@@ -27,6 +32,7 @@ from app.schemas.auth import (
     LoginResult,
     RegisterRequest,
 )
+from app.services.jwt_blacklist import blacklist_access_token
 
 
 class AuthService:
@@ -62,16 +68,18 @@ class AuthService:
     async def login(
         self,
         payload: LoginRequest,
+        redis_client: Redis,
     ) -> LoginResult:
         user = await self.user_repository.get_by_email(payload.email)
 
-        if user is None:
-            raise InvalidCredentialsError()
+        password_hash = user.password_hash if user is not None else TIMING_HASH
 
-        if not verify_password(
+        password_valid = verify_password(
             payload.password,
-            user.password_hash,
-        ):
+            password_hash,
+        )
+
+        if user is None or not password_valid:
             raise InvalidCredentialsError()
 
         if not user.is_active:
@@ -80,6 +88,13 @@ class AuthService:
         access_token = create_access_token(
             user_id=str(user.id),
             role=user.role.value,
+            token_version=user.token_version,
+        )
+
+        await set_token_version(
+            redis_client,
+            str(user.id),
+            user.token_version,
         )
 
         refresh_token = generate_refresh_token()
@@ -179,6 +194,7 @@ class AuthService:
         access_token = create_access_token(
             user_id=str(user.id),
             role=user.role.value,
+            token_version=user.token_version,
         )
 
         await self.session.commit()
@@ -191,9 +207,17 @@ class AuthService:
     async def logout(
         self,
         refresh_token: str,
+        access_token_payload: dict,
+        redis_client: Redis,
     ) -> None:
         if not refresh_token:
             raise InvalidTokenError()
+
+        jti = access_token_payload["jti"]
+
+        exp = access_token_payload["exp"]
+
+        remaining_seconds = get_token_remaining_seconds(exp)
 
         token_hash = hash_refresh_token(refresh_token)
 
@@ -207,11 +231,19 @@ class AuthService:
 
         await self.refresh_token_repository.revoke(stored_token.id)
 
+        await blacklist_access_token(
+            redis_client,
+            jti=jti,
+            expires_in=remaining_seconds,
+        )
+
         await self.session.commit()
 
     async def logout_all(
         self,
         refresh_token: str,
+        current_user: User,
+        redis_client: Redis,
     ) -> None:
         if not refresh_token:
             raise InvalidTokenError()
@@ -223,21 +255,36 @@ class AuthService:
         if stored_token is None:
             raise InvalidTokenError()
 
-        await self.refresh_token_repository.revoke_user(stored_token.user_id)
+        if stored_token.user_id != current_user.id:
+            raise InvalidTokenError()
+
+        await self.refresh_token_repository.revoke_user(current_user.id)
+
+        await self.user_repository.increment_token_version(current_user)
 
         await self.session.commit()
+
+        await set_token_version(
+            redis_client,
+            str(current_user.id),
+            current_user.token_version,
+        )
 
     async def change_password(
         self,
         user: User,
         current_password: str,
         new_password: str,
+        redis_client: Redis,
     ) -> None:
         if not verify_password(
             current_password,
             user.password_hash,
         ):
             raise InvalidCredentialsError()
+
+        if verify_password(new_password, user.password_hash):
+            raise SamePasswordError()
 
         new_password_hash = hash_password(new_password)
 
@@ -248,4 +295,12 @@ class AuthService:
 
         await self.refresh_token_repository.revoke_user(user.id)
 
+        await self.user_repository.increment_token_version(user)
+
         await self.session.commit()
+
+        await set_token_version(
+            redis_client,
+            str(user.id),
+            user.token_version,
+        )

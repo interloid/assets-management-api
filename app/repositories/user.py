@@ -49,3 +49,7 @@ class UserRepository:
         await self.session.flush()
 
         return user
+
+    async def increment_token_version(self, user: User) -> None:
+        user.token_version += 1
+        await self.session.flush()

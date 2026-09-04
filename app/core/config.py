@@ -4,6 +4,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     DATABASE_URL: PostgresDsn
+    redis_url: str
 
     jwt_secret_key: str
     jwt_algorithm: str

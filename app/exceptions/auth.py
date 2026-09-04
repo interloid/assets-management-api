@@ -32,3 +32,15 @@ class EmailAlreadyRegisteredError(AppError):
     status_code = 409
     code = "EMAIL_ALREADY_REGISTERED"
     message = "Email is already registered"
+
+
+class AuthorizationError(AppError):
+    status_code = 403
+    code = "AUTHORIZATION_ERROR"
+    message = "You do not have permission to perform this action"
+
+
+class SamePasswordError(AppError):
+    status_code = 400
+    code = "SAME_PASSWORD"
+    message = "New Password and current password cannot be same"

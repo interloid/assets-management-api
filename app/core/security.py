@@ -13,6 +13,9 @@ from app.exceptions.auth import InvalidTokenError
 password_hash = PasswordHash.recommended()
 
 
+TIMING_HASH = "$argon2id$v=19$m=65536,t=3,p=4$91VoC3BeweKJ+9VtlmV6fg$+Na3rOKaPG06lZZsQBNTHhA0YPMBm/WwRLm655fxaC0"
+
+
 def hash_password(password: str) -> str:
     return password_hash.hash(password)
 
@@ -33,6 +36,7 @@ def create_access_token(
     *,
     user_id: str,
     role: str,
+    token_version: int,
 ) -> str:
     now = datetime.now(timezone.utc)
     expires_at = now + timedelta(minutes=settings.access_token_expiry_minutes)
@@ -43,6 +47,7 @@ def create_access_token(
         "iat": now,
         "exp": expires_at,
         "jti": str(uuid7()),
+        "token_version": token_version,
     }
 
     return jwt.encode(
@@ -63,6 +68,7 @@ def decode_access_token(token: str) -> dict[str, Any]:
                     "iat",
                     "exp",
                     "jti",
+                    "token_version",
                 ],
             },
         )
@@ -74,3 +80,12 @@ def decode_access_token(token: str) -> dict[str, Any]:
         raise InvalidTokenError() from exc
 
     return payload
+
+
+def get_token_remaining_seconds(exp: int | float) -> int:
+    now = datetime.now(timezone.utc).timestamp()
+
+    return max(
+        0,
+        int(exp - now),
+    )

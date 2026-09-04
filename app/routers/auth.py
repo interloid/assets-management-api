@@ -1,7 +1,13 @@
 from fastapi import APIRouter, Response, status
 
 from app.core.config import settings
-from app.dependencies.types import CurrentUser, DBSession, RefreshToken
+from app.dependencies.redis import RedisClient
+from app.dependencies.types import (
+    AccessTokenPayload,
+    CurrentUser,
+    DBSession,
+    RefreshToken,
+)
 from app.schemas.auth import (
     ChangePasswordRequest,
     LoginRequest,
@@ -42,10 +48,14 @@ async def login(
     payload: LoginRequest,
     response: Response,
     session: DBSession,
+    redis_client: RedisClient,
 ) -> LoginResponse:
     service = AuthService(session)
 
-    result = await service.login(payload)
+    result = await service.login(
+        payload,
+        redis_client,
+    )
 
     response.set_cookie(
         key="refresh_token",
@@ -97,11 +107,13 @@ async def refresh(
 async def logout(
     response: Response,
     session: DBSession,
+    access_token: AccessTokenPayload,
     refresh_token: RefreshToken = None,
-):
+    redis_client: RedisClient = None,
+) -> None:
     service = AuthService(session)
 
-    await service.logout(refresh_token)
+    await service.logout(refresh_token, access_token, redis_client)
 
     response.delete_cookie(
         key="refresh_token", httponly=True, secure=True, samesite="lax"
@@ -115,11 +127,13 @@ async def logout(
 async def logout_all(
     response: Response,
     session: DBSession,
+    current_user: CurrentUser,
+    redis_client: RedisClient,
     refresh_token: RefreshToken = None,
-):
+) -> None:
     service = AuthService(session)
 
-    await service.logout_all(refresh_token)
+    await service.logout_all(refresh_token, current_user, redis_client)
 
     response.delete_cookie(
         key="refresh_token", httponly=True, secure=True, samesite="lax"
@@ -144,6 +158,7 @@ async def change_password(
     data: ChangePasswordRequest,
     current_user: CurrentUser,
     session: DBSession,
+    redis_client: RedisClient,
 ) -> MessageResponse:
     service = AuthService(session)
 
@@ -151,6 +166,7 @@ async def change_password(
         user=current_user,
         current_password=data.current_password,
         new_password=data.new_password,
+        redis_client=redis_client,
     )
 
     return MessageResponse(
