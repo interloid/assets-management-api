@@ -11,19 +11,17 @@ from sqlalchemy.ext.asyncio import (
 )
 from uuid6 import uuid7
 
-from app.core.config import settings
 from app.db.session import get_db
 from app.main import app
 from app.models.enums import UserRole
 from app.models.user import User
-
 from tests.config import test_settings
 
 
 @pytest_asyncio.fixture
 async def db_session() -> AsyncGenerator[AsyncSession, None]:
     engine = create_async_engine(
-        test_settings.test_database_url,
+        str(test_settings.test_database_url),
         echo=False,
     )
 

@@ -172,3 +172,17 @@ async def change_password(
     return MessageResponse(
         message="Password changed successfully",
     )
+
+
+@router.get("/health/redis")
+async def redis_health(redis_client: RedisClient):
+    key = "debug:redis:test"
+
+    await redis_client.set(key, "hello", ex=300)
+
+    value = await redis_client.get(key)
+
+    return {
+        "redis": "connected",
+        "value": value,
+    }
