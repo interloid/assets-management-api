@@ -1,16 +1,16 @@
-from pydantic import PostgresDsn
+from pydantic import PostgresDsn, RedisDsn
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     DATABASE_URL: PostgresDsn
-    redis_url: str
+    REDIS_URL: RedisDsn
 
-    jwt_secret_key: str
-    jwt_algorithm: str
+    JWT_SECRET_KEY: str
+    JWT_ALGORITHM: str
 
-    access_token_expiry_minutes: int
-    refresh_token_expiry_days: int
+    ACCESS_TOKEN_EXPIRE_MINUTES: int
+    REFRESH_TOKEN_EXPIRE_DAYS: int
 
     model_config = SettingsConfigDict(
         env_file=".env",

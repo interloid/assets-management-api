@@ -276,9 +276,7 @@ async def test_refresh_token_created(
 
     auth_service.refresh_token_repository.create.assert_awaited_once()
 
-    create_kwargs = (
-        auth_service.refresh_token_repository.create.await_args.kwargs
-    )
+    create_kwargs = auth_service.refresh_token_repository.create.await_args.kwargs
 
     assert create_kwargs["user_id"] == active_user.id
     assert create_kwargs["token_hash"] == "hashed-refresh-token"

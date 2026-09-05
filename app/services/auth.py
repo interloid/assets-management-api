@@ -101,7 +101,7 @@ class AuthService:
         refresh_token_hash = hash_refresh_token(refresh_token)
 
         expires_at = datetime.now(timezone.utc) + timedelta(
-            days=settings.refresh_token_expiry_days
+            days=settings.REFRESH_TOKEN_EXPIRE_DAYS
         )
 
         family_id = uuid7()
@@ -177,7 +177,7 @@ class AuthService:
         )
 
         new_expires_at = now + timedelta(
-            days=settings.refresh_token_expiry_days,
+            days=settings.REFRESH_TOKEN_EXPIRE_DAYS,
         )
 
         await self.refresh_token_repository.revoke(

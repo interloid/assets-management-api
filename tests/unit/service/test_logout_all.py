@@ -72,6 +72,7 @@ async def test_logout_all_success(
         1,
     )
 
+
 @pytest.mark.asyncio
 async def test_logout_all_empty_refresh_token(
     auth_service,
@@ -90,6 +91,7 @@ async def test_logout_all_empty_refresh_token(
             current_user,
             redis_client,
         )
+
 
 @pytest.mark.asyncio
 async def test_logout_all_refresh_token_not_found(

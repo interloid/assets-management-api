@@ -18,8 +18,8 @@ def test_jwt_contains_required_claims() -> None:
 
     payload = jwt.decode(
         token,
-        settings.jwt_secret_key,
-        algorithms=[settings.jwt_algorithm],
+        settings.JWT_SECRET_KEY,
+        algorithms=[settings.JWT_ALGORITHM],
     )
 
     assert payload["sub"] == user_id
@@ -41,8 +41,8 @@ def test_jwt_expires_after_15_minutes() -> None:
 
     payload = jwt.decode(
         token,
-        settings.jwt_secret_key,
-        algorithms=[settings.jwt_algorithm],
+        settings.JWT_SECRET_KEY,
+        algorithms=[settings.JWT_ALGORITHM],
     )
 
     expires_at = datetime.fromtimestamp(payload["exp"], tz=timezone.utc)
@@ -68,14 +68,14 @@ def test_each_jwt_has_unique_jti() -> None:
 
     payload_1 = jwt.decode(
         token_1,
-        settings.jwt_secret_key,
-        algorithms=[settings.jwt_algorithm],
+        settings.JWT_SECRET_KEY,
+        algorithms=[settings.JWT_ALGORITHM],
     )
 
     payload_2 = jwt.decode(
         token_2,
-        settings.jwt_secret_key,
-        algorithms=[settings.jwt_algorithm],
+        settings.JWT_SECRET_KEY,
+        algorithms=[settings.JWT_ALGORITHM],
     )
 
     assert payload_1["jti"] != payload_2["jti"]
