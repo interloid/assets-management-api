@@ -2,13 +2,13 @@ from pydantic import PostgresDsn
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class Settings(BaseSettings):
-    DATABASE_URL: PostgresDsn
+class TestSettings(BaseSettings):
+    TEST_DATABASE_URL: PostgresDsn
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=".env.test",
         env_file_encoding="utf-8",
     )
 
 
-settings = Settings()
+test_settings = TestSettings()

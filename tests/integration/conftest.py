@@ -7,14 +7,14 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-from app.core.config import settings
 from app.models.user import User
+from tests.config import test_settings
 
 
 @pytest_asyncio.fixture
 async def db_session() -> AsyncGenerator[AsyncSession, None]:
     engine = create_async_engine(
-        settings.test_database_url,
+        str(test_settings.TEST_DATABASE_URL),
         echo=False,
     )
 
