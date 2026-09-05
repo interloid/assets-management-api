@@ -5,13 +5,13 @@ from app.models.refresh_token import RefreshToken
 from app.models.user import User
 
 
-def test_all_models_registered():
+def test_all_models_registered() -> None:
     expected_tables = {"users", "refresh_tokens", "assets"}
 
     assert set(Base.metadata.tables.keys()) == expected_tables
 
 
-def test_common_created_at():
+def test_common_created_at() -> None:
     for model in (User, RefreshToken, Asset):
         column = model.__table__.c.created_at
 
@@ -19,7 +19,7 @@ def test_common_created_at():
         assert column.server_default is not None
 
 
-def test_common_updated_at():
+def test_common_updated_at() -> None:
     for model in (User, Asset):
         column = model.__table__.c.updated_at
 
