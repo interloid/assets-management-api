@@ -12,7 +12,6 @@ async def test_register_then_login(
     db_session: AsyncSession,
     user_payload,
 ) -> None:
-
     register_response = await integration_client.post(
         "/auth/register",
         json=user_payload,
@@ -22,12 +21,19 @@ async def test_register_then_login(
 
     register_body = register_response.json()
 
-    assert register_body["email"] == user_payload["email"]
-    assert register_body["full_name"] == user_payload["full_name"]
-    assert register_body["role"] == "user"
-    assert register_body["is_active"] is True
+    assert register_body["success"] is True
+    assert register_body["statusCode"] == 201
+    assert register_body["message"] == "User registered successfully"
+    assert register_body["error"] is None
 
-    user_id = register_body["id"]
+    register_data = register_body["data"]
+
+    assert register_data["email"] == user_payload["email"]
+    assert register_data["full_name"] == user_payload["full_name"]
+    assert register_data["role"] == "user"
+    assert register_data["is_active"] is True
+
+    user_id = register_data["id"]
 
     result = await db_session.execute(select(User).where(User.id == user_id))
 
@@ -49,8 +55,15 @@ async def test_register_then_login(
 
     login_body = login_response.json()
 
-    assert login_body["access_token"]
-    assert login_body["token_type"] == "bearer"
+    assert login_body["success"] is True
+    assert login_body["statusCode"] == 200
+    assert login_body["message"] == "Login successful"
+    assert login_body["error"] is None
+
+    login_data = login_body["data"]
+
+    assert login_data["access_token"]
+    assert login_data["token_type"] == "bearer"
 
     assert "refresh_token" not in login_body
 
@@ -62,7 +75,9 @@ async def test_register_then_login(
     assert len(refresh_token) > 0
 
     result = await db_session.execute(
-        select(RefreshToken).where(RefreshToken.user_id == user.id)
+        select(RefreshToken).where(
+            RefreshToken.user_id == user.id,
+        )
     )
 
     persisted_refresh_token = result.scalar_one()
@@ -80,7 +95,6 @@ async def test_login_then_refresh(
     db_session: AsyncSession,
     user_payload,
 ) -> None:
-
     register_response = await integration_client.post(
         "/auth/register",
         json=user_payload,
@@ -100,8 +114,15 @@ async def test_login_then_refresh(
 
     login_body = login_response.json()
 
-    assert login_body["access_token"]
-    assert login_body["token_type"] == "bearer"
+    assert login_body["success"] is True
+    assert login_body["statusCode"] == 200
+    assert login_body["message"] == "Login successful"
+    assert login_body["error"] is None
+
+    login_data = login_body["data"]
+
+    assert login_data["access_token"]
+    assert login_data["token_type"] == "bearer"
 
     assert "refresh_token" in login_response.cookies
 
@@ -132,8 +153,15 @@ async def test_login_then_refresh(
 
     refresh_body = refresh_response.json()
 
-    assert refresh_body["access_token"]
-    assert refresh_body["token_type"] == "bearer"
+    assert refresh_body["success"] is True
+    assert refresh_body["statusCode"] == 200
+    assert refresh_body["message"] == "Token refreshed successfully"
+    assert refresh_body["error"] is None
+
+    refresh_data = refresh_body["data"]
+
+    assert refresh_data["access_token"]
+    assert refresh_data["token_type"] == "bearer"
 
     assert "refresh_token" not in refresh_body
 
@@ -145,7 +173,9 @@ async def test_login_then_refresh(
     assert new_refresh_token != old_refresh_token
 
     result = await db_session.execute(
-        select(RefreshToken).where(RefreshToken.user_id == old_token_record.user_id)
+        select(RefreshToken).where(
+            RefreshToken.user_id == old_token_record.user_id,
+        )
     )
 
     tokens = result.scalars().all()
@@ -182,7 +212,8 @@ async def test_refresh_token_reuse_revokes_family(
 
     assert register_response.status_code == 201
 
-    user_id = register_response.json()["id"]
+    register_body = register_response.json()
+    user_id = register_body["data"]["id"]
 
     login_response = await integration_client.post(
         "/auth/login",
@@ -217,6 +248,12 @@ async def test_refresh_token_reuse_revokes_family(
 
     assert first_refresh_response.status_code == 200
 
+    first_refresh_body = first_refresh_response.json()
+
+    assert first_refresh_body["success"] is True
+    assert first_refresh_body["statusCode"] == 200
+    assert first_refresh_body["error"] is None
+
     new_refresh_token = first_refresh_response.cookies["refresh_token"]
 
     assert new_refresh_token != old_refresh_token
@@ -232,6 +269,7 @@ async def test_refresh_token_reuse_revokes_family(
     assert len(family_tokens) == 2
 
     assert any(token.revoked_at is not None for token in family_tokens)
+
     assert any(token.revoked_at is None for token in family_tokens)
 
     integration_client.cookies.set(
@@ -247,6 +285,13 @@ async def test_refresh_token_reuse_revokes_family(
 
     body = reuse_response.json()
 
+    assert body["success"] is False
+    assert body["statusCode"] == 401
+    assert body["message"] == "Refresh token has already been used"
+    assert body["data"] is None
+    assert body["error"]["code"] == "REFRESH_TOKEN_REUSE"
+    assert body["error"]["details"] is None
+
     result = await db_session.execute(
         select(RefreshToken).where(
             RefreshToken.family_id == family_id,
@@ -260,8 +305,6 @@ async def test_refresh_token_reuse_revokes_family(
     for token in family_tokens:
         assert token.revoked_at is not None
 
-    assert body["detail"] == "Refresh token has already been used"
-
 
 @pytest.mark.asyncio
 async def test_logout_refresh_rejected(
@@ -269,15 +312,12 @@ async def test_logout_refresh_rejected(
     db_session: AsyncSession,
     user_payload,
 ) -> None:
-
     register_response = await integration_client.post(
         "/auth/register",
         json=user_payload,
     )
 
     assert register_response.status_code == 201
-
-    # user_id = register_response.json()["id"]
 
     login_response = await integration_client.post(
         "/auth/login",
@@ -289,7 +329,8 @@ async def test_logout_refresh_rejected(
 
     assert login_response.status_code == 200
 
-    access_token = login_response.json()["access_token"]
+    login_body = login_response.json()
+    access_token = login_body["data"]["access_token"]
     refresh_token = login_response.cookies["refresh_token"]
 
     integration_client.cookies.set(
@@ -318,15 +359,12 @@ async def test_logout_all_sessions_rejected(
     db_session: AsyncSession,
     user_payload,
 ) -> None:
-
     register_response = await integration_client.post(
         "/auth/register",
         json=user_payload,
     )
 
     assert register_response.status_code == 201
-
-    # user_id = register_response.json()["id"]
 
     login_response_1 = await integration_client.post(
         "/auth/login",
@@ -338,7 +376,9 @@ async def test_logout_all_sessions_rejected(
 
     assert login_response_1.status_code == 200
 
-    access_token_1 = login_response_1.json()["access_token"]
+    login_body_1 = login_response_1.json()
+
+    access_token_1 = login_body_1["data"]["access_token"]
     refresh_token_1 = login_response_1.cookies["refresh_token"]
 
     login_response_2 = await integration_client.post(
@@ -351,7 +391,9 @@ async def test_logout_all_sessions_rejected(
 
     assert login_response_2.status_code == 200
 
-    access_token_2 = login_response_2.json()["access_token"]
+    login_body_2 = login_response_2.json()
+
+    access_token_2 = login_body_2["data"]["access_token"]
     refresh_token_2 = login_response_2.cookies["refresh_token"]
 
     integration_client.cookies.set(
@@ -419,7 +461,8 @@ async def test_change_password_revokes_all_sessions(
 
     assert register_response.status_code == 201
 
-    user_id = register_response.json()["id"]
+    register_body = register_response.json()
+    user_id = register_body["data"]["id"]
 
     login_response_1 = await integration_client.post(
         "/auth/login",
@@ -444,7 +487,7 @@ async def test_change_password_revokes_all_sessions(
     assert login_response_2.status_code == 200
 
     refresh_token_2 = login_response_2.cookies["refresh_token"]
-    access_token = login_response_2.json()["access_token"]
+    access_token = login_response_2.json()["data"]["access_token"]
 
     change_password_response = await integration_client.post(
         "/auth/change-password",
@@ -458,6 +501,14 @@ async def test_change_password_revokes_all_sessions(
     )
 
     assert change_password_response.status_code == 200
+
+    change_password_body = change_password_response.json()
+
+    assert change_password_body["success"] is True
+    assert change_password_body["statusCode"] == 200
+    assert change_password_body["message"] == ("Password changed successfully")
+    assert change_password_body["data"] is None
+    assert change_password_body["error"] is None
 
     result = await db_session.execute(
         select(RefreshToken).where(
@@ -505,8 +556,11 @@ async def test_change_password_revokes_all_sessions(
 
     new_login_body = new_login_response.json()
 
-    assert new_login_body["access_token"]
-    assert new_login_body["token_type"] == "bearer"
+    assert new_login_body["success"] is True
+    assert new_login_body["statusCode"] == 200
+    assert new_login_body["data"]["access_token"]
+    assert new_login_body["data"]["token_type"] == "bearer"
+    assert new_login_body["error"] is None
 
     old_login_response = await integration_client.post(
         "/auth/login",

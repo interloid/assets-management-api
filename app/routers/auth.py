@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Response, status
 
 from app.core.config import settings
+from app.core.responses import success_response
 from app.dependencies.redis import RedisClient
 from app.dependencies.types import (
     AccessTokenPayload,
@@ -12,7 +13,6 @@ from app.schemas.auth import (
     ChangePasswordRequest,
     LoginRequest,
     LoginResponse,
-    MessageResponse,
     RegisterRequest,
     UserResponse,
 )
@@ -31,13 +31,17 @@ router = APIRouter(
 async def register(
     data: RegisterRequest,
     session: DBSession,
-) -> UserResponse:
+):
 
     service = AuthService(session)
 
     user = await service.register(data)
 
-    return UserResponse.model_validate(user)
+    return success_response(
+        status_code=status.HTTP_201_CREATED,
+        message="User registered successfully",
+        data=UserResponse.model_validate(user).model_dump(mode="json"),
+    )
 
 
 @router.post(
@@ -46,10 +50,9 @@ async def register(
 )
 async def login(
     payload: LoginRequest,
-    response: Response,
     session: DBSession,
     redis_client: RedisClient,
-) -> LoginResponse:
+):
     service = AuthService(session)
 
     result = await service.login(
@@ -57,6 +60,17 @@ async def login(
         redis_client,
     )
 
+    data = LoginResponse(
+        access_token=result.access_token,
+        token_type="bearer",
+    )
+
+    response = success_response(
+        status_code=status.HTTP_200_OK,
+        message="Login successful",
+        data=data.model_dump(mode="json"),
+    )
+
     response.set_cookie(
         key="refresh_token",
         value=result.refresh_token,
@@ -64,12 +78,10 @@ async def login(
         secure=True,
         samesite="lax",
         max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
+        path="/",
     )
 
-    return LoginResponse(
-        access_token=result.access_token,
-        token_type="bearer",
-    )
+    return response
 
 
 @router.post(
@@ -77,13 +89,23 @@ async def login(
     status_code=status.HTTP_200_OK,
 )
 async def refresh(
-    response: Response,
     session: DBSession,
     refresh_token: RefreshToken = None,
-) -> LoginResponse:
+):
     service = AuthService(session)
 
     result = await service.refresh(refresh_token)
+
+    data = LoginResponse(
+        access_token=result.access_token,
+        token_type="bearer",
+    )
+
+    response = success_response(
+        status_code=status.HTTP_200_OK,
+        message="Token refreshed successfully",
+        data=data.model_dump(mode="json"),
+    )
 
     response.set_cookie(
         key="refresh_token",
@@ -92,12 +114,10 @@ async def refresh(
         secure=True,
         samesite="lax",
         max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
+        path="/auth",
     )
 
-    return LoginResponse(
-        access_token=result.access_token,
-        token_type="bearer",
-    )
+    return response
 
 
 @router.post(
@@ -146,8 +166,14 @@ async def logout_all(
 )
 async def get_me(
     current_user: CurrentUser,
-) -> UserResponse:
-    return UserResponse.model_validate(current_user)
+):
+    return success_response(
+        status_code=status.HTTP_200_OK,
+        message="User retrieved successfully",
+        data=UserResponse.model_validate(current_user).model_dump(
+            mode="json",
+        ),
+    )
 
 
 @router.post(
@@ -159,7 +185,7 @@ async def change_password(
     current_user: CurrentUser,
     session: DBSession,
     redis_client: RedisClient,
-) -> MessageResponse:
+):
     service = AuthService(session)
 
     await service.change_password(
@@ -169,8 +195,8 @@ async def change_password(
         redis_client=redis_client,
     )
 
-    return MessageResponse(
+    return success_response(
+        status_code=status.HTTP_200_OK,
         message="Password changed successfully",
+        data=None,
     )
-
-

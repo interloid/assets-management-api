@@ -42,7 +42,14 @@ async def test_valid_refresh(
 
     body = response.json()
 
-    assert body["access_token"] == "new-access-token"
+    assert body["success"] is True
+    assert body["statusCode"] == 200
+    assert body["message"] == "Token refreshed successfully"
+    assert body["data"]["access_token"] == "new-access-token"
+    assert body["data"]["token_type"] == "bearer"
+    assert body["error"] is None
+
+    assert "refresh_token" not in body
 
     assert response.cookies["refresh_token"] == "new-refresh-token"
 
@@ -75,7 +82,12 @@ async def test_invalid_token(
 
     body = response.json()
 
-    assert body["detail"] == "Invalid or expired token"
+    assert body["success"] is False
+    assert body["statusCode"] == 401
+    assert body["message"] == "Invalid or expired token"
+    assert body["data"] is None
+    assert body["error"]["code"] == "INVALID_TOKEN"
+    assert body["error"]["details"] is None
 
 
 @pytest.mark.asyncio
@@ -106,4 +118,9 @@ async def test_api_refresh_04_reuse_detection(
 
     body = response.json()
 
-    assert body["detail"] == "Refresh token has already been used"
+    assert body["success"] is False
+    assert body["statusCode"] == 401
+    assert body["message"] == "Refresh token has already been used"
+    assert body["data"] is None
+    assert body["error"]["code"] == "REFRESH_TOKEN_REUSE"
+    assert body["error"]["details"] is None

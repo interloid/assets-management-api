@@ -32,11 +32,18 @@ async def test_me_success(
 
     body = response.json()
 
-    assert body["id"] == str(user.id)
-    assert body["email"] == user.email
-    assert body["full_name"] == user.full_name
-    assert body["role"] == user.role.value
-    assert "created_at" in body
+    assert body["success"] is True
+    assert body["statusCode"] == 200
+    assert body["message"] == "User retrieved successfully"
+    assert body["error"] is None
+
+    data = body["data"]
+
+    assert data["id"] == str(user.id)
+    assert data["email"] == user.email
+    assert data["full_name"] == user.full_name
+    assert data["role"] == user.role.value
+    assert "created_at" in data
 
 
 @pytest.mark.asyncio
@@ -50,7 +57,13 @@ async def test_me_missing_jwt(
     assert response.status_code == 401
 
     body = response.json()
-    assert body["detail"] == "Not authenticated"
+
+    assert body["success"] is False
+    assert body["statusCode"] == 401
+    assert body["message"] == "Authentication required"
+    assert body["data"] is None
+    assert body["error"]["code"] == "AUTHENTICATION_REQUIRED"
+    assert body["error"]["details"] == ("Authentication credentials were not provided")
 
 
 @pytest.mark.asyncio
@@ -71,4 +84,10 @@ async def test_me_invalid_jwt(
     assert response.status_code == 401
 
     body = response.json()
-    assert body["detail"] == "Invalid or expired token"
+
+    assert body["success"] is False
+    assert body["statusCode"] == 401
+    assert body["message"] == "Invalid or expired token"
+    assert body["data"] is None
+    assert body["error"]["code"] == "INVALID_TOKEN"
+    assert body["error"]["details"] is None

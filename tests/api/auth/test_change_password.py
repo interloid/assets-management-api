@@ -47,6 +47,14 @@ async def test_change_password_success(
 
     assert response.status_code == 200
 
+    body = response.json()
+
+    assert body["success"] is True
+    assert body["statusCode"] == 200
+    assert body["message"] == "Password changed successfully"
+    assert body["data"] is None
+    assert body["error"] is None
+
     mock_change_password.assert_awaited_once_with(
         user=user,
         current_password=payload["current_password"],
@@ -104,7 +112,12 @@ async def test_change_password_wrong_current_password(
 
     body = response.json()
 
-    assert body["detail"] == "Invalid email or password"
+    assert body["success"] is False
+    assert body["statusCode"] == 401
+    assert body["message"] == "Invalid email or password"
+    assert body["data"] is None
+    assert body["error"]["code"] == "INVALID_CREDENTIALS"
+    assert body["error"]["details"] is None
 
 
 @pytest.mark.asyncio
@@ -146,6 +159,15 @@ async def test_change_password_invalid_new_password(
 
     assert response.status_code == 422
 
+    body = response.json()
+
+    assert body["success"] is False
+    assert body["statusCode"] == 422
+    assert body["message"] == "Validation failed"
+    assert body["data"] is None
+    assert body["error"]["code"] == "INVALID_INPUT"
+    assert isinstance(body["error"]["details"], list)
+
     mock_change_password.assert_not_awaited()
 
 
@@ -168,5 +190,14 @@ async def test_change_password_unauthenticated(
         )
 
     assert response.status_code == 401
+
+    body = response.json()
+
+    assert body["success"] is False
+    assert body["statusCode"] == 401
+    assert body["message"] == "Authentication required"
+    assert body["data"] is None
+    assert body["error"]["code"] == "AUTHENTICATION_REQUIRED"
+    assert body["error"]["details"] == ("Authentication credentials were not provided")
 
     mock_change_password.assert_not_awaited()

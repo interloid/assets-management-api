@@ -1,4 +1,5 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, status
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from app.dependencies.redis import RedisClient
@@ -10,45 +11,35 @@ router = APIRouter(
 )
 
 
-@router.get("/db")
-async def database_health(
+@router.get("")
+async def health_check(
     db: DBSession,
-) -> dict[str, str]:
+    redis: RedisClient,
+) -> JSONResponse:
+    database_status = "up"
+    redis_status = "up"
+
     try:
         await db.execute(text("SELECT 1"))
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Database is unavailable",
-        ) from exc
+    except Exception:
+        database_status = "down"
 
-    return {
-        "status": "healthy",
-        "service": "database",
-    }
-
-
-@router.get("/redis")
-async def redis_health(
-    redis: RedisClient,
-) -> dict[str, str]:
     try:
         await redis.ping()
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Redis is unavailable",
-        ) from exc
+    except Exception:
+        redis_status = "down"
 
-    return {
-        "status": "healthy",
-        "service": "redis",
-    }
+    is_ready = database_status == "up" and redis_status == "up"
 
-
-@router.get("/live")
-async def liveness_check() -> dict[str, str]:
-    return {
-        "status": "healthy",
-        "service": "api",
-    }
+    return JSONResponse(
+        status_code=(
+            status.HTTP_200_OK if is_ready else status.HTTP_503_SERVICE_UNAVAILABLE
+        ),
+        content={
+            "status": "ready" if is_ready else "not ready",
+            "services": {
+                "database": database_status,
+                "redis": redis_status,
+            },
+        },
+    )

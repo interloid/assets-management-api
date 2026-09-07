@@ -1,3 +1,4 @@
+from typing import Any
 from uuid import UUID
 
 from fastapi import Depends
@@ -78,17 +79,24 @@ async def get_current_user(
     return user
 
 
-def get_current_access_token(
+async def get_current_access_token(
     credentials: HTTPAuthorizationCredentials = Depends(security),
-) -> dict[str, any]:
+    redis_client: Redis = Depends(get_redis),
+) -> dict[str, Any]:
     token = credentials.credentials
 
     payload = decode_access_token(token)
 
     try:
-        payload["jti"]
+        jti = payload["jti"]
         payload["exp"]
     except (KeyError, TypeError) as exc:
         raise InvalidTokenError() from exc
+
+    if await is_access_token_blacklisted(
+        redis_client,
+        jti,
+    ):
+        raise InvalidTokenError()
 
     return payload
