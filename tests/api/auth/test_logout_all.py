@@ -4,7 +4,7 @@ from uuid import uuid4
 
 import pytest
 
-from app.dependencies.authentication import get_current_user
+from app.dependencies.authentication import get_logout_all_context
 from app.dependencies.redis import get_redis
 from app.exceptions.auth import InvalidTokenError
 from app.main import app
@@ -27,7 +27,14 @@ async def test_logout_all_success(
         token_version=0,
     )
 
-    app.dependency_overrides[get_current_user] = lambda: current_user
+    logout_all_context = {
+        "user": current_user,
+        "token_version": 0,
+    }
+
+    app.dependency_overrides[get_logout_all_context] = (
+        lambda: logout_all_context
+    )
     app.dependency_overrides[get_redis] = lambda: mock_redis
 
     api_client.cookies.set(
@@ -47,6 +54,7 @@ async def test_logout_all_success(
         mock_logout_all.assert_awaited_once_with(
             refresh_token,
             current_user,
+            0,
             mock_redis,
         )
 
@@ -54,6 +62,7 @@ async def test_logout_all_success(
             "set-cookie",
             "",
         )
+
     finally:
         app.dependency_overrides.clear()
 
@@ -75,7 +84,14 @@ async def test_logout_all_failed(
         token_version=0,
     )
 
-    app.dependency_overrides[get_current_user] = lambda: current_user
+    logout_all_context = {
+        "user": current_user,
+        "token_version": 0,
+    }
+
+    app.dependency_overrides[get_logout_all_context] = (
+        lambda: logout_all_context
+    )
     app.dependency_overrides[get_redis] = lambda: mock_redis
 
     api_client.cookies.set(
@@ -96,7 +112,9 @@ async def test_logout_all_failed(
         mock_logout_all.assert_awaited_once_with(
             refresh_token,
             current_user,
+            0,
             mock_redis,
         )
+
     finally:
         app.dependency_overrides.clear()

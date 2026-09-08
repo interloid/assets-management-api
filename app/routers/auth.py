@@ -4,9 +4,10 @@ from app.core.config import settings
 from app.core.responses import success_response
 from app.dependencies.redis import RedisClient
 from app.dependencies.types import (
-    AccessTokenPayload,
     CurrentUser,
     DBSession,
+    LogoutAccessTokenPayload,
+    LogoutAllContext,
     RefreshToken,
 )
 from app.schemas.auth import (
@@ -127,7 +128,7 @@ async def refresh(
 async def logout(
     response: Response,
     session: DBSession,
-    access_token: AccessTokenPayload,
+    access_token: LogoutAccessTokenPayload,
     refresh_token: RefreshToken = None,
     redis_client: RedisClient = None,
 ) -> None:
@@ -147,16 +148,24 @@ async def logout(
 async def logout_all(
     response: Response,
     session: DBSession,
-    current_user: CurrentUser,
+    logout_all_context: LogoutAllContext,
     redis_client: RedisClient,
     refresh_token: RefreshToken = None,
 ) -> None:
     service = AuthService(session)
 
-    await service.logout_all(refresh_token, current_user, redis_client)
+    await service.logout_all(
+        refresh_token,
+        logout_all_context["user"],
+        logout_all_context["token_version"],
+        redis_client,
+    )
 
     response.delete_cookie(
-        key="refresh_token", httponly=True, secure=True, samesite="lax"
+        key="refresh_token",
+        httponly=True,
+        secure=True,
+        samesite="lax",
     )
 
 

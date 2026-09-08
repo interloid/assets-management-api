@@ -206,30 +206,27 @@ class AuthService:
 
     async def logout(
         self,
-        refresh_token: str,
+        refresh_token: str | None,
         access_token_payload: dict,
         redis_client: Redis,
     ) -> None:
-        if not refresh_token:
-            raise InvalidTokenError()
-
         jti = access_token_payload["jti"]
-
         exp = access_token_payload["exp"]
 
         remaining_seconds = get_token_remaining_seconds(exp)
 
-        token_hash = hash_refresh_token(refresh_token)
+        if refresh_token:
+            token_hash = hash_refresh_token(refresh_token)
 
-        stored_token = await self.refresh_token_repository.get_by_hash(
-            token_hash,
-            for_update=True,
-        )
+            stored_token = await self.refresh_token_repository.get_by_hash(
+                token_hash,
+                for_update=True,
+            )
 
-        if stored_token is None:
-            raise InvalidTokenError()
-
-        await self.refresh_token_repository.revoke(stored_token.id)
+            if stored_token is not None:
+                await self.refresh_token_repository.revoke(
+                    stored_token.id,
+                )
 
         await blacklist_access_token(
             redis_client,
@@ -241,26 +238,35 @@ class AuthService:
 
     async def logout_all(
         self,
-        refresh_token: str,
+        refresh_token: str | None,
         current_user: User,
+        access_token_version: int,
         redis_client: Redis,
     ) -> None:
-        if not refresh_token:
+        if access_token_version < current_user.token_version:
+            return
+
+        if access_token_version > current_user.token_version:
             raise InvalidTokenError()
 
-        token_hash = hash_refresh_token(refresh_token)
+        if refresh_token:
+            token_hash = hash_refresh_token(refresh_token)
 
-        stored_token = await self.refresh_token_repository.get_by_hash(token_hash)
+            stored_token = await self.refresh_token_repository.get_by_hash(
+                token_hash,
+            )
 
-        if stored_token is None:
-            raise InvalidTokenError()
+            if stored_token is not None:
+                if stored_token.user_id != current_user.id:
+                    raise InvalidTokenError()
 
-        if stored_token.user_id != current_user.id:
-            raise InvalidTokenError()
+        await self.refresh_token_repository.revoke_user(
+            current_user.id,
+        )
 
-        await self.refresh_token_repository.revoke_user(current_user.id)
-
-        await self.user_repository.increment_token_version(current_user)
+        await self.user_repository.increment_token_version(
+            current_user,
+        )
 
         await self.session.commit()
 

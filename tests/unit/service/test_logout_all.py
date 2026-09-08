@@ -3,8 +3,6 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.exceptions.auth import InvalidTokenError
-
 
 @pytest.mark.asyncio
 async def test_logout_all_success(
@@ -20,6 +18,8 @@ async def test_logout_all_success(
         token_version=0,
     )
 
+    access_token_version = 0
+
     with patch(
         "app.services.auth.hash_refresh_token",
         return_value="hashed_refresh_token",
@@ -28,7 +28,7 @@ async def test_logout_all_success(
             return_value=valid_stored_token,
         )
 
-        auth_service.refresh_token_repository.revoke_all_for_user = AsyncMock()
+        auth_service.refresh_token_repository.revoke_user = AsyncMock()
 
         auth_service.user_repository.increment_token_version = AsyncMock(
             side_effect=lambda user: setattr(
@@ -45,6 +45,7 @@ async def test_logout_all_success(
             await auth_service.logout_all(
                 refresh_token,
                 current_user,
+                access_token_version,
                 redis_client,
             )
 
@@ -76,8 +77,9 @@ async def test_logout_all_success(
 @pytest.mark.asyncio
 async def test_logout_all_empty_refresh_token(
     auth_service,
+    mock_session,
 ) -> None:
-    refresh_token = ""
+    refresh_token = None
     redis_client = AsyncMock()
 
     current_user = SimpleNamespace(
@@ -85,12 +87,46 @@ async def test_logout_all_empty_refresh_token(
         token_version=0,
     )
 
-    with pytest.raises(InvalidTokenError):
+    access_token_version = 0
+
+    auth_service.refresh_token_repository.revoke_user = AsyncMock()
+
+    auth_service.user_repository.increment_token_version = AsyncMock(
+        side_effect=lambda user: setattr(
+            user,
+            "token_version",
+            user.token_version + 1,
+        ),
+    )
+
+    with patch(
+        "app.services.auth.set_token_version",
+        new_callable=AsyncMock,
+    ) as mock_set_token_version:
         await auth_service.logout_all(
             refresh_token,
             current_user,
+            access_token_version,
             redis_client,
         )
+
+    auth_service.refresh_token_repository.revoke_user.assert_awaited_once_with(
+        current_user.id,
+    )
+
+    auth_service.user_repository.increment_token_version.assert_awaited_once_with(
+        current_user,
+    )
+
+    mock_session.commit.assert_awaited_once()
+
+    assert current_user.token_version == 1
+
+    mock_set_token_version.assert_awaited_once_with(
+        redis_client,
+        str(current_user.id),
+        1,
+    )
 
 
 @pytest.mark.asyncio
@@ -106,17 +142,125 @@ async def test_logout_all_refresh_token_not_found(
         token_version=0,
     )
 
-    with patch(
-        "app.services.auth.hash_refresh_token",
-        return_value="hashed_refresh_token",
+    access_token_version = 0
+
+    with (
+        patch(
+            "app.services.auth.hash_refresh_token",
+            return_value="hashed_refresh_token",
+        ) as mock_hash,
+        patch(
+            "app.services.auth.set_token_version",
+            new_callable=AsyncMock,
+        ) as mock_set_token_version,
     ):
         auth_service.refresh_token_repository.get_by_hash = AsyncMock(
             return_value=None,
         )
 
-        with pytest.raises(InvalidTokenError):
-            await auth_service.logout_all(
-                refresh_token,
-                current_user,
-                redis_client,
-            )
+        auth_service.refresh_token_repository.revoke_user = AsyncMock()
+
+        auth_service.user_repository.increment_token_version = AsyncMock(
+            side_effect=lambda user: setattr(
+                user,
+                "token_version",
+                user.token_version + 1,
+            ),
+        )
+
+        await auth_service.logout_all(
+            refresh_token,
+            current_user,
+            access_token_version,
+            redis_client,
+        )
+
+    mock_hash.assert_called_once_with(refresh_token)
+
+    auth_service.refresh_token_repository.get_by_hash.assert_awaited_once_with(
+        "hashed_refresh_token",
+    )
+
+    auth_service.refresh_token_repository.revoke_user.assert_awaited_once_with(
+        current_user.id,
+    )
+
+    auth_service.user_repository.increment_token_version.assert_awaited_once_with(
+        current_user,
+    )
+
+    mock_session.commit.assert_awaited_once()
+
+    assert current_user.token_version == 1
+
+    mock_set_token_version.assert_awaited_once_with(
+        redis_client,
+        str(current_user.id),
+        1,
+    )
+
+
+@pytest.mark.asyncio
+async def test_logout_all_idempotent(
+    auth_service,
+    mock_session,
+) -> None:
+    redis_client = AsyncMock()
+
+    current_user = SimpleNamespace(
+        id="user-123",
+        token_version=0,
+    )
+
+    access_token_version = 0
+
+    auth_service.refresh_token_repository.revoke_user = AsyncMock()
+
+    auth_service.user_repository.increment_token_version = AsyncMock(
+        side_effect=lambda user: setattr(
+            user,
+            "token_version",
+            user.token_version + 1,
+        ),
+    )
+
+    with patch(
+        "app.services.auth.set_token_version",
+        new_callable=AsyncMock,
+    ) as mock_set_token_version:
+        # First logout-all.
+        await auth_service.logout_all(
+            None,
+            current_user,
+            access_token_version,
+            redis_client,
+        )
+
+        assert current_user.token_version == 1
+
+        # Repeat logout-all using the same access token.
+        await auth_service.logout_all(
+            None,
+            current_user,
+            access_token_version,
+            redis_client,
+        )
+
+    # Token version must not be incremented again.
+    assert current_user.token_version == 1
+
+    auth_service.refresh_token_repository.revoke_user.assert_awaited_once_with(
+        current_user.id,
+    )
+
+    auth_service.user_repository.increment_token_version.assert_awaited_once_with(
+        current_user,
+    )
+
+    mock_session.commit.assert_awaited_once()
+
+    mock_set_token_version.assert_awaited_once_with(
+        redis_client,
+        str(current_user.id),
+        1,
+    )
