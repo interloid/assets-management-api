@@ -54,11 +54,13 @@ async def register(
 async def login(
     payload: LoginRequest,
     session: DBSession,
+    redis_client: RedisClient,
 ):
     service = AuthService(session)
 
     result = await service.login(
         payload,
+        redis_client,
     )
 
     data = LoginResponse(
@@ -76,7 +78,7 @@ async def login(
         key="refresh_token",
         value=result.refresh_token,
         httponly=True,
-        secure=True,
+        secure=False,
         samesite="lax",
         max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
         path=COOKIE_PATH,
@@ -112,7 +114,7 @@ async def refresh(
         key="refresh_token",
         value=result.refresh_token,
         httponly=True,
-        secure=True,
+        secure=False,
         samesite="lax",
         max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
         path=COOKIE_PATH,
@@ -129,8 +131,8 @@ async def logout(
     response: Response,
     session: DBSession,
     access_token: LogoutAccessTokenPayload,
-    redis_client: RedisClient,
     refresh_token: RefreshToken = None,
+    redis_client: RedisClient = None,
 ) -> None:
     service = AuthService(session)
 
@@ -139,7 +141,7 @@ async def logout(
     response.delete_cookie(
         key="refresh_token",
         httponly=True,
-        secure=True,
+        secure=False,
         samesite="lax",
         path=COOKIE_PATH,
     )
@@ -153,6 +155,7 @@ async def logout_all(
     response: Response,
     session: DBSession,
     logout_all_context: LogoutAllContext,
+    redis_client: RedisClient,
     refresh_token: RefreshToken = None,
 ) -> None:
     service = AuthService(session)
@@ -161,12 +164,13 @@ async def logout_all(
         refresh_token,
         logout_all_context["user"],
         logout_all_context["token_version"],
+        redis_client,
     )
 
     response.delete_cookie(
         key="refresh_token",
         httponly=True,
-        secure=True,
+        secure=False,
         samesite="lax",
         path=COOKIE_PATH,
     )
@@ -196,6 +200,7 @@ async def change_password(
     data: ChangePasswordRequest,
     current_user: CurrentUser,
     session: DBSession,
+    redis_client: RedisClient,
 ):
     service = AuthService(session)
 
@@ -203,6 +208,7 @@ async def change_password(
         user=current_user,
         current_password=data.current_password,
         new_password=data.new_password,
+        redis_client=redis_client,
     )
 
     return success_response(

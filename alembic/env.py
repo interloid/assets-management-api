@@ -14,7 +14,7 @@ from app.db.base import Base
 # access to the values within the .ini file in use.
 config = context.config
 
-database_url = os.getenv("ALEMBIC_DATABASE_URL", settings.database_url)
+database_url = os.getenv("ALEMBIC_DATABASE_URL", str(settings.DATABASE_URL))
 
 config.set_main_option(
     "sqlalchemy.url",
