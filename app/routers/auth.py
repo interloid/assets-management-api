@@ -24,6 +24,8 @@ router = APIRouter(
     tags=["Authentication"],
 )
 
+COOKIE_PATH = "/auth"
+
 
 @router.post(
     "/register",
@@ -76,10 +78,10 @@ async def login(
         key="refresh_token",
         value=result.refresh_token,
         httponly=True,
-        secure=True,
+        secure=False,
         samesite="lax",
         max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
-        path="/",
+        path=COOKIE_PATH,
     )
 
     return response
@@ -112,10 +114,10 @@ async def refresh(
         key="refresh_token",
         value=result.refresh_token,
         httponly=True,
-        secure=True,
+        secure=False,
         samesite="lax",
         max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
-        path="/auth",
+        path=COOKIE_PATH,
     )
 
     return response
@@ -137,7 +139,11 @@ async def logout(
     await service.logout(refresh_token, access_token, redis_client)
 
     response.delete_cookie(
-        key="refresh_token", httponly=True, secure=True, samesite="lax"
+        key="refresh_token",
+        httponly=True,
+        secure=False,
+        samesite="lax",
+        path=COOKIE_PATH,
     )
 
 
@@ -164,8 +170,9 @@ async def logout_all(
     response.delete_cookie(
         key="refresh_token",
         httponly=True,
-        secure=True,
+        secure=False,
         samesite="lax",
+        path=COOKIE_PATH,
     )
 
 

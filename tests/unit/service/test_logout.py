@@ -126,4 +126,3 @@ async def test_logout_refresh_token_not_found(
     mock_blacklist.assert_awaited_once()
 
     mock_session.commit.assert_awaited_once()
-

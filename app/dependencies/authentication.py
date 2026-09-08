@@ -117,6 +117,7 @@ def get_logout_access_token(
 
     return payload
 
+
 async def get_logout_all_context(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     session: AsyncSession = Depends(get_db),

@@ -9,7 +9,7 @@ from app.exceptions.handlers import (
     unexpected_exception_handler,
     validation_exception_handler,
 )
-from app.routers import auth, health, root
+from app.routers import assets, auth, health, root
 
 app = FastAPI(
     title="Assets Management API",
@@ -26,3 +26,4 @@ app.add_exception_handler(RequestValidationError, validation_exception_handler)
 app.include_router(health.router)
 app.include_router(root.router)
 app.include_router(auth.router)
+app.include_router(assets.router)

@@ -32,9 +32,7 @@ async def test_logout_all_success(
         "token_version": 0,
     }
 
-    app.dependency_overrides[get_logout_all_context] = (
-        lambda: logout_all_context
-    )
+    app.dependency_overrides[get_logout_all_context] = lambda: logout_all_context
     app.dependency_overrides[get_redis] = lambda: mock_redis
 
     api_client.cookies.set(
@@ -89,9 +87,7 @@ async def test_logout_all_failed(
         "token_version": 0,
     }
 
-    app.dependency_overrides[get_logout_all_context] = (
-        lambda: logout_all_context
-    )
+    app.dependency_overrides[get_logout_all_context] = lambda: logout_all_context
     app.dependency_overrides[get_redis] = lambda: mock_redis
 
     api_client.cookies.set(

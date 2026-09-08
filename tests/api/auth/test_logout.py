@@ -16,9 +16,7 @@ async def test_logout_success(api_client) -> None:
         "exp": 9999999999,
     }
 
-    app.dependency_overrides[get_logout_access_token] = (
-        lambda: access_token_payload
-    )
+    app.dependency_overrides[get_logout_access_token] = lambda: access_token_payload
 
     api_client.cookies.set(
         "refresh_token",
@@ -59,9 +57,7 @@ async def test_logout_failed(
         "exp": 9999999999,
     }
 
-    app.dependency_overrides[get_logout_access_token] = (
-        lambda: access_token_payload
-    )
+    app.dependency_overrides[get_logout_access_token] = lambda: access_token_payload
 
     api_client.cookies.set(
         "refresh_token",
@@ -85,4 +81,3 @@ async def test_logout_failed(
         )
     finally:
         app.dependency_overrides.clear()
-
