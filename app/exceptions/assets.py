@@ -15,3 +15,11 @@ class AssetTagAlreadyExistsError(AssetAlreadyExistsError):
 class SerialNumberAlreadyExistsError(AssetAlreadyExistsError):
     code = "SERIAL_NUMBER_ALREADY_EXISTS"
     message = "Serial number already exists"
+
+
+class AssetNotFoundError(AppError):
+    status_code = 404
+
+    code = "ASSET_NOT_FOUND"
+
+    message = "Asset not found"

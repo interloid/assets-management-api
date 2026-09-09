@@ -88,3 +88,12 @@ class AssetRepository:
         assets = list(result.scalars().all())
 
         return assets, total
+
+    async def get_by_id(
+        self,
+        asset_id: UUID,
+    ) -> Asset:
+        stmt = select(Asset).where(Asset.id == asset_id)
+        result = await self.session.execute(stmt)
+
+        return result.scalar_one_or_none()

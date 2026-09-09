@@ -5,7 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, Query, status
 
 from app.core.responses import success_response
-from app.dependencies.types import AdminUser, DBSession
+from app.dependencies.types import AdminUser, CurrentUser, DBSession
 from app.models.enums import AssetStatus, AssetType
 from app.schemas.assets import AssetCreate, AssetResponse
 from app.services.assets import AssetService
@@ -71,4 +71,22 @@ async def list_assets(
         status_code=status.HTTP_200_OK,
         message="Assets retrieved successfully",
         data=result.model_dump(mode="json"),
+    )
+
+
+@router.get("/{asset_id}", status_code=status.HTTP_200_OK)
+async def get_by_id(
+    asset_id: UUID, session: DBSession, current_user: CurrentUser
+) -> AssetResponse:
+    service = AssetService(session)
+
+    asset = await service.get_by_id(
+        asset_id=asset_id,
+        current_user=current_user,
+    )
+
+    return success_response(
+        status_code=status.HTTP_200_OK,
+        message="Asset retrieved successfully",
+        data=AssetResponse.model_validate(asset).model_dump(mode="json"),
     )

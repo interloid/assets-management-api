@@ -139,3 +139,10 @@ async def admin_access_token(
         role=integration_admin.role.value,
         token_version=integration_admin.token_version,
     )
+
+
+@pytest_asyncio.fixture
+async def asset_owner(
+    db_session: AsyncSession,
+) -> User:
+    return await create_test_user(db_session)

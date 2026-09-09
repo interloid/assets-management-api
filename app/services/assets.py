@@ -9,11 +9,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.asset_tag.generator import build_asset_tag, get_company_prefix
 from app.asset_tag.repository import AssetTagCounterRepository
 from app.exceptions.assets import (
+    AssetNotFoundError,
     AssetTagAlreadyExistsError,
     SerialNumberAlreadyExistsError,
 )
 from app.models.assets import Asset
-from app.models.enums import AssetStatus, AssetType
+from app.models.enums import AssetStatus, AssetType, UserRole
+from app.models.user import User
 from app.repositories.assets import AssetRepository
 from app.schemas.assets import AssetCreate, AssetListResponse, AssetResponse
 
@@ -111,3 +113,22 @@ class AssetService:
             total=total,
             pages=pages,
         )
+
+    async def get_by_id(
+        self,
+        *,
+        asset_id: UUID,
+        current_user: User,
+    ) -> Asset:
+        asset = await self.asset_repository.get_by_id(asset_id)
+
+        if asset is None:
+            raise AssetNotFoundError()
+
+        if current_user.role == UserRole.ADMIN:
+            return asset
+
+        if asset.assigned_to == current_user.id:
+            return asset
+
+        raise AssetNotFoundError()
