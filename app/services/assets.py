@@ -11,13 +11,36 @@ from app.asset_tag.repository import AssetTagCounterRepository
 from app.exceptions.assets import (
     AssetNotFoundError,
     AssetTagAlreadyExistsError,
+    InvalidAssetStatusTransitionError,
     SerialNumberAlreadyExistsError,
 )
 from app.models.assets import Asset
 from app.models.enums import AssetStatus, AssetType, UserRole
 from app.models.user import User
 from app.repositories.assets import AssetRepository
-from app.schemas.assets import AssetCreate, AssetListResponse, AssetResponse
+from app.schemas.assets import (
+    AssetCreate,
+    AssetListResponse,
+    AssetResponse,
+    AssetUpdate,
+)
+
+ALLOWED_STATUS_TRANSITIONS: dict[AssetStatus, set[AssetStatus]] = {
+    AssetStatus.IN_STOCK: {
+        AssetStatus.ASSIGNED,
+        AssetStatus.REPAIR,
+        AssetStatus.RETIRED,
+    },
+    AssetStatus.ASSIGNED: {
+        AssetStatus.IN_STOCK,
+        AssetStatus.REPAIR,
+    },
+    AssetStatus.REPAIR: {
+        AssetStatus.IN_STOCK,
+        AssetStatus.RETIRED,
+    },
+    AssetStatus.RETIRED: set(),
+}
 
 
 def get_constraint_name(exc: IntegrityError) -> str | None:
@@ -39,6 +62,19 @@ class AssetService:
         self.session = session
         self.asset_repository = AssetRepository(session)
         self.asset_tag_counter_repository = AssetTagCounterRepository(session)
+
+    def _validate_status_transition(
+        self,
+        current_status: AssetStatus,
+        new_status: AssetStatus,
+    ) -> None:
+        allowed = ALLOWED_STATUS_TRANSITIONS[current_status]
+
+        if new_status not in allowed:
+            raise InvalidAssetStatusTransitionError(
+                current_status=current_status.value,
+                new_status=new_status.value,
+            )
 
     async def create(self, data: AssetCreate) -> Asset:
         company_prefix = get_company_prefix()
@@ -132,3 +168,58 @@ class AssetService:
             return asset
 
         raise AssetNotFoundError()
+
+    async def update(
+        self,
+        asset_id: UUID,
+        data: AssetUpdate,
+    ) -> Asset:
+        asset = await self.asset_repository.get_by_id(asset_id)
+
+        if asset is None:
+            raise AssetNotFoundError()
+
+        try:
+            update_data = data.model_dump(exclude_unset=True)
+
+            if "type" in update_data:
+                new_type = update_data["type"]
+
+                if new_type != asset.type:
+                    company_prefix = get_company_prefix()
+
+                    number = await self.asset_tag_counter_repository.get_next_number(
+                        company_prefix=company_prefix,
+                        asset_type=new_type,
+                    )
+
+                    print("NEXT NUMBER:", number)
+
+                    asset.asset_tag = build_asset_tag(
+                        asset_type=new_type,
+                        number=number,
+                    )
+
+                    print("NEW TAG:", asset.asset_tag)
+
+            await self.asset_repository.update(
+                asset=asset,
+                data=data,
+            )
+
+            await self.session.commit()
+
+        except IntegrityError as exc:
+            await self.session.rollback()
+
+            constraint_name = get_constraint_name(exc)
+
+            if constraint_name == "assets_serial_number_key":
+                raise SerialNumberAlreadyExistsError() from exc
+
+            if constraint_name == "assets_asset_tag_key":
+                raise AssetTagAlreadyExistsError() from exc
+
+            raise
+
+        return asset

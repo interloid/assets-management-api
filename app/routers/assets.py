@@ -7,7 +7,7 @@ from fastapi import APIRouter, Query, status
 from app.core.responses import success_response
 from app.dependencies.types import AdminUser, CurrentUser, DBSession
 from app.models.enums import AssetStatus, AssetType
-from app.schemas.assets import AssetCreate, AssetResponse
+from app.schemas.assets import AssetCreate, AssetResponse, AssetUpdate
 from app.services.assets import AssetService
 
 router = APIRouter(
@@ -110,5 +110,26 @@ async def get_by_id(
     return success_response(
         status_code=status.HTTP_200_OK,
         message="Asset retrieved successfully",
+        data=AssetResponse.model_validate(asset).model_dump(mode="json"),
+    )
+
+
+@router.patch("/{asset_id}", status_code=status.HTTP_200_OK)
+async def update_asset(
+    asset_id: UUID,
+    data: AssetUpdate,
+    session: DBSession,
+    _admin_user: AdminUser,
+) -> AssetResponse:
+    service = AssetService(session)
+
+    asset = await service.update(
+        asset_id=asset_id,
+        data=data,
+    )
+
+    return success_response(
+        status_code=status.HTTP_200_OK,
+        message="Asset updated successfully",
         data=AssetResponse.model_validate(asset).model_dump(mode="json"),
     )

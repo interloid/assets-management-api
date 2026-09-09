@@ -23,3 +23,16 @@ class AssetNotFoundError(AppError):
     code = "ASSET_NOT_FOUND"
 
     message = "Asset not found"
+
+
+class InvalidAssetStatusTransitionError(AppError):
+    status_code = 409
+    code = "INVALID_ASSET_STATUS_TRANSITION"
+
+    def __init__(
+        self,
+        current_status: str,
+        new_status: str,
+    ) -> None:
+        self.message = f"Cannot change status from '{current_status}' to '{new_status}'"
+        super().__init__()

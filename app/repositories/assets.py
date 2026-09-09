@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.assets import Asset
 from app.models.enums import AssetStatus, AssetType
+from app.schemas.assets import AssetUpdate
 
 
 def escape_like(value: str) -> str:
@@ -97,3 +98,18 @@ class AssetRepository:
         result = await self.session.execute(stmt)
 
         return result.scalar_one_or_none()
+
+    async def update(
+        self,
+        asset: Asset,
+        data: AssetUpdate,
+    ) -> Asset:
+        updated_data = data.model_dump(exclude_unset=True)
+
+        for field, value in updated_data.items():
+            setattr(asset, field, value)
+
+        await self.session.flush()
+        await self.session.refresh(asset)
+
+        return asset
