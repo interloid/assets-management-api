@@ -6,7 +6,7 @@ from app.models.user import User
 
 
 def test_all_models_registered() -> None:
-    expected_tables = {"users", "refresh_tokens", "assets"}
+    expected_tables = {"users", "refresh_tokens", "assets", "asset_tag_counters"}
 
     assert set(Base.metadata.tables.keys()) == expected_tables
 
