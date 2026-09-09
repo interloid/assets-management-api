@@ -35,3 +35,11 @@ class AssetResponse(BaseModel):
     notes: str | None
     created_at: datetime
     updated_at: datetime
+
+
+class AssetListResponse(BaseModel):
+    items: list[AssetResponse]
+    page: int
+    size: int
+    total: int
+    pages: int

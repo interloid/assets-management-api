@@ -1,4 +1,7 @@
 import re
+from datetime import date
+from math import ceil
+from uuid import UUID
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,9 +13,9 @@ from app.exceptions.assets import (
     SerialNumberAlreadyExistsError,
 )
 from app.models.assets import Asset
-from app.models.enums import AssetStatus
+from app.models.enums import AssetStatus, AssetType
 from app.repositories.assets import AssetRepository
-from app.schemas.assets import AssetCreate
+from app.schemas.assets import AssetCreate, AssetListResponse, AssetResponse
 
 
 def get_constraint_name(exc: IntegrityError) -> str | None:
@@ -77,3 +80,34 @@ class AssetService:
             raise
 
         return asset
+
+    async def list(
+        self,
+        *,
+        page: int,
+        size: int,
+        asset_type: AssetType | None = None,
+        asset_status: AssetStatus | None = None,
+        assigned_to: UUID | None = None,
+        warranty_expiring_before: date | None = None,
+        search: str | None = None,
+    ) -> AssetListResponse:
+        assets, total = await self.asset_repository.list(
+            page=page,
+            size=size,
+            asset_type=asset_type,
+            asset_status=asset_status,
+            assigned_to=assigned_to,
+            warranty_expiring_before=warranty_expiring_before,
+            search=search,
+        )
+
+        pages = ceil(total / size) if total else 0
+
+        return AssetListResponse(
+            items=[AssetResponse.model_validate(asset) for asset in assets],
+            page=page,
+            size=size,
+            total=total,
+            pages=pages,
+        )

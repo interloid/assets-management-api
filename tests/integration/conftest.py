@@ -111,6 +111,7 @@ async def integration_user(
 
     return user
 
+
 @pytest_asyncio.fixture
 async def integration_admin(
     db_session: AsyncSession,
