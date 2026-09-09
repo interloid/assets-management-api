@@ -43,3 +43,16 @@ class AssetListResponse(BaseModel):
     size: int
     total: int
     pages: int
+
+
+class AssetUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    type: AssetType | None = None
+    notes: str | None = None
+    purchase_date: date | None = None
+    warranty_expiry: date | None = None
+    serial_number: str | None = None
+
+    _validate_serial_number = field_validator(
+        "serial_number",
+    )(validate_serial_number)
