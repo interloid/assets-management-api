@@ -74,6 +74,28 @@ async def list_assets(
     )
 
 
+@router.get("/my", status_code=status.HTTP_200_OK)
+async def get_my_assets(
+    session: DBSession,
+    current_user: CurrentUser,
+    page: int = Query(default=1, ge=1),
+    size: int = Query(
+        default=20,
+        ge=1,
+        le=100,
+    ),
+):
+    service = AssetService(session)
+
+    result = await service.list(page=page, size=size, assigned_to=current_user.id)
+
+    return success_response(
+        status_code=status.HTTP_200_OK,
+        message="Assets retrived successfully",
+        data=result.model_dump(mode="json"),
+    )
+
+
 @router.get("/{asset_id}", status_code=status.HTTP_200_OK)
 async def get_by_id(
     asset_id: UUID, session: DBSession, current_user: CurrentUser
