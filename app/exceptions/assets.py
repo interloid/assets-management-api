@@ -42,3 +42,15 @@ class AssetDeleteConflictError(AppError):
     status_code = 409
     code = "ASSET_DELETE_CONFLICT"
     message = "Asset can only be deleted when its status is 'in_stock' or 'retired'"
+
+
+class AssetAssignmentUserNotFoundError(AppError):
+    status_code = 404
+    code = "ASSET_ASSIGNMENT_USER_NOT_FOUND"
+    message = "Assignment user not found"
+
+
+class AssetAssignmentUserInactiveError(AppError):
+    status_code = 409
+    code = "ASSET_ASSIGNMENT_USER_INACTIVE"
+    message = "Assignment user is inactive"

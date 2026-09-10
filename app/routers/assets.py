@@ -7,7 +7,7 @@ from fastapi import APIRouter, Query, status
 from app.core.responses import success_response
 from app.dependencies.types import AdminUser, CurrentUser, DBSession
 from app.models.enums import AssetStatus, AssetType
-from app.schemas.assets import AssetCreate, AssetResponse, AssetUpdate
+from app.schemas.assets import AssetAssign, AssetCreate, AssetResponse, AssetUpdate
 from app.services.assets import AssetService
 
 router = APIRouter(
@@ -146,3 +146,47 @@ async def delete_asset(
     await service.delete(asset_id)
 
     return None
+
+
+@router.post(
+    "/{asset_id}/assign",
+    status_code=status.HTTP_200_OK,
+)
+async def assign_asset(
+    asset_id: UUID,
+    data: AssetAssign,
+    session: DBSession,
+    _admin_user: AdminUser,
+) -> AssetResponse:
+    service = AssetService(session)
+
+    asset = await service.assign(
+        asset_id=asset_id,
+        user_id=data.user_id,
+    )
+
+    return success_response(
+        status_code=status.HTTP_200_OK,
+        message="Asset assigned successfully",
+        data=AssetResponse.model_validate(asset).model_dump(mode="json"),
+    )
+
+
+@router.post(
+    "/{asset_id}/unassign",
+    status_code=status.HTTP_200_OK,
+)
+async def unassign_asset(
+    asset_id: UUID,
+    session: DBSession,
+    _admin_user: AdminUser,
+) -> AssetResponse:
+    service = AssetService(session)
+
+    asset = await service.unassign(asset_id)
+
+    return success_response(
+        status_code=status.HTTP_200_OK,
+        message="Asset unassigned successfully",
+        data=AssetResponse.model_validate(asset).model_dump(mode="json"),
+    )
