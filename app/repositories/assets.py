@@ -113,3 +113,10 @@ class AssetRepository:
         await self.session.refresh(asset)
 
         return asset
+
+    async def delete(
+        self,
+        asset: Asset,
+    ) -> None:
+        await self.session.delete(asset)
+        await self.session.flush()
