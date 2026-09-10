@@ -36,3 +36,9 @@ class InvalidAssetStatusTransitionError(AppError):
     ) -> None:
         self.message = f"Cannot change status from '{current_status}' to '{new_status}'"
         super().__init__()
+
+
+class AssetDeleteConflictError(AppError):
+    status_code = 409
+    code = "ASSET_DELETE_CONFLICT"
+    message = "Asset can only be deleted when its status is 'in_stock' or 'retired'"

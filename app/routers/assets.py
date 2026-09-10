@@ -133,3 +133,16 @@ async def update_asset(
         message="Asset updated successfully",
         data=AssetResponse.model_validate(asset).model_dump(mode="json"),
     )
+
+
+@router.delete("/{asset_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_asset(
+    asset_id: UUID,
+    _current_user: AdminUser,
+    session: DBSession,
+) -> None:
+    service = AssetService(session)
+
+    await service.delete(asset_id)
+
+    return None

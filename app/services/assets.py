@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.asset_tag.generator import build_asset_tag, get_company_prefix
 from app.asset_tag.repository import AssetTagCounterRepository
 from app.exceptions.assets import (
+    AssetDeleteConflictError,
     AssetNotFoundError,
     AssetTagAlreadyExistsError,
     InvalidAssetStatusTransitionError,
@@ -223,3 +224,17 @@ class AssetService:
             raise
 
         return asset
+
+    async def delete(self, asset_id: UUID) -> None:
+        asset = await self.asset_repository.get_by_id(asset_id)
+
+        if asset is None:
+            raise AssetNotFoundError()
+
+        if asset.status not in {
+            AssetStatus.IN_STOCK,
+            AssetStatus.RETIRED,
+        }:
+            raise AssetDeleteConflictError()
+
+        await self.asset_repository.delete(asset)
