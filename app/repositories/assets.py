@@ -145,3 +145,19 @@ class AssetRepository:
         await self.session.refresh(asset)
 
         return asset
+
+    async def change_status(
+        self,
+        *,
+        asset: Asset,
+        new_status: AssetStatus,
+    ) -> Asset:
+        asset.status = new_status
+
+        if new_status == AssetStatus.REPAIR:
+            asset.assigned_to = None
+
+        await self.session.flush()
+        await self.session.refresh(asset)
+
+        return asset
