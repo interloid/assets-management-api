@@ -56,3 +56,9 @@ class AssetUpdate(BaseModel):
     _validate_serial_number = field_validator(
         "serial_number",
     )(validate_serial_number)
+
+
+class AssetAssign(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    user_id: UUID

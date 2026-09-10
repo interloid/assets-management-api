@@ -120,3 +120,28 @@ class AssetRepository:
     ) -> None:
         await self.session.delete(asset)
         await self.session.flush()
+
+    async def assign(
+        self,
+        asset: Asset,
+        user_id: UUID,
+    ) -> Asset:
+        asset.status = AssetStatus.ASSIGNED
+        asset.assigned_to = user_id
+
+        await self.session.flush()
+        await self.session.refresh(asset)
+
+        return asset
+
+    async def unassign(
+        self,
+        asset: Asset,
+    ) -> Asset:
+        asset.assigned_to = None
+        asset.status = AssetStatus.IN_STOCK
+
+        await self.session.flush()
+        await self.session.refresh(asset)
+
+        return asset

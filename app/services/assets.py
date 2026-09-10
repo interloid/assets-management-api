@@ -9,6 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.asset_tag.generator import build_asset_tag, get_company_prefix
 from app.asset_tag.repository import AssetTagCounterRepository
 from app.exceptions.assets import (
+    AssetAssignmentUserInactiveError,
+    AssetAssignmentUserNotFoundError,
     AssetDeleteConflictError,
     AssetNotFoundError,
     AssetTagAlreadyExistsError,
@@ -19,6 +21,7 @@ from app.models.assets import Asset
 from app.models.enums import AssetStatus, AssetType, UserRole
 from app.models.user import User
 from app.repositories.assets import AssetRepository
+from app.repositories.user import UserRepository
 from app.schemas.assets import (
     AssetCreate,
     AssetListResponse,
@@ -63,6 +66,7 @@ class AssetService:
         self.session = session
         self.asset_repository = AssetRepository(session)
         self.asset_tag_counter_repository = AssetTagCounterRepository(session)
+        self.user_repository = UserRepository(session)
 
     def _validate_status_transition(
         self,
@@ -238,3 +242,52 @@ class AssetService:
             raise AssetDeleteConflictError()
 
         await self.asset_repository.delete(asset)
+
+    async def assign(
+        self,
+        asset_id: UUID,
+        user_id: UUID,
+    ) -> Asset:
+        asset = await self.asset_repository.get_by_id(asset_id)
+
+        if asset is None:
+            raise AssetNotFoundError()
+
+        self._validate_status_transition(
+            current_status=asset.status,
+            new_status=AssetStatus.ASSIGNED,
+        )
+
+        user = await self.user_repository.get_by_id(user_id)
+
+        if user is None:
+            raise AssetAssignmentUserNotFoundError()
+
+        if not user.is_active:
+            raise AssetAssignmentUserInactiveError()
+
+        await self.asset_repository.assign(
+            asset,
+            user_id,
+        )
+
+        await self.session.commit()
+
+        return asset
+
+    async def unassign(self, asset_id: UUID) -> Asset:
+        asset = await self.asset_repository.get_by_id(asset_id)
+
+        if asset is None:
+            raise AssetNotFoundError()
+
+        self._validate_status_transition(
+            current_status=asset.status,
+            new_status=AssetStatus.IN_STOCK,
+        )
+
+        await self.asset_repository.unassign(asset)
+
+        await self.session.commit()
+
+        return asset
