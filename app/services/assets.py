@@ -291,3 +291,36 @@ class AssetService:
         await self.session.commit()
 
         return asset
+
+    async def change_status(
+        self,
+        asset_id: UUID,
+        new_status: AssetStatus,
+    ) -> Asset:
+        asset = await self.asset_repository.get_by_id(asset_id)
+
+        if asset is None:
+            raise AssetNotFoundError()
+
+        if asset.status == AssetStatus.IN_STOCK and new_status == AssetStatus.ASSIGNED:
+            raise InvalidAssetStatusTransitionError(
+                current_status=asset.status.value,
+                new_status=new_status.value,
+            )
+
+        if asset.status == AssetStatus.ASSIGNED and new_status == AssetStatus.IN_STOCK:
+            raise InvalidAssetStatusTransitionError(
+                current_status=asset.status.value,
+                new_status=new_status.value,
+            )
+
+        self._validate_status_transition(
+            current_status=asset.status,
+            new_status=new_status,
+        )
+
+        await self.asset_repository.change_status(asset=asset, new_status=new_status)
+
+        await self.session.commit()
+
+        return asset

@@ -7,7 +7,13 @@ from fastapi import APIRouter, Query, status
 from app.core.responses import success_response
 from app.dependencies.types import AdminUser, CurrentUser, DBSession
 from app.models.enums import AssetStatus, AssetType
-from app.schemas.assets import AssetAssign, AssetCreate, AssetResponse, AssetUpdate
+from app.schemas.assets import (
+    AssetAssign,
+    AssetCreate,
+    AssetResponse,
+    AssetStatusUpdate,
+    AssetUpdate,
+)
 from app.services.assets import AssetService
 
 router = APIRouter(
@@ -188,5 +194,26 @@ async def unassign_asset(
     return success_response(
         status_code=status.HTTP_200_OK,
         message="Asset unassigned successfully",
+        data=AssetResponse.model_validate(asset).model_dump(mode="json"),
+    )
+
+
+@router.post(
+    "/{asset_id}/status",
+    status_code=status.HTTP_200_OK,
+)
+async def change_status(
+    asset_id: UUID,
+    data: AssetStatusUpdate,
+    session: DBSession,
+    _admin_user: AdminUser,
+) -> AssetResponse:
+    service = AssetService(session)
+
+    asset = await service.change_status(asset_id, data.status)
+
+    return success_response(
+        status_code=status.HTTP_200_OK,
+        message="Asset status changed successfully",
         data=AssetResponse.model_validate(asset).model_dump(mode="json"),
     )
