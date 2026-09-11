@@ -80,6 +80,19 @@ async def list_assets(
     )
 
 
+@router.get("/summary", status_code=status.HTTP_200_OK)
+async def get_asset_summary(session: DBSession, _admin_user: AdminUser):
+    service = AssetService(session)
+
+    result = await service.summary()
+
+    return success_response(
+        status_code=status.HTTP_200_OK,
+        message="Assets summary retrieved successfully",
+        data=result,
+    )
+
+
 @router.get("/my", status_code=status.HTTP_200_OK)
 async def get_my_assets(
     session: DBSession,
