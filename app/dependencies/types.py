@@ -22,7 +22,7 @@ RefreshToken = Annotated[
 CurrentUser = Annotated[User, Depends(get_current_user)]
 
 AccessTokenPayload = Annotated[
-    dict[str, any],
+    dict[str, Any],
     Depends(get_current_access_token),
 ]
 

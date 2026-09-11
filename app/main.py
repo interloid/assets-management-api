@@ -1,5 +1,6 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.core.lifespan import lifespan
 from app.exceptions.base import AppError
@@ -20,7 +21,10 @@ app = FastAPI(
 
 app.add_exception_handler(AppError, app_exception_handler)
 app.add_exception_handler(Exception, unexpected_exception_handler)
-app.add_exception_handler(HTTPException, http_exception_handler)
+app.add_exception_handler(
+    StarletteHTTPException,
+    http_exception_handler,
+)
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
 
 app.include_router(health.router)

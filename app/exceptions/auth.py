@@ -43,4 +43,4 @@ class AuthorizationError(AppError):
 class SamePasswordError(AppError):
     status_code = 400
     code = "SAME_PASSWORD"
-    message = "New Password and current password cannot be same"
+    message = "New password and current password cannot be the same"

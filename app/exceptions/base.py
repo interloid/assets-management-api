@@ -10,6 +10,5 @@ class AppError(Exception):
         headers: dict[str, str] | None = None,
     ) -> None:
         self.message = message or self.message
-        self.headers = headers
-
+        self.headers = headers or self.headers
         super().__init__(self.message)

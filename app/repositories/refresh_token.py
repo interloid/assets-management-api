@@ -64,8 +64,6 @@ class RefreshTokenRepository:
 
         await self.session.execute(stmt)
 
-        # await self.session.flush()
-
     async def revoke_family(
         self,
         family_id: UUID,
@@ -83,8 +81,6 @@ class RefreshTokenRepository:
 
         await self.session.execute(stmt)
 
-        # await self.session.flush()
-
     async def revoke_user(
         self,
         user_id: UUID,
@@ -101,5 +97,3 @@ class RefreshTokenRepository:
         )
 
         await self.session.execute(stmt)
-
-        # await self.session.flush()

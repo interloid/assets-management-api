@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.user import User
@@ -51,5 +51,16 @@ class UserRepository:
         return user
 
     async def increment_token_version(self, user: User) -> None:
-        user.token_version += 1
-        await self.session.flush()
+        stmt = (
+            update(User)
+            .where(User.id == user.id)
+            .values(
+                token_version=User.token_version + 1,
+                updated_at=func.now(),
+            )
+            .returning(User.token_version)
+        )
+
+        result = await self.session.execute(stmt)
+
+        user.token_version = result.scalar_one()

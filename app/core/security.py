@@ -73,9 +73,6 @@ def decode_access_token(token: str) -> dict[str, Any]:
             },
         )
 
-    except jwt.ExpiredSignatureError as exc:
-        raise InvalidTokenError() from exc
-
     except jwt.InvalidTokenError as exc:
         raise InvalidTokenError() from exc
 

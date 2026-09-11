@@ -5,7 +5,6 @@ from uuid import uuid4
 import pytest
 
 from app.dependencies.authentication import get_logout_all_context
-from app.dependencies.redis import get_redis
 from app.exceptions.auth import InvalidTokenError
 from app.main import app
 
@@ -15,7 +14,6 @@ async def test_logout_all_success(
     api_client,
 ) -> None:
     refresh_token = "valid_refresh_token"
-    mock_redis = AsyncMock()
 
     current_user = SimpleNamespace(
         id=uuid4(),
@@ -32,10 +30,7 @@ async def test_logout_all_success(
         "token_version": 0,
     }
 
-    app.dependency_overrides[get_logout_all_context] = (
-        lambda: logout_all_context
-    )
-    app.dependency_overrides[get_redis] = lambda: mock_redis
+    app.dependency_overrides[get_logout_all_context] = lambda: logout_all_context
 
     api_client.cookies.set(
         "refresh_token",
@@ -55,7 +50,6 @@ async def test_logout_all_success(
             refresh_token,
             current_user,
             0,
-            mock_redis,
         )
 
         assert "refresh_token" in response.headers.get(
@@ -72,7 +66,6 @@ async def test_logout_all_failed(
     api_client,
 ) -> None:
     refresh_token = "invalid_refresh_token"
-    mock_redis = AsyncMock()
 
     current_user = SimpleNamespace(
         id=uuid4(),
@@ -89,10 +82,7 @@ async def test_logout_all_failed(
         "token_version": 0,
     }
 
-    app.dependency_overrides[get_logout_all_context] = (
-        lambda: logout_all_context
-    )
-    app.dependency_overrides[get_redis] = lambda: mock_redis
+    app.dependency_overrides[get_logout_all_context] = lambda: logout_all_context
 
     api_client.cookies.set(
         "refresh_token",
@@ -113,7 +103,6 @@ async def test_logout_all_failed(
             refresh_token,
             current_user,
             0,
-            mock_redis,
         )
 
     finally:

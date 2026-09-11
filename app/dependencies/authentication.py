@@ -7,7 +7,6 @@ from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import decode_access_token
-from app.db.redis import get_token_version, set_token_version
 from app.db.session import get_db
 from app.dependencies.redis import get_redis
 from app.exceptions.auth import InvalidTokenError, UserInactiveError
@@ -42,36 +41,15 @@ async def get_current_user(
     ):
         raise InvalidTokenError()
 
-    current_token_version = await get_token_version(redis_client, str(user_id))
+    repository = UserRepository(session)
 
-    user = None
-
-    if current_token_version is None:
-        repository = UserRepository(session)
-
-        user = await repository.get_by_id(user_id)
-
-        if user is None:
-            raise InvalidTokenError()
-
-        current_token_version = user.token_version
-
-        await set_token_version(
-            redis_client,
-            str(user_id),
-            current_token_version,
-        )
-
-    if token_version != current_token_version:
-        raise InvalidTokenError()
+    user = await repository.get_by_id(user_id)
 
     if user is None:
-        repository = UserRepository(session)
+        raise InvalidTokenError()
 
-        user = await repository.get_by_id(user_id)
-
-        if user is None:
-            raise InvalidTokenError()
+    if token_version != user.token_version:
+        raise InvalidTokenError()
 
     if not user.is_active:
         raise UserInactiveError()
@@ -116,6 +94,7 @@ def get_logout_access_token(
         raise InvalidTokenError() from exc
 
     return payload
+
 
 async def get_logout_all_context(
     credentials: HTTPAuthorizationCredentials = Depends(security),

@@ -15,7 +15,6 @@ from app.core.security import (
     hash_refresh_token,
     verify_password,
 )
-from app.db.redis import set_token_version
 from app.exceptions.auth import (
     EmailAlreadyRegisteredError,
     InvalidCredentialsError,
@@ -68,7 +67,6 @@ class AuthService:
     async def login(
         self,
         payload: LoginRequest,
-        redis_client: Redis,
     ) -> LoginResult:
         user = await self.user_repository.get_by_email(payload.email)
 
@@ -89,12 +87,6 @@ class AuthService:
             user_id=str(user.id),
             role=user.role.value,
             token_version=user.token_version,
-        )
-
-        await set_token_version(
-            redis_client,
-            str(user.id),
-            user.token_version,
         )
 
         refresh_token = generate_refresh_token()
@@ -144,6 +136,13 @@ class AuthService:
             await self.refresh_token_repository.revoke_family(
                 stored_token.family_id,
             )
+
+            user = await self.user_repository.get_by_id(
+                stored_token.user_id,
+            )
+
+            if user is not None:
+                await self.user_repository.increment_token_version(user)
 
             await self.session.commit()
 
@@ -220,7 +219,6 @@ class AuthService:
 
             stored_token = await self.refresh_token_repository.get_by_hash(
                 token_hash,
-                for_update=True,
             )
 
             if stored_token is not None:
@@ -241,11 +239,12 @@ class AuthService:
         refresh_token: str | None,
         current_user: User,
         access_token_version: int,
-        redis_client: Redis,
     ) -> None:
+        # Stale token: already invalidated by a newer token version.
         if access_token_version < current_user.token_version:
             return
 
+        # Future token version: inconsistent with server state, so reject it.
         if access_token_version > current_user.token_version:
             raise InvalidTokenError()
 
@@ -270,18 +269,11 @@ class AuthService:
 
         await self.session.commit()
 
-        await set_token_version(
-            redis_client,
-            str(current_user.id),
-            current_user.token_version,
-        )
-
     async def change_password(
         self,
         user: User,
         current_password: str,
         new_password: str,
-        redis_client: Redis,
     ) -> None:
         if not verify_password(
             current_password,
@@ -304,9 +296,3 @@ class AuthService:
         await self.user_repository.increment_token_version(user)
 
         await self.session.commit()
-
-        await set_token_version(
-            redis_client,
-            str(user.id),
-            user.token_version,
-        )

@@ -26,7 +26,8 @@ def error_response(
     status_code: int,
     message: str,
     code: str,
-    details: Any,
+    details: Any = None,
+    headers: dict[str, str] | None = None,
 ) -> JSONResponse:
     return JSONResponse(
         status_code=status_code,
@@ -40,4 +41,5 @@ def error_response(
                 "details": details,
             },
         },
+        headers=headers,
     )

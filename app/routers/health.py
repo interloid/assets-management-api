@@ -1,3 +1,5 @@
+import asyncio
+
 from fastapi import APIRouter, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
@@ -20,12 +22,18 @@ async def health_check(
     redis_status = "up"
 
     try:
-        await db.execute(text("SELECT 1"))
+        await asyncio.wait_for(
+            db.execute(text("SELECT 1")),
+            timeout=2,
+        )
     except Exception:
         database_status = "down"
 
     try:
-        await redis.ping()
+        await asyncio.wait_for(
+            redis.ping(),
+            timeout=2,
+        )
     except Exception:
         redis_status = "down"
 

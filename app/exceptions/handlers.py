@@ -2,6 +2,7 @@ from fastapi import HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from app.core.responses import error_response
 from app.exceptions.base import AppError
 
 SENSITIVE_FIELDS = {
@@ -17,18 +18,10 @@ def app_exception_handler(
     _request: Request,
     exc: AppError,
 ) -> JSONResponse:
-    return JSONResponse(
+    return error_response(
         status_code=exc.status_code,
-        content={
-            "success": False,
-            "statusCode": exc.status_code,
-            "message": exc.message,
-            "data": None,
-            "error": {
-                "code": exc.code,
-                "details": None,
-            },
-        },
+        message=exc.message,
+        code=exc.code,
         headers=exc.headers,
     )
 
@@ -51,18 +44,11 @@ def validation_exception_handler(
 
         errors.append(error)
 
-    return JSONResponse(
+    return error_response(
         status_code=422,
-        content={
-            "success": False,
-            "statusCode": 422,
-            "message": "Validation failed",
-            "data": None,
-            "error": {
-                "code": "INVALID_INPUT",
-                "details": errors,
-            },
-        },
+        message="Validation failed",
+        code="INVALID_INPUT",
+        details=errors,
     )
 
 
@@ -70,18 +56,10 @@ def unexpected_exception_handler(
     _request: Request,
     _exc: Exception,
 ) -> JSONResponse:
-    return JSONResponse(
+    return error_response(
         status_code=500,
-        content={
-            "success": False,
-            "statusCode": 500,
-            "message": "Internal server error",
-            "data": None,
-            "error": {
-                "code": "INTERNAL_ERROR",
-                "details": None,
-            },
-        },
+        message="Internal server error",
+        code="INTERNAL_ERROR",
     )
 
 
@@ -90,32 +68,17 @@ def http_exception_handler(
     exc: HTTPException,
 ) -> JSONResponse:
     if exc.status_code == 401:
-        return JSONResponse(
+        return error_response(
             status_code=401,
-            content={
-                "success": False,
-                "statusCode": 401,
-                "message": "Authentication required",
-                "data": None,
-                "error": {
-                    "code": "AUTHENTICATION_REQUIRED",
-                    "details": "Authentication credentials were not provided",
-                },
-            },
+            message="Authentication required",
+            code="AUTHENTICATION_REQUIRED",
+            details="Authentication credentials were not provided",
             headers=exc.headers,
         )
 
-    return JSONResponse(
+    return error_response(
         status_code=exc.status_code,
-        content={
-            "success": False,
-            "statusCode": exc.status_code,
-            "message": str(exc.detail),
-            "data": None,
-            "error": {
-                "code": "HTTP_ERROR",
-                "details": None,
-            },
-        },
+        message=str(exc.detail),
+        code="HTTP_ERROR",
         headers=exc.headers,
     )

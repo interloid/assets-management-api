@@ -41,11 +41,6 @@ async def test_get_current_user_success(
             return_value=False,
         ) as mock_blacklist,
         patch(
-            "app.dependencies.authentication.get_token_version",
-            new_callable=AsyncMock,
-            return_value=0,
-        ) as mock_get_token_version,
-        patch(
             "app.dependencies.authentication.UserRepository",
             return_value=mock_repository,
         ),
@@ -61,11 +56,6 @@ async def test_get_current_user_success(
     mock_blacklist.assert_awaited_once_with(
         mock_redis,
         "jti-123",
-    )
-
-    mock_get_token_version.assert_awaited_once_with(
-        mock_redis,
-        str(created_user.id),
     )
 
     mock_repository.get_by_id.assert_awaited_once_with(
@@ -108,15 +98,6 @@ async def test_get_current_user_redis_miss(
             return_value=False,
         ),
         patch(
-            "app.dependencies.authentication.get_token_version",
-            new_callable=AsyncMock,
-            return_value=None,
-        ) as mock_get_token_version,
-        patch(
-            "app.dependencies.authentication.set_token_version",
-            new_callable=AsyncMock,
-        ) as mock_set_token_version,
-        patch(
             "app.dependencies.authentication.UserRepository",
             return_value=mock_repository,
         ),
@@ -129,19 +110,8 @@ async def test_get_current_user_redis_miss(
 
     assert result is created_user
 
-    mock_get_token_version.assert_awaited_once_with(
-        mock_redis,
-        str(created_user.id),
-    )
-
     mock_repository.get_by_id.assert_awaited_once_with(
         created_user.id,
-    )
-
-    mock_set_token_version.assert_awaited_once_with(
-        mock_redis,
-        str(created_user.id),
-        3,
     )
 
 
@@ -178,11 +148,6 @@ async def test_get_current_user_token_version_mismatch(
             return_value=False,
         ),
         patch(
-            "app.dependencies.authentication.get_token_version",
-            new_callable=AsyncMock,
-            return_value=2,
-        ),
-        patch(
             "app.dependencies.authentication.UserRepository",
             return_value=mock_repository,
         ),
@@ -196,4 +161,6 @@ async def test_get_current_user_token_version_mismatch(
                 redis_client=mock_redis,
             )
 
-    mock_repository.get_by_id.assert_not_awaited()
+    mock_repository.get_by_id.assert_awaited_once_with(
+        created_user.id,
+    )

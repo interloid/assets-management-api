@@ -16,7 +16,6 @@ async def test_correct_current_password(
 ) -> None:
     current_password = "OldPassword123"
     new_password = "NewPassword123"
-    redis_client = AsyncMock()
 
     auth_service.user_repository.update_password = AsyncMock()
     auth_service.refresh_token_repository.revoke_user = AsyncMock()
@@ -30,16 +29,11 @@ async def test_correct_current_password(
             "app.services.auth.hash_password",
             return_value="new-hashed-password",
         ) as mock_hash_password:
-            with patch(
-                "app.services.auth.set_token_version",
-                new_callable=AsyncMock,
-            ) as mock_set_token_version:
-                await auth_service.change_password(
-                    created_user,
-                    current_password,
-                    new_password,
-                    redis_client,
-                )
+            await auth_service.change_password(
+                created_user,
+                current_password,
+                new_password,
+            )
 
     assert mock_verify_password.call_count == 2
 
@@ -72,12 +66,6 @@ async def test_correct_current_password(
 
     mock_session.commit.assert_awaited_once()
 
-    mock_set_token_version.assert_awaited_once_with(
-        redis_client,
-        str(created_user.id),
-        created_user.token_version,
-    )
-
 
 @pytest.mark.asyncio
 async def test_incorrect_current_password(
@@ -87,7 +75,6 @@ async def test_incorrect_current_password(
 ) -> None:
     current_password = "WrongPassword123"
     new_password = "NewPassword123"
-    redis_client = AsyncMock()
 
     auth_service.user_repository.update_password = AsyncMock()
     auth_service.refresh_token_repository.revoke_user = AsyncMock()
@@ -100,17 +87,12 @@ async def test_incorrect_current_password(
         with patch(
             "app.services.auth.hash_password",
         ) as mock_hash_password:
-            with patch(
-                "app.services.auth.set_token_version",
-                new_callable=AsyncMock,
-            ) as mock_set_token_version:
-                with pytest.raises(InvalidCredentialsError):
-                    await auth_service.change_password(
-                        created_user,
-                        current_password,
-                        new_password,
-                        redis_client,
-                    )
+            with pytest.raises(InvalidCredentialsError):
+                await auth_service.change_password(
+                    created_user,
+                    current_password,
+                    new_password,
+                )
 
     mock_verify_password.assert_called_once_with(
         current_password,
@@ -129,8 +111,6 @@ async def test_incorrect_current_password(
 
     mock_session.rollback.assert_not_awaited()
 
-    mock_set_token_version.assert_not_awaited()
-
 
 @pytest.mark.asyncio
 async def test_same_password_rejected(
@@ -140,7 +120,6 @@ async def test_same_password_rejected(
 ) -> None:
     current_password = "OldPassword123"
     new_password = "OldPassword123"
-    redis_client = AsyncMock()
 
     auth_service.user_repository.update_password = AsyncMock()
     auth_service.refresh_token_repository.revoke_user = AsyncMock()
@@ -153,17 +132,12 @@ async def test_same_password_rejected(
         with patch(
             "app.services.auth.hash_password",
         ) as mock_hash_password:
-            with patch(
-                "app.services.auth.set_token_version",
-                new_callable=AsyncMock,
-            ) as mock_set_token_version:
-                with pytest.raises(SamePasswordError):
-                    await auth_service.change_password(
-                        created_user,
-                        current_password,
-                        new_password,
-                        redis_client,
-                    )
+            with pytest.raises(SamePasswordError):
+                await auth_service.change_password(
+                    created_user,
+                    current_password,
+                    new_password,
+                )
 
     assert mock_verify_password.call_count == 2
 
@@ -187,8 +161,6 @@ async def test_same_password_rejected(
 
     mock_session.commit.assert_not_awaited()
 
-    mock_set_token_version.assert_not_awaited()
-
 
 @pytest.mark.asyncio
 async def test_new_password_hashed(
@@ -198,7 +170,6 @@ async def test_new_password_hashed(
 ) -> None:
     current_password = "OldPassword123"
     new_password = "NewPassword123"
-    redis_client = AsyncMock()
 
     auth_service.user_repository.update_password = AsyncMock()
     auth_service.refresh_token_repository.revoke_user = AsyncMock()
@@ -212,16 +183,11 @@ async def test_new_password_hashed(
             "app.services.auth.hash_password",
             return_value="new-hashed-password",
         ) as mock_hash_password:
-            with patch(
-                "app.services.auth.set_token_version",
-                new_callable=AsyncMock,
-            ):
-                await auth_service.change_password(
-                    created_user,
-                    current_password,
-                    new_password,
-                    redis_client,
-                )
+            await auth_service.change_password(
+                created_user,
+                current_password,
+                new_password,
+            )
 
     mock_hash_password.assert_called_once_with(
         new_password,
@@ -243,7 +209,6 @@ async def test_revoke_all_refresh_tokens(
 ) -> None:
     current_password = "OldPassword123"
     new_password = "NewPassword123"
-    redis_client = AsyncMock()
 
     auth_service.user_repository.update_password = AsyncMock()
     auth_service.refresh_token_repository.revoke_user = AsyncMock()
@@ -257,16 +222,11 @@ async def test_revoke_all_refresh_tokens(
             "app.services.auth.hash_password",
             return_value="new-hashed-password",
         ):
-            with patch(
-                "app.services.auth.set_token_version",
-                new_callable=AsyncMock,
-            ):
-                await auth_service.change_password(
-                    created_user,
-                    current_password,
-                    new_password,
-                    redis_client,
-                )
+            await auth_service.change_password(
+                created_user,
+                current_password,
+                new_password,
+            )
 
     auth_service.refresh_token_repository.revoke_user.assert_awaited_once_with(
         created_user.id,

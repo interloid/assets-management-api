@@ -11,7 +11,6 @@ async def test_logout_all_success(
     valid_stored_token,
 ) -> None:
     refresh_token = "valid_refresh_token"
-    redis_client = AsyncMock()
 
     current_user = SimpleNamespace(
         id="user-123",
@@ -38,16 +37,11 @@ async def test_logout_all_success(
             ),
         )
 
-        with patch(
-            "app.services.auth.set_token_version",
-            new_callable=AsyncMock,
-        ) as mock_set_token_version:
-            await auth_service.logout_all(
-                refresh_token,
-                current_user,
-                access_token_version,
-                redis_client,
-            )
+        await auth_service.logout_all(
+            refresh_token,
+            current_user,
+            access_token_version,
+        )
 
     mock_hash.assert_called_once_with(refresh_token)
 
@@ -67,12 +61,6 @@ async def test_logout_all_success(
 
     assert current_user.token_version == 1
 
-    mock_set_token_version.assert_awaited_once_with(
-        redis_client,
-        str(current_user.id),
-        1,
-    )
-
 
 @pytest.mark.asyncio
 async def test_logout_all_empty_refresh_token(
@@ -80,7 +68,6 @@ async def test_logout_all_empty_refresh_token(
     mock_session,
 ) -> None:
     refresh_token = None
-    redis_client = AsyncMock()
 
     current_user = SimpleNamespace(
         id="user-123",
@@ -99,16 +86,11 @@ async def test_logout_all_empty_refresh_token(
         ),
     )
 
-    with patch(
-        "app.services.auth.set_token_version",
-        new_callable=AsyncMock,
-    ) as mock_set_token_version:
-        await auth_service.logout_all(
-            refresh_token,
-            current_user,
-            access_token_version,
-            redis_client,
-        )
+    await auth_service.logout_all(
+        refresh_token,
+        current_user,
+        access_token_version,
+    )
 
     auth_service.refresh_token_repository.revoke_user.assert_awaited_once_with(
         current_user.id,
@@ -122,12 +104,6 @@ async def test_logout_all_empty_refresh_token(
 
     assert current_user.token_version == 1
 
-    mock_set_token_version.assert_awaited_once_with(
-        redis_client,
-        str(current_user.id),
-        1,
-    )
-
 
 @pytest.mark.asyncio
 async def test_logout_all_refresh_token_not_found(
@@ -135,7 +111,6 @@ async def test_logout_all_refresh_token_not_found(
     mock_session,
 ) -> None:
     refresh_token = "invalid_refresh_token"
-    redis_client = AsyncMock()
 
     current_user = SimpleNamespace(
         id="user-123",
@@ -149,10 +124,6 @@ async def test_logout_all_refresh_token_not_found(
             "app.services.auth.hash_refresh_token",
             return_value="hashed_refresh_token",
         ) as mock_hash,
-        patch(
-            "app.services.auth.set_token_version",
-            new_callable=AsyncMock,
-        ) as mock_set_token_version,
     ):
         auth_service.refresh_token_repository.get_by_hash = AsyncMock(
             return_value=None,
@@ -172,7 +143,6 @@ async def test_logout_all_refresh_token_not_found(
             refresh_token,
             current_user,
             access_token_version,
-            redis_client,
         )
 
     mock_hash.assert_called_once_with(refresh_token)
@@ -193,19 +163,12 @@ async def test_logout_all_refresh_token_not_found(
 
     assert current_user.token_version == 1
 
-    mock_set_token_version.assert_awaited_once_with(
-        redis_client,
-        str(current_user.id),
-        1,
-    )
-
 
 @pytest.mark.asyncio
 async def test_logout_all_idempotent(
     auth_service,
     mock_session,
 ) -> None:
-    redis_client = AsyncMock()
 
     current_user = SimpleNamespace(
         id="user-123",
@@ -224,27 +187,21 @@ async def test_logout_all_idempotent(
         ),
     )
 
-    with patch(
-        "app.services.auth.set_token_version",
-        new_callable=AsyncMock,
-    ) as mock_set_token_version:
-        # First logout-all.
-        await auth_service.logout_all(
-            None,
-            current_user,
-            access_token_version,
-            redis_client,
-        )
+    # First logout-all.
+    await auth_service.logout_all(
+        None,
+        current_user,
+        access_token_version,
+    )
 
-        assert current_user.token_version == 1
+    assert current_user.token_version == 1
 
-        # Repeat logout-all using the same access token.
-        await auth_service.logout_all(
-            None,
-            current_user,
-            access_token_version,
-            redis_client,
-        )
+    # Repeat logout-all using the same access token.
+    await auth_service.logout_all(
+        None,
+        current_user,
+        access_token_version,
+    )
 
     # Token version must not be incremented again.
     assert current_user.token_version == 1
@@ -258,9 +215,3 @@ async def test_logout_all_idempotent(
     )
 
     mock_session.commit.assert_awaited_once()
-
-    mock_set_token_version.assert_awaited_once_with(
-        redis_client,
-        str(current_user.id),
-        1,
-    )

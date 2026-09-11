@@ -59,7 +59,6 @@ async def test_change_password_success(
         user=user,
         current_password=payload["current_password"],
         new_password=payload["new_password"],
-        redis_client=mock_redis,
     )
 
 
@@ -107,7 +106,6 @@ async def test_change_password_wrong_current_password(
         user=user,
         current_password=payload["current_password"],
         new_password=payload["new_password"],
-        redis_client=mock_redis,
     )
 
     body = response.json()

@@ -44,7 +44,6 @@ async def test_valid_logout(
 
     auth_service.refresh_token_repository.get_by_hash.assert_awaited_once_with(
         "hashed_refresh_token",
-        for_update=True,
     )
 
     auth_service.refresh_token_repository.revoke.assert_awaited_once_with(
@@ -120,10 +119,8 @@ async def test_logout_refresh_token_not_found(
 
     auth_service.refresh_token_repository.get_by_hash.assert_awaited_once_with(
         "hashed_refresh_token",
-        for_update=True,
     )
 
     mock_blacklist.assert_awaited_once()
 
     mock_session.commit.assert_awaited_once()
-
