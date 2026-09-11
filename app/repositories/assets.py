@@ -161,3 +161,13 @@ class AssetRepository:
         await self.session.refresh(asset)
 
         return asset
+
+    async def summary(self) -> dict[AssetStatus, int]:
+        stmt = select(
+            Asset.status,
+            func.count(Asset.id).label("count"),
+        ).group_by(Asset.status)
+
+        result = await self.session.execute(stmt)
+
+        return dict(result.all())

@@ -243,6 +243,8 @@ class AssetService:
 
         await self.asset_repository.delete(asset)
 
+        await self.session.commit()
+
     async def assign(
         self,
         asset_id: UUID,
@@ -324,3 +326,19 @@ class AssetService:
         await self.session.commit()
 
         return asset
+
+    async def summary(self) -> dict[str, int]:
+        counts = await self.asset_repository.summary()
+
+        in_stock = counts.get(AssetStatus.IN_STOCK, 0)
+        assigned = counts.get(AssetStatus.ASSIGNED, 0)
+        repair = counts.get(AssetStatus.REPAIR, 0)
+        retired = counts.get(AssetStatus.RETIRED, 0)
+
+        return {
+            "total": in_stock + assigned + repair + retired,
+            "in_stock": in_stock,
+            "assigned": assigned,
+            "repair": repair,
+            "retired": retired,
+        }
