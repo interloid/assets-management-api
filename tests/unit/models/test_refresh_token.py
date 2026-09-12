@@ -1,7 +1,7 @@
 from app.models.refresh_token import RefreshToken
 
 
-def test_refresh_token_columns():
+def test_refresh_token_columns() -> None:
     table = RefreshToken.__table__
 
     assert table.c.id.primary_key
@@ -13,7 +13,7 @@ def test_refresh_token_columns():
     assert not table.c.created_at.nullable
 
 
-def test_refresh_token_hash():
+def test_refresh_token_hash() -> None:
     column = RefreshToken.__table__.c.token_hash
 
     assert column.type.python_type is str
@@ -21,7 +21,7 @@ def test_refresh_token_hash():
     assert not column.nullable
 
 
-def test_refresh_token_user_foreign_key():
+def test_refresh_token_user_foreign_key() -> None:
     column = RefreshToken.__table__.c.user_id
 
     foreign_key = next(iter(column.foreign_keys))
@@ -30,13 +30,13 @@ def test_refresh_token_user_foreign_key():
     assert foreign_key.ondelete == "CASCADE"
 
 
-def test_refresh_token_user_id_index():
+def test_refresh_token_user_id_index() -> None:
     table = RefreshToken.__table__
 
     assert any(index.name == "ix_refresh_tokens_user_id" for index in table.indexes)
 
 
-def test_refresh_token_created_at():
+def test_refresh_token_created_at() -> None:
     column = RefreshToken.__table__.c.created_at
 
     assert not column.nullable

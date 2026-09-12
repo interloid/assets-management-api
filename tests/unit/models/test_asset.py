@@ -1,7 +1,7 @@
 from app.models.assets import Asset
 
 
-def test_asset_columns():
+def test_asset_columns() -> None:
     table = Asset.__table__
 
     assert table.c.id.primary_key
@@ -17,20 +17,20 @@ def test_asset_columns():
     assert not table.c.updated_at.nullable
 
 
-def test_asset_unique_fields():
+def test_asset_unique_fields() -> None:
     table = Asset.__table__
 
     assert table.c.asset_tag.unique
     assert table.c.serial_number.unique
 
 
-def test_asset_status_default():
+def test_asset_status_default() -> None:
     column = Asset.__table__.c.status
 
     assert column.server_default is not None
 
 
-def test_asset_assigned_to_foreign_key():
+def test_asset_assigned_to_foreign_key() -> None:
     column = Asset.__table__.c.assigned_to
 
     foreign_key = next(iter(column.foreign_keys))
@@ -39,7 +39,7 @@ def test_asset_assigned_to_foreign_key():
     assert foreign_key.ondelete == "SET NULL"
 
 
-def test_asset_indexes():
+def test_asset_indexes() -> None:
     table = Asset.__table__
 
     index_names = {index.name for index in table.indexes}
@@ -50,7 +50,7 @@ def test_asset_indexes():
     assert "ix_assets_warranty_expiry" in index_names
 
 
-def test_asset_assignment_constraint():
+def test_asset_assignment_constraint() -> None:
     table = Asset.__table__
 
     constraint_names = {constraint.name for constraint in table.constraints}

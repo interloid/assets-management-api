@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, Enum, Text, true
+from sqlalchemy import Boolean, Enum, Integer, Text, true
 from sqlalchemy.dialects.postgresql import CITEXT
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -41,6 +41,13 @@ class User(BaseModel, CreatedAtMixin, UpdatedAtMixin):
 
     is_active: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=true()
+    )
+
+    token_version: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        server_default="0",
     )
 
     refresh_tokens: Mapped[list["RefreshToken"]] = relationship(

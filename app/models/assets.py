@@ -83,7 +83,7 @@ class Asset(
 
     __table_args__ = (
         CheckConstraint(
-            "(status = 'assigned')= (assigned_to IS NOT NULL)",
+            "(status = 'assigned') = (assigned_to IS NOT NULL)",
             name="ck_assets_assignment_status",
         ),
     )
