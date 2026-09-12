@@ -46,6 +46,20 @@ ALLOWED_STATUS_TRANSITIONS: dict[AssetStatus, set[AssetStatus]] = {
     AssetStatus.RETIRED: set(),
 }
 
+ASSIGNMENT_ONLY_TRANSITIONS: set[tuple[AssetStatus, AssetStatus]] = {
+    (AssetStatus.IN_STOCK, AssetStatus.ASSIGNED),
+    (AssetStatus.ASSIGNED, AssetStatus.IN_STOCK),
+}
+
+MANUAL_STATUS_TRANSITIONS: dict[AssetStatus, set[AssetStatus]] = {
+    current: {
+        target
+        for target in targets
+        if (current, target) not in ASSIGNMENT_ONLY_TRANSITIONS
+    }
+    for current, targets in ALLOWED_STATUS_TRANSITIONS.items()
+}
+
 
 def get_constraint_name(exc: IntegrityError) -> str | None:
     message = str(exc.orig)
@@ -70,10 +84,12 @@ class AssetService:
 
     def _validate_status_transition(
         self,
+        *,
         current_status: AssetStatus,
         new_status: AssetStatus,
+        allowed_map: dict[AssetStatus, set[AssetStatus]],
     ) -> None:
-        allowed = ALLOWED_STATUS_TRANSITIONS[current_status]
+        allowed = allowed_map[current_status]
 
         if new_status not in allowed:
             raise InvalidAssetStatusTransitionError(
@@ -184,9 +200,9 @@ class AssetService:
         if asset is None:
             raise AssetNotFoundError()
 
-        try:
-            update_data = data.model_dump(exclude_unset=True)
+        update_data = data.model_dump(exclude_unset=True)
 
+        try:
             if "type" in update_data:
                 new_type = update_data["type"]
 
@@ -198,18 +214,14 @@ class AssetService:
                         asset_type=new_type,
                     )
 
-                    print("NEXT NUMBER:", number)
-
-                    asset.asset_tag = build_asset_tag(
+                    update_data["asset_tag"] = build_asset_tag(
                         asset_type=new_type,
                         number=number,
                     )
 
-                    print("NEW TAG:", asset.asset_tag)
-
             await self.asset_repository.update(
                 asset=asset,
-                data=data,
+                update_data=update_data,
             )
 
             await self.session.commit()
@@ -245,11 +257,7 @@ class AssetService:
 
         await self.session.commit()
 
-    async def assign(
-        self,
-        asset_id: UUID,
-        user_id: UUID,
-    ) -> Asset:
+    async def assign(self, asset_id: UUID, user_id: UUID) -> Asset:
         asset = await self.asset_repository.get_by_id(asset_id)
 
         if asset is None:
@@ -258,6 +266,7 @@ class AssetService:
         self._validate_status_transition(
             current_status=asset.status,
             new_status=AssetStatus.ASSIGNED,
+            allowed_map=ALLOWED_STATUS_TRANSITIONS,
         )
 
         user = await self.user_repository.get_by_id(user_id)
@@ -268,11 +277,7 @@ class AssetService:
         if not user.is_active:
             raise AssetAssignmentUserInactiveError()
 
-        await self.asset_repository.assign(
-            asset,
-            user_id,
-        )
-
+        await self.asset_repository.assign(asset, user_id)
         await self.session.commit()
 
         return asset
@@ -286,10 +291,10 @@ class AssetService:
         self._validate_status_transition(
             current_status=asset.status,
             new_status=AssetStatus.IN_STOCK,
+            allowed_map=ALLOWED_STATUS_TRANSITIONS,
         )
 
         await self.asset_repository.unassign(asset)
-
         await self.session.commit()
 
         return asset
@@ -304,25 +309,13 @@ class AssetService:
         if asset is None:
             raise AssetNotFoundError()
 
-        if asset.status == AssetStatus.IN_STOCK and new_status == AssetStatus.ASSIGNED:
-            raise InvalidAssetStatusTransitionError(
-                current_status=asset.status.value,
-                new_status=new_status.value,
-            )
-
-        if asset.status == AssetStatus.ASSIGNED and new_status == AssetStatus.IN_STOCK:
-            raise InvalidAssetStatusTransitionError(
-                current_status=asset.status.value,
-                new_status=new_status.value,
-            )
-
         self._validate_status_transition(
             current_status=asset.status,
             new_status=new_status,
+            allowed_map=MANUAL_STATUS_TRANSITIONS,
         )
 
         await self.asset_repository.change_status(asset=asset, new_status=new_status)
-
         await self.session.commit()
 
         return asset

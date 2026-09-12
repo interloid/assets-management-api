@@ -17,6 +17,7 @@ from app.schemas.auth import (
     RegisterRequest,
     UserResponse,
 )
+from app.schemas.common import SuccessEnvelope
 from app.services.auth import AuthService
 
 router = APIRouter(
@@ -34,7 +35,7 @@ COOKIE_PATH = "/auth"
 async def register(
     data: RegisterRequest,
     session: DBSession,
-):
+) -> SuccessEnvelope[UserResponse]:
 
     service = AuthService(session)
 
@@ -55,7 +56,7 @@ async def login(
     payload: LoginRequest,
     session: DBSession,
     redis_client: RedisClient,
-):
+) -> SuccessEnvelope[LoginResponse]:
     service = AuthService(session)
 
     result = await service.login(
@@ -94,7 +95,7 @@ async def login(
 async def refresh(
     session: DBSession,
     refresh_token: RefreshToken = None,
-):
+) -> SuccessEnvelope[LoginResponse]:
     service = AuthService(session)
 
     result = await service.refresh(refresh_token)
@@ -182,7 +183,7 @@ async def logout_all(
 )
 async def get_me(
     current_user: CurrentUser,
-):
+) -> SuccessEnvelope[UserResponse]:
     return success_response(
         status_code=status.HTTP_200_OK,
         message="User retrieved successfully",
@@ -201,7 +202,7 @@ async def change_password(
     current_user: CurrentUser,
     session: DBSession,
     redis_client: RedisClient,
-):
+) -> SuccessEnvelope[None]:
     service = AuthService(session)
 
     await service.change_password(

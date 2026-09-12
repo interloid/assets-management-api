@@ -6,7 +6,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.assets import Asset
 from app.models.enums import AssetStatus, AssetType
-from app.schemas.assets import AssetUpdate
 
 
 def escape_like(value: str) -> str:
@@ -54,39 +53,32 @@ class AssetRepository:
 
             filters.append(
                 or_(
-                    Asset.asset_tag.ilike(
-                        search_pattern,
-                        escape="\\",
-                    ),
-                    Asset.serial_number.ilike(
-                        search_pattern,
-                        escape="\\",
-                    ),
-                    Asset.notes.ilike(
-                        search_pattern,
-                        escape="\\",
-                    ),
+                    Asset.asset_tag.ilike(search_pattern, escape="\\"),
+                    Asset.serial_number.ilike(search_pattern, escape="\\"),
+                    Asset.notes.ilike(search_pattern, escape="\\"),
                 ),
             )
 
-        total_query = select(func.count()).select_from(Asset).where(*filters)
-
-        total_result = await self.session.execute(total_query)
-        total = total_result.scalar_one()
-
         offset = (page - 1) * size
-
         query = (
-            select(Asset)
+            select(
+                Asset,
+                func.count().over().label("total_count"),
+            )
             .where(*filters)
             .order_by(Asset.created_at.desc())
             .offset(offset)
             .limit(size)
         )
-
         result = await self.session.execute(query)
+        rows = result.all()
 
-        assets = list(result.scalars().all())
+        if not rows:
+            count_query = select(func.count()).select_from(Asset).where(*filters)
+            total = (await self.session.execute(count_query)).scalar_one()
+            return [], total
+        assets = [row[0] for row in rows]
+        total = rows[0].total_count
 
         return assets, total
 
@@ -102,11 +94,9 @@ class AssetRepository:
     async def update(
         self,
         asset: Asset,
-        data: AssetUpdate,
+        update_data: dict,
     ) -> Asset:
-        updated_data = data.model_dump(exclude_unset=True)
-
-        for field, value in updated_data.items():
+        for field, value in update_data.items():
             setattr(asset, field, value)
 
         await self.session.flush()

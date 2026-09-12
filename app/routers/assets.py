@@ -10,10 +10,12 @@ from app.models.enums import AssetStatus, AssetType
 from app.schemas.assets import (
     AssetAssign,
     AssetCreate,
+    AssetListResponse,
     AssetResponse,
     AssetStatusUpdate,
     AssetUpdate,
 )
+from app.schemas.common import SuccessEnvelope
 from app.services.assets import AssetService
 
 router = APIRouter(
@@ -27,7 +29,7 @@ async def create_asset(
     data: AssetCreate,
     session: DBSession,
     _admin_user: AdminUser,
-) -> AssetResponse:
+) -> SuccessEnvelope[AssetResponse]:
     service = AssetService(session)
 
     asset = await service.create(data)
@@ -60,7 +62,7 @@ async def list_assets(
     warranty_expiring_before: date | None = None,
     search: str | None = None,
     sort: Literal["created_at"] = Query(default="created_at"),
-):
+) -> SuccessEnvelope[AssetListResponse]:
     service = AssetService(session)
 
     result = await service.list(
@@ -76,12 +78,14 @@ async def list_assets(
     return success_response(
         status_code=status.HTTP_200_OK,
         message="Assets retrieved successfully",
-        data=result.model_dump(mode="json"),
+        data=AssetListResponse.model_validate(result).model_dump(mode="json"),
     )
 
 
 @router.get("/summary", status_code=status.HTTP_200_OK)
-async def get_asset_summary(session: DBSession, _admin_user: AdminUser):
+async def get_asset_summary(
+    session: DBSession, _admin_user: AdminUser
+) -> SuccessEnvelope[dict[str, int]]:
     service = AssetService(session)
 
     result = await service.summary()
@@ -103,22 +107,22 @@ async def get_my_assets(
         ge=1,
         le=100,
     ),
-):
+) -> SuccessEnvelope[AssetListResponse]:
     service = AssetService(session)
 
     result = await service.list(page=page, size=size, assigned_to=current_user.id)
 
     return success_response(
         status_code=status.HTTP_200_OK,
-        message="Assets retrived successfully",
-        data=result.model_dump(mode="json"),
+        message="Assets retrieved successfully",
+        data=AssetListResponse.model_validate(result).model_dump(mode="json"),
     )
 
 
 @router.get("/{asset_id}", status_code=status.HTTP_200_OK)
 async def get_by_id(
     asset_id: UUID, session: DBSession, current_user: CurrentUser
-) -> AssetResponse:
+) -> SuccessEnvelope[AssetResponse]:
     service = AssetService(session)
 
     asset = await service.get_by_id(
@@ -139,7 +143,7 @@ async def update_asset(
     data: AssetUpdate,
     session: DBSession,
     _admin_user: AdminUser,
-) -> AssetResponse:
+) -> SuccessEnvelope[AssetResponse]:
     service = AssetService(session)
 
     asset = await service.update(
@@ -176,7 +180,7 @@ async def assign_asset(
     data: AssetAssign,
     session: DBSession,
     _admin_user: AdminUser,
-) -> AssetResponse:
+) -> SuccessEnvelope[AssetResponse]:
     service = AssetService(session)
 
     asset = await service.assign(
@@ -199,7 +203,7 @@ async def unassign_asset(
     asset_id: UUID,
     session: DBSession,
     _admin_user: AdminUser,
-) -> AssetResponse:
+) -> SuccessEnvelope[AssetResponse]:
     service = AssetService(session)
 
     asset = await service.unassign(asset_id)
@@ -220,7 +224,7 @@ async def change_status(
     data: AssetStatusUpdate,
     session: DBSession,
     _admin_user: AdminUser,
-) -> AssetResponse:
+) -> SuccessEnvelope[AssetResponse]:
     service = AssetService(session)
 
     asset = await service.change_status(asset_id, data.status)
