@@ -1,6 +1,7 @@
 import re
 from datetime import date
 from math import ceil
+from typing import Literal
 from uuid import UUID
 
 from sqlalchemy.exc import IntegrityError
@@ -150,6 +151,8 @@ class AssetService:
         assigned_to: UUID | None = None,
         warranty_expiring_before: date | None = None,
         search: str | None = None,
+        sort: Literal["created_at", "purchase_date", "asset_tag"] = "created_at",
+        order: Literal["asc", "desc"] = "desc",
     ) -> AssetListResponse:
         assets, total = await self.asset_repository.list(
             page=page,
@@ -159,6 +162,8 @@ class AssetService:
             assigned_to=assigned_to,
             warranty_expiring_before=warranty_expiring_before,
             search=search,
+            sort=sort,
+            order=order,
         )
 
         pages = ceil(total / size) if total else 0

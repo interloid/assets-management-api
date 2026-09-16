@@ -47,21 +47,17 @@ async def create_asset(
 async def list_assets(
     session: DBSession,
     _admin_user: AdminUser,
-    page: int = Query(
-        default=1,
-        ge=1,
-    ),
-    size: int = Query(
-        default=20,
-        ge=1,
-        le=100,
-    ),
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=20, ge=1, le=100),
     asset_type: AssetType | None = Query(default=None, alias="type"),
     asset_status: AssetStatus | None = None,
     assigned_to: UUID | None = None,
     warranty_expiring_before: date | None = None,
     search: str | None = None,
-    sort: Literal["created_at"] = Query(default="created_at"),
+    sort: Literal["created_at", "purchase_date", "asset_tag"] = Query(
+        default="created_at"
+    ),
+    order: Literal["asc", "desc"] = Query(default="desc"),
 ) -> SuccessEnvelope[AssetListResponse]:
     service = AssetService(session)
 
@@ -73,6 +69,8 @@ async def list_assets(
         assigned_to=assigned_to,
         warranty_expiring_before=warranty_expiring_before,
         search=search,
+        sort=sort,
+        order=order,
     )
 
     return success_response(

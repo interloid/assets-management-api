@@ -1,4 +1,5 @@
 from datetime import date
+from typing import Literal
 from uuid import UUID
 
 from sqlalchemy import func, or_, select
@@ -6,6 +7,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.assets import Asset
 from app.models.enums import AssetStatus, AssetType
+
+SORT_COLUMNS = {
+    "created_at": Asset.created_at,
+    "purchase_date": Asset.purchase_date,
+    "asset_tag": Asset.asset_tag,
+}
 
 
 def escape_like(value: str) -> str:
@@ -32,25 +39,23 @@ class AssetRepository:
         assigned_to: UUID | None = None,
         warranty_expiring_before: date | None = None,
         search: str | None = None,
+        sort: Literal["created_at", "purchase_date", "asset_tag"] = "created_at",
+        order: Literal["asc", "desc"] = "desc",
     ) -> tuple[list[Asset], int]:
         filters = []
 
         if asset_type is not None:
             filters.append(Asset.type == asset_type)
-
         if asset_status is not None:
             filters.append(Asset.status == asset_status)
-
         if assigned_to is not None:
             filters.append(Asset.assigned_to == assigned_to)
-
         if warranty_expiring_before is not None:
             filters.append(Asset.warranty_expiry <= warranty_expiring_before)
 
         if search:
             search = search.strip()
             search_pattern = f"%{escape_like(search)}%"
-
             filters.append(
                 or_(
                     Asset.asset_tag.ilike(search_pattern, escape="\\"),
@@ -59,14 +64,20 @@ class AssetRepository:
                 ),
             )
 
+        sort_column = SORT_COLUMNS[sort]
+        order_by_clause = sort_column.asc() if order == "asc" else sort_column.desc()
+
+        order_clauses = (
+            [order_by_clause, Asset.id.asc()]
+            if sort == "created_at"
+            else [order_by_clause, Asset.created_at.desc(), Asset.id.asc()]
+        )
+
         offset = (page - 1) * size
         query = (
-            select(
-                Asset,
-                func.count().over().label("total_count"),
-            )
+            select(Asset, func.count().over().label("total_count"))
             .where(*filters)
-            .order_by(Asset.created_at.desc())
+            .order_by(*order_clauses)
             .offset(offset)
             .limit(size)
         )
@@ -77,6 +88,7 @@ class AssetRepository:
             count_query = select(func.count()).select_from(Asset).where(*filters)
             total = (await self.session.execute(count_query)).scalar_one()
             return [], total
+
         assets = [row[0] for row in rows]
         total = rows[0].total_count
 
