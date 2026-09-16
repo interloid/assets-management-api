@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import PositiveInt, PostgresDsn, RedisDsn
+from pydantic import Field, PositiveInt, PostgresDsn, RedisDsn
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -13,6 +13,8 @@ class Settings(BaseSettings):
 
     ACCESS_TOKEN_EXPIRE_MINUTES: PositiveInt
     REFRESH_TOKEN_EXPIRE_DAYS: PositiveInt
+
+    ASSET_TAG_COMPANY_PREFIX: str = Field(min_length=1, max_length=20)
 
     model_config = SettingsConfigDict(
         env_file=".env",

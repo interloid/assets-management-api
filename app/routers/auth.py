@@ -17,6 +17,7 @@ from app.schemas.auth import (
     RegisterRequest,
     UserResponse,
 )
+from app.schemas.common import SuccessEnvelope
 from app.services.auth import AuthService
 
 router = APIRouter(
@@ -34,7 +35,7 @@ COOKIE_PATH = "/auth"
 async def register(
     data: RegisterRequest,
     session: DBSession,
-):
+) -> SuccessEnvelope[UserResponse]:
 
     service = AuthService(session)
 
@@ -54,7 +55,7 @@ async def register(
 async def login(
     payload: LoginRequest,
     session: DBSession,
-):
+) -> SuccessEnvelope[LoginResponse]:
     service = AuthService(session)
 
     result = await service.login(
@@ -76,7 +77,7 @@ async def login(
         key="refresh_token",
         value=result.refresh_token,
         httponly=True,
-        secure=True,
+        secure=False,
         samesite="lax",
         max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
         path=COOKIE_PATH,
@@ -92,7 +93,7 @@ async def login(
 async def refresh(
     session: DBSession,
     refresh_token: RefreshToken = None,
-):
+) -> SuccessEnvelope[LoginResponse]:
     service = AuthService(session)
 
     result = await service.refresh(refresh_token)
@@ -112,7 +113,7 @@ async def refresh(
         key="refresh_token",
         value=result.refresh_token,
         httponly=True,
-        secure=True,
+        secure=False,
         samesite="lax",
         max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
         path=COOKIE_PATH,
@@ -129,8 +130,8 @@ async def logout(
     response: Response,
     session: DBSession,
     access_token: LogoutAccessTokenPayload,
-    redis_client: RedisClient,
     refresh_token: RefreshToken = None,
+    redis_client: RedisClient = None,
 ) -> None:
     service = AuthService(session)
 
@@ -139,7 +140,7 @@ async def logout(
     response.delete_cookie(
         key="refresh_token",
         httponly=True,
-        secure=True,
+        secure=False,
         samesite="lax",
         path=COOKIE_PATH,
     )
@@ -166,7 +167,7 @@ async def logout_all(
     response.delete_cookie(
         key="refresh_token",
         httponly=True,
-        secure=True,
+        secure=False,
         samesite="lax",
         path=COOKIE_PATH,
     )
@@ -178,7 +179,7 @@ async def logout_all(
 )
 async def get_me(
     current_user: CurrentUser,
-):
+) -> SuccessEnvelope[UserResponse]:
     return success_response(
         status_code=status.HTTP_200_OK,
         message="User retrieved successfully",
@@ -196,7 +197,7 @@ async def change_password(
     data: ChangePasswordRequest,
     current_user: CurrentUser,
     session: DBSession,
-):
+) -> SuccessEnvelope[None]:
     service = AuthService(session)
 
     await service.change_password(

@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import (
 )
 from uuid6 import uuid7
 
+from app.core.security import create_access_token
 from app.db.session import get_db
 from app.main import app
 from app.models.enums import UserRole
@@ -42,6 +43,7 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
                     """
                     TRUNCATE TABLE
                         refresh_tokens,
+                        asset_tag_counters,
                         assets,
                         users
                     RESTART IDENTITY CASCADE
@@ -108,3 +110,39 @@ async def integration_user(
     await db_session.flush()
 
     return user
+
+
+@pytest_asyncio.fixture
+async def integration_admin(
+    db_session: AsyncSession,
+) -> User:
+    admin = User(
+        email=f"asset-admin-{uuid7()}@example.com",
+        password_hash="hashed-password",
+        full_name="Asset Admin",
+        role=UserRole.ADMIN,
+        is_active=True,
+    )
+
+    db_session.add(admin)
+    await db_session.flush()
+
+    return admin
+
+
+@pytest_asyncio.fixture
+async def admin_access_token(
+    integration_admin: User,
+) -> str:
+    return create_access_token(
+        user_id=str(integration_admin.id),
+        role=integration_admin.role.value,
+        token_version=integration_admin.token_version,
+    )
+
+
+@pytest_asyncio.fixture
+async def asset_owner(
+    db_session: AsyncSession,
+) -> User:
+    return await create_test_user(db_session)

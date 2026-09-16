@@ -1,8 +1,9 @@
 from uuid import UUID
 
-from sqlalchemy import func, select, update
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.utils import escape_like
 from app.models.user import User
 
 
@@ -64,3 +65,51 @@ class UserRepository:
         result = await self.session.execute(stmt)
 
         user.token_version = result.scalar_one()
+
+    async def list_users(
+        self,
+        *,
+        page: int,
+        size: int,
+        search: str | None = None,
+    ) -> tuple[list[User], int]:
+        filters = []
+        if search:
+            search = search.strip()
+            search_pattern = f"%{escape_like(search)}%"
+
+            filters.append(
+                or_(
+                    User.email.ilike(search_pattern, escape="\\"),
+                    User.full_name.ilike(search_pattern, escape="\\"),
+                ),
+            )
+
+        offset = (page - 1) * size
+
+        stmt = (
+            select(
+                User,
+                func.count().over().label("total_count"),
+            )
+            .where(*filters)
+            .order_by(User.created_at.desc(), User.id.asc())
+            .offset(offset)
+            .limit(size)
+        )
+
+        result = await self.session.execute(stmt)
+
+        rows = result.all()
+
+        if not rows:
+            count_query = select(func.count()).select_from(User).where(*filters)
+
+            total = (await self.session.execute(count_query)).scalar_one()
+
+            return [], total
+
+        users = [row[0] for row in rows]
+        total = rows[0].total_count
+
+        return users, total
