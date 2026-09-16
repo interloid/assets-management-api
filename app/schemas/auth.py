@@ -29,6 +29,22 @@ class UserResponse(BaseModel):
     updated_at: datetime
 
 
+class UserListResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    email: EmailStr
+    full_name: str
+    role: UserRole
+
+
+class UserListData(BaseModel):
+    items: list[UserListResponse]
+    total: int
+    page: int
+    size: int
+
+
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str

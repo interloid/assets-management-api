@@ -5,6 +5,7 @@ from uuid import UUID
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.utils import escape_like
 from app.models.assets import Asset
 from app.models.enums import AssetStatus, AssetType
 
@@ -13,10 +14,6 @@ SORT_COLUMNS = {
     "purchase_date": Asset.purchase_date,
     "asset_tag": Asset.asset_tag,
 }
-
-
-def escape_like(value: str) -> str:
-    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 class AssetRepository:

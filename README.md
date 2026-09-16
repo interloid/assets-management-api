@@ -136,6 +136,12 @@ assets-management-api/
 * Status summary endpoint (counts by status via a single `GROUP BY` query)
 * Regular users can only view assets assigned to them (`/assets/my`); admins have full visibility
 
+### Users
+
+* `GET /users` (Admin) — paginated list of users (`id`, `email`, `full_name`, `role`)
+* Case-insensitive `search` across email and full name (for assignment pickers)
+* Pagination (`page`, `size`, capped at 100 per page)
+
 ---
 
 ## Project Setup
