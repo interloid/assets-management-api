@@ -24,7 +24,7 @@ async def health_check(
     try:
         await asyncio.wait_for(
             db.execute(text("SELECT 1")),
-            timeout=2,
+            timeout=5,
         )
     except Exception:
         database_status = "down"
