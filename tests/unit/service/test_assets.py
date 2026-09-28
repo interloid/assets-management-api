@@ -4,16 +4,16 @@ from unittest.mock import AsyncMock
 import pytest
 from uuid6 import uuid7
 
-from app.exceptions.assets import (
+from app.modules.asset.exceptions import (
     AssetAssignmentUserInactiveError,
     AssetAssignmentUserNotFoundError,
     AssetDeleteConflictError,
     AssetNotFoundError,
     InvalidAssetStatusTransitionError,
 )
-from app.models.assets import Asset
-from app.models.enums import AssetStatus, AssetType, UserRole
-from app.services.assets import AssetService
+from app.modules.asset.models import Asset
+from app.modules.asset.services import AssetService
+from app.shared.models.enums import AssetStatus, AssetType, UserRole
 
 
 @pytest.mark.asyncio

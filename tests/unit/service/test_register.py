@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from sqlalchemy.exc import IntegrityError
 
-from app.exceptions.auth import EmailAlreadyRegisteredError
+from app.modules.auth.exceptions import EmailAlreadyRegisteredError
 
 
 @pytest.mark.asyncio
@@ -19,7 +19,7 @@ async def test_valid_registration(
     )
 
     with patch(
-        "app.services.auth.hash_password",
+        "app.modules.auth.services.hash_password",
         return_value="hashed-password",
     ) as mock_hash_password:
         result = await auth_service.register(register_user_payload)
@@ -84,7 +84,7 @@ async def test_password_hashed(
     )
 
     with patch(
-        "app.services.auth.hash_password",
+        "app.modules.auth.services.hash_password",
         return_value="hashed-password",
     ) as mock_hash_password:
         await auth_service.register(register_user_payload)

@@ -5,7 +5,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid6 import uuid7
 
-from app.models.refresh_token import RefreshToken
+from app.modules.auth.models import RefreshToken
 from tests.integration.conftest import create_test_user
 
 

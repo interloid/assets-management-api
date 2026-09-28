@@ -5,9 +5,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid6 import uuid7
 
-from app.models.refresh_token import RefreshToken
-from app.models.user import User
-from app.repositories.refresh_token import RefreshTokenRepository
+from app.modules.auth.models import RefreshToken
+from app.modules.auth.repositories import RefreshTokenRepository
+from app.modules.user.models import User
 
 
 @pytest.mark.asyncio
@@ -229,8 +229,6 @@ async def test_refresh_token_family_preserved(
 
     assert refresh_response.status_code == 200
 
-
-
     result = await db_session.execute(
         select(RefreshToken).where(
             RefreshToken.user_id == user_id,
@@ -361,8 +359,6 @@ async def test_change_password_revokes_all_refresh_tokens(
     )
 
     assert response.status_code == 200
-
-
 
     result = await db_session.execute(
         select(RefreshToken).where(

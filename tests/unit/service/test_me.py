@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from uuid6 import uuid7
 
-from app.dependencies.authentication import get_current_user
+from app.api.v1.dependencies import get_current_user
 
 
 @pytest.mark.asyncio
@@ -28,7 +28,7 @@ async def test_get_current_user_success(
 
     with (
         patch(
-            "app.dependencies.authentication.decode_access_token",
+            "app.api.v1.dependencies.decode_access_token",
             return_value={
                 "sub": str(created_user.id),
                 "jti": "jti-123",
@@ -36,12 +36,12 @@ async def test_get_current_user_success(
             },
         ),
         patch(
-            "app.dependencies.authentication.is_access_token_blacklisted",
+            "app.api.v1.dependencies.is_access_token_blacklisted",
             new_callable=AsyncMock,
             return_value=False,
         ) as mock_blacklist,
         patch(
-            "app.dependencies.authentication.UserRepository",
+            "app.api.v1.dependencies.UserRepository",
             return_value=mock_repository,
         ),
     ):
@@ -85,7 +85,7 @@ async def test_get_current_user_redis_miss(
 
     with (
         patch(
-            "app.dependencies.authentication.decode_access_token",
+            "app.api.v1.dependencies.decode_access_token",
             return_value={
                 "sub": str(created_user.id),
                 "jti": "jti-123",
@@ -93,12 +93,12 @@ async def test_get_current_user_redis_miss(
             },
         ),
         patch(
-            "app.dependencies.authentication.is_access_token_blacklisted",
+            "app.api.v1.dependencies.is_access_token_blacklisted",
             new_callable=AsyncMock,
             return_value=False,
         ),
         patch(
-            "app.dependencies.authentication.UserRepository",
+            "app.api.v1.dependencies.UserRepository",
             return_value=mock_repository,
         ),
     ):
@@ -135,7 +135,7 @@ async def test_get_current_user_token_version_mismatch(
 
     with (
         patch(
-            "app.dependencies.authentication.decode_access_token",
+            "app.api.v1.dependencies.decode_access_token",
             return_value={
                 "sub": str(created_user.id),
                 "jti": "jti-123",
@@ -143,16 +143,16 @@ async def test_get_current_user_token_version_mismatch(
             },
         ),
         patch(
-            "app.dependencies.authentication.is_access_token_blacklisted",
+            "app.api.v1.dependencies.is_access_token_blacklisted",
             new_callable=AsyncMock,
             return_value=False,
         ),
         patch(
-            "app.dependencies.authentication.UserRepository",
+            "app.api.v1.dependencies.UserRepository",
             return_value=mock_repository,
         ),
     ):
-        from app.exceptions.auth import InvalidTokenError
+        from app.modules.auth.exceptions import InvalidTokenError
 
         with pytest.raises(InvalidTokenError):
             await get_current_user(

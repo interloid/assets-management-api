@@ -1,6 +1,6 @@
 import pytest
 
-from app.schemas.auth import validate_full_name
+from app.api.v1.schemas.auth import validate_full_name
 
 
 def test_valid_full_name() -> None:

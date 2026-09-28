@@ -2,9 +2,9 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.dependencies.authentication import get_current_user
-from app.exceptions.auth import InvalidCredentialsError
+from app.api.v1.dependencies import get_current_user
 from app.main import app
+from app.modules.auth.exceptions import InvalidCredentialsError
 
 
 @pytest.mark.asyncio
@@ -24,7 +24,7 @@ async def test_change_password_success(
 
     try:
         with patch(
-            "app.routers.auth.AuthService.change_password",
+            "app.api.v1.endpoints.auth.AuthService.change_password",
             new_callable=AsyncMock,
         ) as mock_change_password:
             response = await api_client.post(
@@ -67,7 +67,7 @@ async def test_change_password_wrong_current_password(
 
     try:
         with patch(
-            "app.routers.auth.AuthService.change_password",
+            "app.api.v1.endpoints.auth.AuthService.change_password",
             new_callable=AsyncMock,
             side_effect=InvalidCredentialsError(),
         ) as mock_change_password:
@@ -112,7 +112,7 @@ async def test_change_password_invalid_new_password(
 
     try:
         with patch(
-            "app.routers.auth.AuthService.change_password",
+            "app.api.v1.endpoints.auth.AuthService.change_password",
             new_callable=AsyncMock,
         ) as mock_change_password:
             response = await api_client.post(
@@ -146,7 +146,7 @@ async def test_change_password_unauthenticated(
     }
 
     with patch(
-        "app.routers.auth.AuthService.change_password",
+        "app.api.v1.endpoints.auth.AuthService.change_password",
         new_callable=AsyncMock,
     ) as mock_change_password:
         response = await api_client.post(

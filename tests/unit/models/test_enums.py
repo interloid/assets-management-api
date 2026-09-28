@@ -1,4 +1,4 @@
-from app.models.enums import AssetStatus, AssetType, UserRole
+from app.shared.models.enums import AssetStatus, AssetType, UserRole
 
 
 def test_user_role() -> None:

@@ -2,8 +2,8 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.db.redis import create_redis_client
-from app.db.session import engine
+from app.core.database import engine
+from app.core.redis import create_redis_client
 
 
 @asynccontextmanager

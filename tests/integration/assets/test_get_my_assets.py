@@ -5,9 +5,9 @@ from httpx import AsyncClient
 from sqlalchemy import select
 
 from app.core.security import create_access_token
-from app.models.assets import Asset
-from app.models.enums import AssetStatus
-from app.models.user import User
+from app.modules.asset.models import Asset
+from app.modules.user.models import User
+from app.shared.models.enums import AssetStatus
 
 
 @pytest.mark.asyncio

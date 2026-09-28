@@ -1,4 +1,4 @@
-from app.models.assets import Asset
+from app.modules.asset.models import Asset
 
 
 def test_asset_columns() -> None:

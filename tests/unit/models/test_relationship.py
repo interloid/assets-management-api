@@ -1,6 +1,6 @@
-from app.models.assets import Asset
-from app.models.refresh_token import RefreshToken
-from app.models.user import User
+from app.modules.asset.models import Asset
+from app.modules.auth.models import RefreshToken
+from app.modules.user.models import User
 
 
 def test_user_refresh_tokens_relationship() -> None:

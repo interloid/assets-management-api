@@ -2,15 +2,16 @@ from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from app.core.lifespan import lifespan
-from app.exceptions.base import AppError
-from app.exceptions.handlers import (
+from app.api.router import router as api_router
+from app.core import health_router
+from app.core.exception_handlers import (
     app_error_handler,
     http_exception_handler,
     unexpected_exception_handler,
     validation_exception_handler,
 )
-from app.routers import assets, auth, health, user
+from app.core.exceptions import AppError
+from app.core.lifespan import lifespan
 
 app = FastAPI(
     title="Assets Management API",
@@ -25,9 +26,10 @@ app.add_exception_handler(
     StarletteHTTPException,
     http_exception_handler,
 )
-app.add_exception_handler(RequestValidationError, validation_exception_handler)
+app.add_exception_handler(
+    RequestValidationError,
+    validation_exception_handler,
+)
 
-app.include_router(health.router)
-app.include_router(user.router)
-app.include_router(auth.router)
-app.include_router(assets.router)
+app.include_router(health_router.router)
+app.include_router(api_router)

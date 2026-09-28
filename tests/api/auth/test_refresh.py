@@ -2,11 +2,11 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.exceptions.auth import (
+from app.api.v1.schemas.auth import LoginResult
+from app.modules.auth.exceptions import (
     InvalidTokenError,
     RefreshTokenReuseError,
 )
-from app.schemas.auth import LoginResult
 
 
 @pytest.mark.asyncio
@@ -26,7 +26,7 @@ async def test_valid_refresh(
     )
 
     with patch(
-        "app.routers.auth.AuthService.refresh",
+        "app.api.v1.endpoints.auth.AuthService.refresh",
         new_callable=AsyncMock,
         return_value=result,
     ) as mock_refresh:
@@ -62,7 +62,7 @@ async def test_invalid_token(
     )
 
     with patch(
-        "app.routers.auth.AuthService.refresh",
+        "app.api.v1.endpoints.auth.AuthService.refresh",
         new_callable=AsyncMock,
         side_effect=InvalidTokenError(),
     ) as mock_refresh:
@@ -94,7 +94,7 @@ async def test_api_refresh_04_reuse_detection(
     )
 
     with patch(
-        "app.routers.auth.AuthService.refresh",
+        "app.api.v1.endpoints.auth.AuthService.refresh",
         new_callable=AsyncMock,
         side_effect=RefreshTokenReuseError(),
     ) as mock_refresh:

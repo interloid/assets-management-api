@@ -2,9 +2,9 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.dependencies.authentication import get_logout_access_token
-from app.exceptions.auth import InvalidTokenError
+from app.api.v1.dependencies import get_logout_access_token
 from app.main import app
+from app.modules.auth.exceptions import InvalidTokenError
 
 
 @pytest.mark.asyncio
@@ -25,7 +25,7 @@ async def test_logout_success(api_client) -> None:
 
     try:
         with patch(
-            "app.routers.auth.AuthService.logout",
+            "app.api.v1.endpoints.auth.AuthService.logout",
             new_callable=AsyncMock,
         ) as mock_logout:
             response = await api_client.post("/auth/logout")
@@ -66,7 +66,7 @@ async def test_logout_failed(
 
     try:
         with patch(
-            "app.routers.auth.AuthService.logout",
+            "app.api.v1.endpoints.auth.AuthService.logout",
             new_callable=AsyncMock,
             side_effect=InvalidTokenError(),
         ) as mock_logout:

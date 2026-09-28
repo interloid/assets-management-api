@@ -11,11 +11,11 @@ from sqlalchemy.ext.asyncio import (
 )
 from uuid6 import uuid7
 
+from app.core.database import get_db
 from app.core.security import create_access_token
-from app.db.session import get_db
 from app.main import app
-from app.models.enums import UserRole
-from app.models.user import User
+from app.modules.user.models import User
+from app.shared.models.enums import UserRole
 from tests.config import test_settings
 
 

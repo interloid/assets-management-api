@@ -1,6 +1,6 @@
 import pytest
 
-from app.schemas.auth import validate_password
+from app.api.v1.schemas.auth import validate_password
 
 
 def test_valid_password() -> None:

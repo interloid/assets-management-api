@@ -1,4 +1,4 @@
-from app.models.refresh_token import RefreshToken
+from app.modules.auth.models import RefreshToken
 
 
 def test_refresh_token_columns() -> None:

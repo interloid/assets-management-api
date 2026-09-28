@@ -4,8 +4,8 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.enums import UserRole
-from app.models.user import User
+from app.modules.user.models import User
+from app.shared.models.enums import UserRole
 
 
 @pytest.mark.asyncio

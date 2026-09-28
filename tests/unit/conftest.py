@@ -5,8 +5,8 @@ from unittest.mock import AsyncMock
 import pytest
 from uuid6 import uuid7
 
-from app.models.refresh_token import RefreshToken
-from app.services.auth import AuthService
+from app.modules.auth.models import RefreshToken
+from app.modules.auth.services import AuthService
 
 
 @pytest.fixture

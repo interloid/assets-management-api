@@ -2,7 +2,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.exceptions.auth import (
+from app.modules.auth.exceptions import (
     InvalidCredentialsError,
     SamePasswordError,
 )
@@ -22,11 +22,11 @@ async def test_correct_current_password(
     auth_service.user_repository.increment_token_version = AsyncMock()
 
     with patch(
-        "app.services.auth.verify_password",
+        "app.modules.auth.services.verify_password",
         side_effect=[True, False],
     ) as mock_verify_password:
         with patch(
-            "app.services.auth.hash_password",
+            "app.modules.auth.services.hash_password",
             return_value="new-hashed-password",
         ) as mock_hash_password:
             await auth_service.change_password(
@@ -81,11 +81,11 @@ async def test_incorrect_current_password(
     auth_service.user_repository.increment_token_version = AsyncMock()
 
     with patch(
-        "app.services.auth.verify_password",
+        "app.modules.auth.services.verify_password",
         return_value=False,
     ) as mock_verify_password:
         with patch(
-            "app.services.auth.hash_password",
+            "app.modules.auth.services.hash_password",
         ) as mock_hash_password:
             with pytest.raises(InvalidCredentialsError):
                 await auth_service.change_password(
@@ -126,11 +126,11 @@ async def test_same_password_rejected(
     auth_service.user_repository.increment_token_version = AsyncMock()
 
     with patch(
-        "app.services.auth.verify_password",
+        "app.modules.auth.services.verify_password",
         side_effect=[True, True],
     ) as mock_verify_password:
         with patch(
-            "app.services.auth.hash_password",
+            "app.modules.auth.services.hash_password",
         ) as mock_hash_password:
             with pytest.raises(SamePasswordError):
                 await auth_service.change_password(
@@ -176,11 +176,11 @@ async def test_new_password_hashed(
     auth_service.user_repository.increment_token_version = AsyncMock()
 
     with patch(
-        "app.services.auth.verify_password",
+        "app.modules.auth.services.verify_password",
         side_effect=[True, False],
     ):
         with patch(
-            "app.services.auth.hash_password",
+            "app.modules.auth.services.hash_password",
             return_value="new-hashed-password",
         ) as mock_hash_password:
             await auth_service.change_password(
@@ -215,11 +215,11 @@ async def test_revoke_all_refresh_tokens(
     auth_service.user_repository.increment_token_version = AsyncMock()
 
     with patch(
-        "app.services.auth.verify_password",
+        "app.modules.auth.services.verify_password",
         side_effect=[True, False],
     ):
         with patch(
-            "app.services.auth.hash_password",
+            "app.modules.auth.services.hash_password",
             return_value="new-hashed-password",
         ):
             await auth_service.change_password(

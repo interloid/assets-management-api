@@ -8,7 +8,7 @@ from pwdlib import PasswordHash
 from uuid6 import uuid7
 
 from app.core.config import settings
-from app.exceptions.auth import InvalidTokenError
+from app.modules.auth.exceptions import InvalidTokenError
 
 password_hash = PasswordHash.recommended()
 

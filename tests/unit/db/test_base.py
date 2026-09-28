@@ -1,8 +1,8 @@
-import app.models  # noqa: F401
-from app.db.base import Base
-from app.models.assets import Asset
-from app.models.refresh_token import RefreshToken
-from app.models.user import User
+import app.shared.models  # noqa: F401
+from app.modules.asset.models import Asset
+from app.modules.auth.models import RefreshToken
+from app.modules.user.models import User
+from app.shared.models.base import Base
 
 
 def test_all_models_registered() -> None:

@@ -20,11 +20,11 @@ async def test_valid_logout(
 
     with (
         patch(
-            "app.services.auth.hash_refresh_token",
+            "app.modules.auth.services.hash_refresh_token",
             return_value="hashed_refresh_token",
         ) as mock_hash,
         patch(
-            "app.services.auth.blacklist_access_token",
+            "app.modules.auth.services.blacklist_access_token",
             new_callable=AsyncMock,
         ) as mock_blacklist,
     ):
@@ -68,7 +68,7 @@ async def test_logout_empty_refresh_token(
     }
 
     with patch(
-        "app.services.auth.blacklist_access_token",
+        "app.modules.auth.services.blacklist_access_token",
         new_callable=AsyncMock,
     ) as mock_blacklist:
         await auth_service.logout(
@@ -97,11 +97,11 @@ async def test_logout_refresh_token_not_found(
 
     with (
         patch(
-            "app.services.auth.hash_refresh_token",
+            "app.modules.auth.services.hash_refresh_token",
             return_value="hashed_refresh_token",
         ) as mock_hash,
         patch(
-            "app.services.auth.blacklist_access_token",
+            "app.modules.auth.services.blacklist_access_token",
             new_callable=AsyncMock,
         ) as mock_blacklist,
     ):

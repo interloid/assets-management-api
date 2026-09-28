@@ -4,8 +4,8 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.assets import Asset
-from app.models.enums import AssetStatus, AssetType
+from app.modules.asset.models import Asset
+from app.shared.models.enums import AssetStatus, AssetType
 from tests.integration.conftest import create_test_user
 
 

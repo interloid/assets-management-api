@@ -2,7 +2,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.exceptions.auth import EmailAlreadyRegisteredError
+from app.modules.auth.exceptions import EmailAlreadyRegisteredError
 
 
 @pytest.mark.asyncio
@@ -14,7 +14,7 @@ async def test_valid_registration(
     response_user = user
 
     with patch(
-        "app.routers.auth.AuthService.register",
+        "app.api.v1.endpoints.auth.AuthService.register",
         new_callable=AsyncMock,
         return_value=response_user,
     ) as mock_register:
@@ -44,7 +44,7 @@ async def test_duplicate_email(
     user_payload,
 ) -> None:
     with patch(
-        "app.routers.auth.AuthService.register",
+        "app.api.v1.endpoints.auth.AuthService.register",
         new_callable=AsyncMock,
         side_effect=EmailAlreadyRegisteredError(),
     ) as mock_register:
@@ -72,7 +72,7 @@ async def test_invalid_email(
     payload["email"] = "invalid-email"
 
     with patch(
-        "app.routers.auth.AuthService.register",
+        "app.api.v1.endpoints.auth.AuthService.register",
         new_callable=AsyncMock,
     ) as mock_register:
         response = await api_client.post(
@@ -99,7 +99,7 @@ async def test_missing_field(
     del payload["full_name"]
 
     with patch(
-        "app.routers.auth.AuthService.register",
+        "app.api.v1.endpoints.auth.AuthService.register",
         new_callable=AsyncMock,
     ) as mock_register:
         response = await api_client.post(
@@ -126,7 +126,7 @@ async def test_invalid_password(
     payload["password"] = "password"
 
     with patch(
-        "app.routers.auth.AuthService.register",
+        "app.api.v1.endpoints.auth.AuthService.register",
         new_callable=AsyncMock,
     ) as mock_register:
         response = await api_client.post(

@@ -2,8 +2,8 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.refresh_token import RefreshToken
-from app.models.user import User
+from app.modules.auth.models import RefreshToken
+from app.modules.user.models import User
 
 
 @pytest.mark.asyncio
@@ -20,7 +20,6 @@ async def test_register_then_login(
     assert register_response.status_code == 201
 
     register_body = register_response.json()
-
 
     register_data = register_body["data"]
 
@@ -50,7 +49,6 @@ async def test_register_then_login(
     assert login_response.status_code == 200
 
     login_body = login_response.json()
-
 
     login_data = login_body["data"]
 
@@ -106,8 +104,6 @@ async def test_login_then_refresh(
 
     login_body = login_response.json()
 
-
-
     login_data = login_body["data"]
 
     assert login_data["access_token"]
@@ -141,7 +137,6 @@ async def test_login_then_refresh(
     assert refresh_response.status_code == 200
 
     refresh_body = refresh_response.json()
-
 
     refresh_data = refresh_body["data"]
 
@@ -265,7 +260,6 @@ async def test_refresh_token_reuse_revokes_family(
     body = reuse_response.json()
 
     assert body["error"]["code"] == "REFRESH_TOKEN_REUSE"
-
 
     result = await db_session.execute(
         select(RefreshToken).where(
@@ -479,9 +473,7 @@ async def test_change_password_revokes_all_sessions(
 
     change_password_body = change_password_response.json()
 
-
     assert change_password_body["data"] is None
-
 
     result = await db_session.execute(
         select(RefreshToken).where(
@@ -529,10 +521,8 @@ async def test_change_password_revokes_all_sessions(
 
     new_login_body = new_login_response.json()
 
-
     assert new_login_body["data"]["access_token"]
     assert new_login_body["data"]["token_type"] == "bearer"
-
 
     old_login_response = await integration_client.post(
         "/auth/login",

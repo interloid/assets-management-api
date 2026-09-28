@@ -2,7 +2,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from app.services.users import UserService
+from app.modules.user.services import UserService
 
 
 @pytest.mark.asyncio

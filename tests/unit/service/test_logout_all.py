@@ -20,7 +20,7 @@ async def test_logout_all_success(
     access_token_version = 0
 
     with patch(
-        "app.services.auth.hash_refresh_token",
+        "app.modules.auth.services.hash_refresh_token",
         return_value="hashed_refresh_token",
     ) as mock_hash:
         auth_service.refresh_token_repository.get_by_hash = AsyncMock(
@@ -121,7 +121,7 @@ async def test_logout_all_refresh_token_not_found(
 
     with (
         patch(
-            "app.services.auth.hash_refresh_token",
+            "app.modules.auth.services.hash_refresh_token",
             return_value="hashed_refresh_token",
         ) as mock_hash,
     ):

@@ -2,8 +2,8 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.exceptions.auth import InvalidCredentialsError
-from app.schemas.auth import LoginResult
+from app.api.v1.schemas.auth import LoginResult
+from app.modules.auth.exceptions import InvalidCredentialsError
 
 
 @pytest.mark.asyncio
@@ -17,7 +17,7 @@ async def test_login_success(
     )
 
     with patch(
-        "app.routers.auth.AuthService.login",
+        "app.api.v1.endpoints.auth.AuthService.login",
         new_callable=AsyncMock,
         return_value=login_result,
     ) as mock_login:
@@ -48,7 +48,7 @@ async def test_login_invalid_credentials(
     payload["password"] = "WrongPassword123"
 
     with patch(
-        "app.routers.auth.AuthService.login",
+        "app.api.v1.endpoints.auth.AuthService.login",
         new_callable=AsyncMock,
         side_effect=InvalidCredentialsError(),
     ) as mock_login:
@@ -76,7 +76,7 @@ async def test_login_invalid_email(
     payload["email"] = "invalid-email"
 
     with patch(
-        "app.routers.auth.AuthService.login",
+        "app.api.v1.endpoints.auth.AuthService.login",
         new_callable=AsyncMock,
     ) as mock_login:
         response = await api_client.post(
@@ -103,7 +103,7 @@ async def test_login_missing_password(
     del payload["password"]
 
     with patch(
-        "app.routers.auth.AuthService.login",
+        "app.api.v1.endpoints.auth.AuthService.login",
         new_callable=AsyncMock,
     ) as mock_login:
         response = await api_client.post(

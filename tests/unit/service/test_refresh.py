@@ -2,7 +2,7 @@ from unittest.mock import patch
 
 import pytest
 
-from app.exceptions.auth import (
+from app.modules.auth.exceptions import (
     InvalidTokenError,
     RefreshTokenReuseError,
 )
@@ -23,18 +23,18 @@ async def test_valid_refresh(
 
     with (
         patch(
-            "app.services.auth.hash_refresh_token",
+            "app.modules.auth.services.hash_refresh_token",
             side_effect=[
                 "old-token-hash",
                 "new-token-hash",
             ],
         ),
         patch(
-            "app.services.auth.generate_refresh_token",
+            "app.modules.auth.services.generate_refresh_token",
             return_value="new-refresh-token",
         ),
         patch(
-            "app.services.auth.create_access_token",
+            "app.modules.auth.services.create_access_token",
             return_value="new-access-token",
         ),
     ):
@@ -86,18 +86,18 @@ async def test_refresh_token_rotation(
 
     with (
         patch(
-            "app.services.auth.hash_refresh_token",
+            "app.modules.auth.services.hash_refresh_token",
             side_effect=[
                 "old-token-hash",
                 "new-token-hash",
             ],
         ),
         patch(
-            "app.services.auth.generate_refresh_token",
+            "app.modules.auth.services.generate_refresh_token",
             return_value="new-refresh-token",
         ),
         patch(
-            "app.services.auth.create_access_token",
+            "app.modules.auth.services.create_access_token",
             return_value="new-access-token",
         ),
     ):
@@ -131,18 +131,18 @@ async def test_refresh_family_preserved(
 
     with (
         patch(
-            "app.services.auth.hash_refresh_token",
+            "app.modules.auth.services.hash_refresh_token",
             side_effect=[
                 "old-token-hash",
                 "new-token-hash",
             ],
         ),
         patch(
-            "app.services.auth.generate_refresh_token",
+            "app.modules.auth.services.generate_refresh_token",
             return_value="new-refresh-token",
         ),
         patch(
-            "app.services.auth.create_access_token",
+            "app.modules.auth.services.create_access_token",
             return_value="new-access-token",
         ),
     ):
@@ -167,7 +167,7 @@ async def test_expired_refresh_token(
     refresh_token_repository.get_by_hash.return_value = expired_stored_token
 
     with patch(
-        "app.services.auth.hash_refresh_token",
+        "app.modules.auth.services.hash_refresh_token",
         return_value="old-token-hash",
     ):
         with pytest.raises(InvalidTokenError):
@@ -192,7 +192,7 @@ async def test_invalid_refresh_token(
     refresh_token_repository.get_by_hash.return_value = None
 
     with patch(
-        "app.services.auth.hash_refresh_token",
+        "app.modules.auth.services.hash_refresh_token",
         return_value="invalid-token-hash",
     ):
         with pytest.raises(InvalidTokenError):
@@ -223,7 +223,7 @@ async def test_refresh_token_reuse_detection(
     refresh_token_repository.get_by_hash.return_value = revoked_stored_token
 
     with patch(
-        "app.services.auth.hash_refresh_token",
+        "app.modules.auth.services.hash_refresh_token",
         return_value="old-token-hash",
     ):
         with pytest.raises(RefreshTokenReuseError):

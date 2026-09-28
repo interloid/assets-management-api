@@ -1,6 +1,6 @@
 from sqlalchemy.dialects.postgresql import CITEXT
 
-from app.models.user import User
+from app.modules.user.models import User
 
 
 def test_user_columns() -> None:

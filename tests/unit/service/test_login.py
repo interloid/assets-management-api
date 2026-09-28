@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from app.core.security import TIMING_HASH
-from app.exceptions.auth import InvalidCredentialsError
+from app.modules.auth.exceptions import InvalidCredentialsError
 
 
 @pytest.mark.asyncio
@@ -22,19 +22,19 @@ async def test_valid_credentials(
 
     with (
         patch(
-            "app.services.auth.verify_password",
+            "app.modules.auth.services.verify_password",
             return_value=True,
         ) as mock_verify_password,
         patch(
-            "app.services.auth.create_access_token",
+            "app.modules.auth.services.create_access_token",
             return_value="access-token",
         ) as mock_create_access_token,
         patch(
-            "app.services.auth.generate_refresh_token",
+            "app.modules.auth.services.generate_refresh_token",
             return_value="refresh-token",
         ) as mock_generate_refresh_token,
         patch(
-            "app.services.auth.hash_refresh_token",
+            "app.modules.auth.services.hash_refresh_token",
             return_value="refresh-token-hash",
         ) as mock_hash_refresh_token,
     ):
@@ -84,13 +84,13 @@ async def test_unknown_email(
 
     with (
         patch(
-            "app.services.auth.verify_password",
+            "app.modules.auth.services.verify_password",
         ) as mock_verify_password,
         patch(
-            "app.services.auth.create_access_token",
+            "app.modules.auth.services.create_access_token",
         ) as mock_create_access_token,
         patch(
-            "app.services.auth.generate_refresh_token",
+            "app.modules.auth.services.generate_refresh_token",
         ) as mock_generate_refresh_token,
     ):
         with pytest.raises(InvalidCredentialsError):
@@ -127,14 +127,14 @@ async def test_incorrect_password(
 
     with (
         patch(
-            "app.services.auth.verify_password",
+            "app.modules.auth.services.verify_password",
             return_value=False,
         ) as mock_verify_password,
         patch(
-            "app.services.auth.create_access_token",
+            "app.modules.auth.services.create_access_token",
         ) as mock_create_access_token,
         patch(
-            "app.services.auth.generate_refresh_token",
+            "app.modules.auth.services.generate_refresh_token",
         ) as mock_generate_refresh_token,
     ):
         with pytest.raises(InvalidCredentialsError):
@@ -166,14 +166,14 @@ async def test_inactive_user(
 
     with (
         patch(
-            "app.services.auth.verify_password",
+            "app.modules.auth.services.verify_password",
             return_value=True,
         ) as mock_verify_password,
         patch(
-            "app.services.auth.create_access_token",
+            "app.modules.auth.services.create_access_token",
         ) as mock_create_access_token,
         patch(
-            "app.services.auth.generate_refresh_token",
+            "app.modules.auth.services.generate_refresh_token",
         ) as mock_generate_refresh_token,
     ):
         with pytest.raises(InvalidCredentialsError):
@@ -208,19 +208,19 @@ async def test_refresh_token_created(
 
     with (
         patch(
-            "app.services.auth.verify_password",
+            "app.modules.auth.services.verify_password",
             return_value=True,
         ),
         patch(
-            "app.services.auth.create_access_token",
+            "app.modules.auth.services.create_access_token",
             return_value="access-token",
         ),
         patch(
-            "app.services.auth.generate_refresh_token",
+            "app.modules.auth.services.generate_refresh_token",
             return_value="refresh-token",
         ) as mock_generate_refresh_token,
         patch(
-            "app.services.auth.hash_refresh_token",
+            "app.modules.auth.services.hash_refresh_token",
             return_value="hashed-refresh-token",
         ) as mock_hash_refresh_token,
     ):

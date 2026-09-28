@@ -2,9 +2,9 @@ from unittest.mock import patch
 
 import pytest
 
-from app.dependencies.authentication import get_current_user
-from app.exceptions.auth import InvalidTokenError
+from app.api.v1.dependencies import get_current_user
 from app.main import app
+from app.modules.auth.exceptions import InvalidTokenError
 
 
 @pytest.mark.asyncio
@@ -62,7 +62,7 @@ async def test_me_invalid_jwt(
     api_client,
 ) -> None:
     with patch(
-        "app.dependencies.authentication.decode_access_token",
+        "app.api.v1.dependencies.decode_access_token",
         side_effect=InvalidTokenError(),
     ):
         response = await api_client.get(

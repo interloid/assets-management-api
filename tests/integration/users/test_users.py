@@ -30,9 +30,7 @@ async def test_admin_list_users(
 
     assert len(body["data"]) == 2
 
-    user = next(
-        item for item in body["data"] if item["id"] == str(integration_user.id)
-    )
+    user = next(item for item in body["data"] if item["id"] == str(integration_user.id))
 
     assert user["email"] == integration_user.email
     assert user["full_name"] == integration_user.full_name
