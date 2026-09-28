@@ -21,10 +21,6 @@ async def test_register_then_login(
 
     register_body = register_response.json()
 
-    assert register_body["success"] is True
-    assert register_body["statusCode"] == 201
-    assert register_body["message"] == "User registered successfully"
-    assert register_body["error"] is None
 
     register_data = register_body["data"]
 
@@ -55,10 +51,6 @@ async def test_register_then_login(
 
     login_body = login_response.json()
 
-    assert login_body["success"] is True
-    assert login_body["statusCode"] == 200
-    assert login_body["message"] == "Login successful"
-    assert login_body["error"] is None
 
     login_data = login_body["data"]
 
@@ -114,10 +106,7 @@ async def test_login_then_refresh(
 
     login_body = login_response.json()
 
-    assert login_body["success"] is True
-    assert login_body["statusCode"] == 200
-    assert login_body["message"] == "Login successful"
-    assert login_body["error"] is None
+
 
     login_data = login_body["data"]
 
@@ -153,10 +142,6 @@ async def test_login_then_refresh(
 
     refresh_body = refresh_response.json()
 
-    assert refresh_body["success"] is True
-    assert refresh_body["statusCode"] == 200
-    assert refresh_body["message"] == "Token refreshed successfully"
-    assert refresh_body["error"] is None
 
     refresh_data = refresh_body["data"]
 
@@ -248,12 +233,6 @@ async def test_refresh_token_reuse_revokes_family(
 
     assert first_refresh_response.status_code == 200
 
-    first_refresh_body = first_refresh_response.json()
-
-    assert first_refresh_body["success"] is True
-    assert first_refresh_body["statusCode"] == 200
-    assert first_refresh_body["error"] is None
-
     new_refresh_token = first_refresh_response.cookies["refresh_token"]
 
     assert new_refresh_token != old_refresh_token
@@ -285,12 +264,8 @@ async def test_refresh_token_reuse_revokes_family(
 
     body = reuse_response.json()
 
-    assert body["success"] is False
-    assert body["statusCode"] == 401
-    assert body["message"] == "Refresh token has already been used"
-    assert body["data"] is None
     assert body["error"]["code"] == "REFRESH_TOKEN_REUSE"
-    assert body["error"]["details"] is None
+
 
     result = await db_session.execute(
         select(RefreshToken).where(
@@ -504,11 +479,9 @@ async def test_change_password_revokes_all_sessions(
 
     change_password_body = change_password_response.json()
 
-    assert change_password_body["success"] is True
-    assert change_password_body["statusCode"] == 200
-    assert change_password_body["message"] == ("Password changed successfully")
+
     assert change_password_body["data"] is None
-    assert change_password_body["error"] is None
+
 
     result = await db_session.execute(
         select(RefreshToken).where(
@@ -556,11 +529,10 @@ async def test_change_password_revokes_all_sessions(
 
     new_login_body = new_login_response.json()
 
-    assert new_login_body["success"] is True
-    assert new_login_body["statusCode"] == 200
+
     assert new_login_body["data"]["access_token"]
     assert new_login_body["data"]["token_type"] == "bearer"
-    assert new_login_body["error"] is None
+
 
     old_login_response = await integration_client.post(
         "/auth/login",

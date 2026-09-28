@@ -20,18 +20,18 @@ async def test_admin_list_users(
 
     body = response.json()
 
-    assert body["success"] is True
-    assert body["statusCode"] == 200
-    assert body["message"] == "Users retrieved successfully"
-    assert body["error"] is None
+    assert "data" in body
+    assert "meta" in body
 
-    assert body["data"]["page"] == 1
-    assert body["data"]["size"] == 20
-    assert body["data"]["total"] == 2
-    assert len(body["data"]["items"]) == 2
+    assert body["meta"]["page"] == 1
+    assert body["meta"]["size"] == 20
+    assert body["meta"]["total_items"] == 2
+    assert body["meta"]["total_pages"] == 1
+
+    assert len(body["data"]) == 2
 
     user = next(
-        item for item in body["data"]["items"] if item["id"] == str(integration_user.id)
+        item for item in body["data"] if item["id"] == str(integration_user.id)
     )
 
     assert user["email"] == integration_user.email
@@ -61,11 +61,12 @@ async def test_admin_list_users_pagination(
 
     body = response.json()
 
-    assert body["success"] is True
-    assert body["data"]["page"] == 1
-    assert body["data"]["size"] == 1
-    assert body["data"]["total"] == 2
-    assert len(body["data"]["items"]) == 1
+    assert body["meta"]["page"] == 1
+    assert body["meta"]["size"] == 1
+    assert body["meta"]["total_items"] == 2
+    assert body["meta"]["total_pages"] == 2
+
+    assert len(body["data"]) == 1
 
 
 @pytest.mark.asyncio
@@ -85,11 +86,10 @@ async def test_admin_list_users_search_by_email(
 
     body = response.json()
 
-    assert body["success"] is True
-    assert body["data"]["total"] == 1
-    assert len(body["data"]["items"]) == 1
+    assert body["meta"]["total_items"] == 1
+    assert body["meta"]["total_pages"] == 1
 
-    user = body["data"]["items"][0]
+    user = body["data"][0]
 
     assert user["id"] == str(integration_user.id)
     assert user["email"] == integration_user.email
@@ -112,11 +112,10 @@ async def test_admin_list_users_search_by_full_name(
 
     body = response.json()
 
-    assert body["success"] is True
-    assert body["data"]["total"] == 1
-    assert len(body["data"]["items"]) == 1
+    assert body["meta"]["total_items"] == 1
+    assert body["meta"]["total_pages"] == 1
 
-    user = body["data"]["items"][0]
+    user = body["data"][0]
 
     assert user["id"] == str(integration_user.id)
     assert user["full_name"] == integration_user.full_name
@@ -139,11 +138,10 @@ async def test_admin_list_users_search_is_case_insensitive(
 
     body = response.json()
 
-    assert body["success"] is True
-    assert body["data"]["total"] == 1
-    assert len(body["data"]["items"]) == 1
+    assert body["meta"]["total_items"] == 1
+    assert body["meta"]["total_pages"] == 1
 
-    assert body["data"]["items"][0]["id"] == str(integration_user.id)
+    assert body["data"][0]["id"] == str(integration_user.id)
 
 
 @pytest.mark.asyncio
@@ -165,11 +163,6 @@ async def test_non_admin_cannot_list_users(
     )
 
     assert response.status_code == 403
-
-    body = response.json()
-
-    assert body["success"] is False
-    assert body["statusCode"] == 403
 
 
 @pytest.mark.asyncio

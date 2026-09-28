@@ -1,21 +1,29 @@
 from datetime import date
+from math import ceil
 from typing import Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Query, status
 
+from app.constants.response import (
+    CONFLICT_RESPONSE,
+    FORBIDDEN_RESPONSE,
+    INTERNAL_SERVER_ERROR_RESPONSE,
+    NOT_FOUND_RESPONSE,
+    UNAUTHORIZED_RESPONSE,
+    VALIDATION_RESPONSE,
+)
 from app.core.responses import success_response
 from app.dependencies.types import AdminUser, CurrentUser, DBSession
 from app.models.enums import AssetStatus, AssetType
 from app.schemas.assets import (
     AssetAssign,
     AssetCreate,
-    AssetListResponse,
     AssetResponse,
     AssetStatusUpdate,
     AssetUpdate,
 )
-from app.schemas.common import SuccessEnvelope
+from app.schemas.common import PaginationMeta, SuccessResponse
 from app.services.assets import AssetService
 
 router = APIRouter(
@@ -24,26 +32,44 @@ router = APIRouter(
 )
 
 
-@router.post("", status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        **CONFLICT_RESPONSE,
+        **FORBIDDEN_RESPONSE,
+        **INTERNAL_SERVER_ERROR_RESPONSE,
+        **UNAUTHORIZED_RESPONSE,
+        **VALIDATION_RESPONSE,
+    },
+)
 async def create_asset(
     data: AssetCreate,
     session: DBSession,
     _admin_user: AdminUser,
-) -> SuccessEnvelope[AssetResponse]:
+) -> SuccessResponse[AssetResponse]:
     service = AssetService(session)
 
     asset = await service.create(data)
 
     return success_response(
         status_code=status.HTTP_201_CREATED,
-        message="Asset created successfully",
         data=AssetResponse.model_validate(
             asset,
         ).model_dump(mode="json"),
     )
 
 
-@router.get("")
+@router.get(
+    "",
+    status_code=status.HTTP_200_OK,
+    responses={
+        **FORBIDDEN_RESPONSE,
+        **INTERNAL_SERVER_ERROR_RESPONSE,
+        **UNAUTHORIZED_RESPONSE,
+        **VALIDATION_RESPONSE,
+    },
+)
 async def list_assets(
     session: DBSession,
     _admin_user: AdminUser,
@@ -55,13 +81,13 @@ async def list_assets(
     warranty_expiring_before: date | None = None,
     search: str | None = None,
     sort: Literal["created_at", "purchase_date", "asset_tag"] = Query(
-        default="created_at"
+        default="created_at",
     ),
     order: Literal["asc", "desc"] = Query(default="desc"),
-) -> SuccessEnvelope[AssetListResponse]:
+) -> SuccessResponse[list[AssetResponse]]:
     service = AssetService(session)
 
-    result = await service.list(
+    assets, total = await service.list(
         page=page,
         size=size,
         asset_type=asset_type,
@@ -73,29 +99,58 @@ async def list_assets(
         order=order,
     )
 
+    data = [
+        AssetResponse.model_validate(asset).model_dump(mode="json") for asset in assets
+    ]
+
+    total_pages = ceil(total / size) if total else 0
+
+    meta = PaginationMeta(
+        page=page,
+        size=size,
+        total_pages=total_pages,
+        total_items=total,
+    ).model_dump(mode="json")
+
     return success_response(
         status_code=status.HTTP_200_OK,
-        message="Assets retrieved successfully",
-        data=AssetListResponse.model_validate(result).model_dump(mode="json"),
+        data=data,
+        meta=meta,
     )
 
 
-@router.get("/summary", status_code=status.HTTP_200_OK)
+@router.get(
+    "/summary",
+    status_code=status.HTTP_200_OK,
+    responses={
+        **FORBIDDEN_RESPONSE,
+        **INTERNAL_SERVER_ERROR_RESPONSE,
+        **UNAUTHORIZED_RESPONSE,
+    },
+)
 async def get_asset_summary(
-    session: DBSession, _admin_user: AdminUser
-) -> SuccessEnvelope[dict[str, int]]:
+    session: DBSession,
+    _admin_user: AdminUser,
+) -> SuccessResponse[dict[str, int]]:
     service = AssetService(session)
 
     result = await service.summary()
 
     return success_response(
         status_code=status.HTTP_200_OK,
-        message="Assets summary retrieved successfully",
         data=result,
     )
 
 
-@router.get("/my", status_code=status.HTTP_200_OK)
+@router.get(
+    "/my",
+    status_code=status.HTTP_200_OK,
+    responses={
+        **INTERNAL_SERVER_ERROR_RESPONSE,
+        **UNAUTHORIZED_RESPONSE,
+        **VALIDATION_RESPONSE,
+    },
+)
 async def get_my_assets(
     session: DBSession,
     current_user: CurrentUser,
@@ -105,22 +160,50 @@ async def get_my_assets(
         ge=1,
         le=100,
     ),
-) -> SuccessEnvelope[AssetListResponse]:
+) -> SuccessResponse[list[AssetResponse]]:
     service = AssetService(session)
 
-    result = await service.list(page=page, size=size, assigned_to=current_user.id)
+    assets, total = await service.list(
+        page=page,
+        size=size,
+        assigned_to=current_user.id,
+    )
+
+    data = [
+        AssetResponse.model_validate(asset).model_dump(mode="json") for asset in assets
+    ]
+
+    total_pages = ceil(total / size) if total else 0
+
+    meta = PaginationMeta(
+        page=page,
+        size=size,
+        total_pages=total_pages,
+        total_items=total,
+    ).model_dump(mode="json")
 
     return success_response(
         status_code=status.HTTP_200_OK,
-        message="Assets retrieved successfully",
-        data=AssetListResponse.model_validate(result).model_dump(mode="json"),
+        data=data,
+        meta=meta,
     )
 
 
-@router.get("/{asset_id}", status_code=status.HTTP_200_OK)
+@router.get(
+    "/{asset_id}",
+    status_code=status.HTTP_200_OK,
+    responses={
+        **INTERNAL_SERVER_ERROR_RESPONSE,
+        **NOT_FOUND_RESPONSE,
+        **UNAUTHORIZED_RESPONSE,
+        **VALIDATION_RESPONSE,
+    },
+)
 async def get_by_id(
-    asset_id: UUID, session: DBSession, current_user: CurrentUser
-) -> SuccessEnvelope[AssetResponse]:
+    asset_id: UUID,
+    session: DBSession,
+    current_user: CurrentUser,
+) -> SuccessResponse[AssetResponse]:
     service = AssetService(session)
 
     asset = await service.get_by_id(
@@ -130,18 +213,29 @@ async def get_by_id(
 
     return success_response(
         status_code=status.HTTP_200_OK,
-        message="Asset retrieved successfully",
-        data=AssetResponse.model_validate(asset).model_dump(mode="json"),
+        data=AssetResponse.model_validate(
+            asset,
+        ).model_dump(mode="json"),
     )
 
 
-@router.patch("/{asset_id}", status_code=status.HTTP_200_OK)
+@router.patch(
+    "/{asset_id}",
+    status_code=status.HTTP_200_OK,
+    responses={
+        **FORBIDDEN_RESPONSE,
+        **INTERNAL_SERVER_ERROR_RESPONSE,
+        **NOT_FOUND_RESPONSE,
+        **UNAUTHORIZED_RESPONSE,
+        **VALIDATION_RESPONSE,
+    },
+)
 async def update_asset(
     asset_id: UUID,
     data: AssetUpdate,
     session: DBSession,
     _admin_user: AdminUser,
-) -> SuccessEnvelope[AssetResponse]:
+) -> SuccessResponse[AssetResponse]:
     service = AssetService(session)
 
     asset = await service.update(
@@ -151,12 +245,24 @@ async def update_asset(
 
     return success_response(
         status_code=status.HTTP_200_OK,
-        message="Asset updated successfully",
-        data=AssetResponse.model_validate(asset).model_dump(mode="json"),
+        data=AssetResponse.model_validate(
+            asset,
+        ).model_dump(mode="json"),
     )
 
 
-@router.delete("/{asset_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{asset_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses={
+        **CONFLICT_RESPONSE,
+        **FORBIDDEN_RESPONSE,
+        **INTERNAL_SERVER_ERROR_RESPONSE,
+        **NOT_FOUND_RESPONSE,
+        **UNAUTHORIZED_RESPONSE,
+        **VALIDATION_RESPONSE,
+    },
+)
 async def delete_asset(
     asset_id: UUID,
     _current_user: AdminUser,
@@ -166,19 +272,25 @@ async def delete_asset(
 
     await service.delete(asset_id)
 
-    return None
-
 
 @router.post(
     "/{asset_id}/assign",
     status_code=status.HTTP_200_OK,
+    responses={
+        **CONFLICT_RESPONSE,
+        **FORBIDDEN_RESPONSE,
+        **INTERNAL_SERVER_ERROR_RESPONSE,
+        **NOT_FOUND_RESPONSE,
+        **UNAUTHORIZED_RESPONSE,
+        **VALIDATION_RESPONSE,
+    },
 )
 async def assign_asset(
     asset_id: UUID,
     data: AssetAssign,
     session: DBSession,
     _admin_user: AdminUser,
-) -> SuccessEnvelope[AssetResponse]:
+) -> SuccessResponse[AssetResponse]:
     service = AssetService(session)
 
     asset = await service.assign(
@@ -188,47 +300,69 @@ async def assign_asset(
 
     return success_response(
         status_code=status.HTTP_200_OK,
-        message="Asset assigned successfully",
-        data=AssetResponse.model_validate(asset).model_dump(mode="json"),
+        data=AssetResponse.model_validate(
+            asset,
+        ).model_dump(mode="json"),
     )
 
 
 @router.post(
     "/{asset_id}/unassign",
     status_code=status.HTTP_200_OK,
+    responses={
+        **CONFLICT_RESPONSE,
+        **FORBIDDEN_RESPONSE,
+        **INTERNAL_SERVER_ERROR_RESPONSE,
+        **NOT_FOUND_RESPONSE,
+        **UNAUTHORIZED_RESPONSE,
+        **VALIDATION_RESPONSE,
+    },
 )
 async def unassign_asset(
     asset_id: UUID,
     session: DBSession,
     _admin_user: AdminUser,
-) -> SuccessEnvelope[AssetResponse]:
+) -> SuccessResponse[AssetResponse]:
     service = AssetService(session)
 
     asset = await service.unassign(asset_id)
 
     return success_response(
         status_code=status.HTTP_200_OK,
-        message="Asset unassigned successfully",
-        data=AssetResponse.model_validate(asset).model_dump(mode="json"),
+        data=AssetResponse.model_validate(
+            asset,
+        ).model_dump(mode="json"),
     )
 
 
 @router.post(
     "/{asset_id}/status",
     status_code=status.HTTP_200_OK,
+    responses={
+        **CONFLICT_RESPONSE,
+        **FORBIDDEN_RESPONSE,
+        **INTERNAL_SERVER_ERROR_RESPONSE,
+        **NOT_FOUND_RESPONSE,
+        **UNAUTHORIZED_RESPONSE,
+        **VALIDATION_RESPONSE,
+    },
 )
 async def change_status(
     asset_id: UUID,
     data: AssetStatusUpdate,
     session: DBSession,
     _admin_user: AdminUser,
-) -> SuccessEnvelope[AssetResponse]:
+) -> SuccessResponse[AssetResponse]:
     service = AssetService(session)
 
-    asset = await service.change_status(asset_id, data.status)
+    asset = await service.change_status(
+        asset_id,
+        data.status,
+    )
 
     return success_response(
         status_code=status.HTTP_200_OK,
-        message="Asset status changed successfully",
-        data=AssetResponse.model_validate(asset).model_dump(mode="json"),
+        data=AssetResponse.model_validate(
+            asset,
+        ).model_dump(mode="json"),
     )

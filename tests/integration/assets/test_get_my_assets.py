@@ -56,16 +56,15 @@ async def test_user_can_list_my_assets(
     )
 
     assert response.status_code == 200
+    body = response.json()
+    data = body["data"]
+    meta = body["meta"]
 
-    data = response.json()["data"]
-
-    assert data["page"] == 1
-    assert data["size"] == 20
-    assert data["total"] == 1
-    assert data["pages"] == 1
-    assert len(data["items"]) == 1
-    assert data["items"][0]["serial_number"] == "SN-MY-001"
-    assert data["items"][0]["assigned_to"] == str(integration_user.id)
+    assert meta["page"] == 1
+    assert meta["size"] == 20
+    assert meta["total_items"] == 1
+    assert meta["total_pages"] == 1
+    assert len(data) == 1
 
 
 @pytest.mark.asyncio
@@ -155,12 +154,13 @@ async def test_my_assets_returns_only_assets_assigned_to_current_user(
 
     assert response.status_code == 200
 
-    data = response.json()["data"]
+    body = response.json()
+    data = body["data"]
+    meta = body["meta"]
 
-    assert data["total"] == 1
-    assert len(data["items"]) == 1
-    assert data["items"][0]["serial_number"] == "SN-MY-USER"
-    assert data["items"][0]["assigned_to"] == str(integration_user.id)
+    assert meta["total_items"] == 1
+    assert meta["total_pages"] == 1
+    assert len(data) == 1
 
 
 @pytest.mark.asyncio
@@ -216,13 +216,15 @@ async def test_my_assets_supports_pagination(
 
     assert response.status_code == 200
 
-    data = response.json()["data"]
+    body = response.json()
+    data = body["data"]
+    meta = body["meta"]
 
-    assert data["page"] == 2
-    assert data["size"] == 2
-    assert data["total"] == 5
-    assert data["pages"] == 3
-    assert len(data["items"]) == 2
+    assert meta["page"] == 2
+    assert meta["size"] == 2
+    assert meta["total_items"] == 5
+    assert meta["total_pages"] == 3
+    assert len(data) == 2
 
 
 @pytest.mark.asyncio

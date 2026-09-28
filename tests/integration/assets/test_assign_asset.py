@@ -43,7 +43,6 @@ async def test_admin_can_assign_in_stock_asset(
 
     data = response.json()
 
-    assert data["success"] is True
     assert data["data"]["id"] == asset_id
     assert data["data"]["status"] == AssetStatus.ASSIGNED.value
     assert data["data"]["assigned_to"] == str(integration_user.id)
@@ -92,7 +91,6 @@ async def test_admin_cannot_assign_non_in_stock_asset(
 
     data = response.json()
 
-    assert data["success"] is False
     assert data["error"]["code"] == "INVALID_ASSET_STATUS_TRANSITION"
 
 
@@ -131,7 +129,6 @@ async def test_assign_fails_when_user_does_not_exist(
 
     data = response.json()
 
-    assert data["success"] is False
     assert data["error"]["code"] == "ASSET_ASSIGNMENT_USER_NOT_FOUND"
 
 
@@ -175,7 +172,6 @@ async def test_assign_fails_when_user_is_inactive(
 
     data = response.json()
 
-    assert data["success"] is False
     assert data["error"]["code"] == "ASSET_ASSIGNMENT_USER_INACTIVE"
 
 
@@ -244,5 +240,4 @@ async def test_assign_nonexistent_asset(
 
     data = response.json()
 
-    assert data["success"] is False
     assert data["error"]["code"] == "ASSET_NOT_FOUND"

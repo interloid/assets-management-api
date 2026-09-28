@@ -1,23 +1,12 @@
-from fastapi import HTTPException, Request
+from fastapi import Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.core.responses import error_response
 from app.exceptions.base import AppError
 
-SENSITIVE_FIELDS = {
-    "password",
-    "current_password",
-    "new_password",
-    "refresh_token",
-    "access_token",
-}
 
-
-def app_exception_handler(
-    _request: Request,
-    exc: AppError,
-) -> JSONResponse:
+def app_error_handler(_request: Request, exc: AppError):
     return error_response(
         status_code=exc.status_code,
         message=exc.message,
@@ -26,56 +15,39 @@ def app_exception_handler(
     )
 
 
-def validation_exception_handler(
-    _request: Request,
-    exc: RequestValidationError,
-) -> JSONResponse:
-    errors = []
-
+def validation_exception_handler(_request: Request, exc: RequestValidationError):
+    details = []
     for error in exc.errors():
-        error = error.copy()
-
         loc = error.get("loc", [])
-
-        if any(field in SENSITIVE_FIELDS for field in loc):
-            error.pop("input", None)
-
-        error.pop("ctx", None)
-
-        errors.append(error)
-
+        fields = [str(f) for f in loc if f not in {"body", "query", "path"}]
+        details.append(
+            {
+                "field": ".".join(fields) if fields else "request",
+                "issue": error.get("msg", "Invalid value"),
+            }
+        )
     return error_response(
         status_code=422,
-        message="Validation failed",
-        code="INVALID_INPUT",
-        details=errors,
+        message="Invalid input",
+        code="VALIDATION_ERROR",
+        details=details,
     )
 
 
-def unexpected_exception_handler(
-    _request: Request,
-    _exc: Exception,
-) -> JSONResponse:
+def unexpected_exception_handler(_request: Request, _exc: Exception):
     return error_response(
-        status_code=500,
-        message="Internal server error",
-        code="INTERNAL_ERROR",
+        status_code=500, message="Internal server error", code="INTERNAL_ERROR"
     )
 
 
-def http_exception_handler(
-    _request: Request,
-    exc: HTTPException,
-) -> JSONResponse:
+def http_exception_handler(_request: Request, exc: StarletteHTTPException):
     if exc.status_code == 401:
         return error_response(
             status_code=401,
-            message="Authentication required",
+            message="Authentication credentials were not provided",
             code="AUTHENTICATION_REQUIRED",
-            details="Authentication credentials were not provided",
             headers=exc.headers,
         )
-
     return error_response(
         status_code=exc.status_code,
         message=str(exc.detail),

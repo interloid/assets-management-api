@@ -5,12 +5,12 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.core.lifespan import lifespan
 from app.exceptions.base import AppError
 from app.exceptions.handlers import (
-    app_exception_handler,
+    app_error_handler,
     http_exception_handler,
     unexpected_exception_handler,
     validation_exception_handler,
 )
-from app.routers import assets, auth, health, root, user
+from app.routers import assets, auth, health, user
 
 app = FastAPI(
     title="Assets Management API",
@@ -19,7 +19,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-app.add_exception_handler(AppError, app_exception_handler)
+app.add_exception_handler(AppError, app_error_handler)
 app.add_exception_handler(Exception, unexpected_exception_handler)
 app.add_exception_handler(
     StarletteHTTPException,
@@ -28,7 +28,6 @@ app.add_exception_handler(
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
 
 app.include_router(health.router)
-app.include_router(root.router)
 app.include_router(user.router)
 app.include_router(auth.router)
 app.include_router(assets.router)

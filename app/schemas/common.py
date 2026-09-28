@@ -1,6 +1,6 @@
-from typing import Any, Generic, TypeVar
+from typing import Generic, TypeVar
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 DataT = TypeVar("DataT")
 
@@ -12,40 +12,28 @@ class APIModel(BaseModel):
     )
 
 
+class PaginationMeta(APIModel):
+    page: int
+    size: int
+    total_pages: int
+    total_items: int
+
+
+class SuccessResponse(APIModel, Generic[DataT]):
+    data: DataT
+    meta: PaginationMeta | None = None
+
+
 class ErrorDetail(APIModel):
-    code: str
-    details: Any
-
-
-class ValidationErrorDetail(APIModel):
     field: str
-    message: str
+    issue: str
 
 
 class APIError(APIModel):
     code: str
-    details: str | list[ValidationErrorDetail]
-
-
-class SuccessResponse(APIModel):
-    success: bool = True
-    status_code: int = Field(alias="statusCode")
     message: str
-    data: Any | None = None
-    error: None = None
+    details: list[ErrorDetail] | None = None
 
 
 class ErrorResponse(APIModel):
-    success: bool = False
-    status_code: int = Field(alias="statusCode")
-    message: str
-    data: None
     error: APIError
-
-
-class SuccessEnvelope(APIModel, Generic[DataT]):
-    success: bool = True
-    status_code: int = Field(alias="statusCode")
-    message: str
-    data: DataT
-    error: None = None

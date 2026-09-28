@@ -32,12 +32,8 @@ async def test_login_success(
 
     body = response.json()
 
-    assert body["success"] is True
-    assert body["statusCode"] == 200
-    assert body["message"] == "Login successful"
     assert body["data"]["access_token"] == "access-token"
     assert body["data"]["token_type"] == "bearer"
-    assert body["error"] is None
 
     assert "refresh_token" not in body
     assert response.cookies["refresh_token"] == "refresh-token"
@@ -67,12 +63,8 @@ async def test_login_invalid_credentials(
 
     body = response.json()
 
-    assert body["success"] is False
-    assert body["statusCode"] == 401
-    assert body["message"] == "Invalid email or password"
-    assert body["data"] is None
+    assert body["error"]["message"] == "Invalid email or password"
     assert body["error"]["code"] == "INVALID_CREDENTIALS"
-    assert body["error"]["details"] is None
 
 
 @pytest.mark.asyncio
@@ -96,12 +88,8 @@ async def test_login_invalid_email(
 
     body = response.json()
 
-    assert body["success"] is False
-    assert body["statusCode"] == 422
-    assert body["message"] == "Validation failed"
-    assert body["data"] is None
-    assert body["error"]["code"] == "INVALID_INPUT"
-    assert isinstance(body["error"]["details"], list)
+    assert body["error"]["message"] == "Invalid input"
+    assert body["error"]["code"] == "VALIDATION_ERROR"
 
     mock_login.assert_not_awaited()
 
@@ -127,11 +115,7 @@ async def test_login_missing_password(
 
     body = response.json()
 
-    assert body["success"] is False
-    assert body["statusCode"] == 422
-    assert body["message"] == "Validation failed"
-    assert body["data"] is None
-    assert body["error"]["code"] == "INVALID_INPUT"
-    assert isinstance(body["error"]["details"], list)
+    assert body["error"]["message"] == "Invalid input"
+    assert body["error"]["code"] == "VALIDATION_ERROR"
 
     mock_login.assert_not_awaited()

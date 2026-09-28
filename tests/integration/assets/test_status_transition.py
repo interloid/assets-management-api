@@ -246,7 +246,6 @@ async def test_admin_cannot_change_in_stock_to_assigned_via_status(
 
     data = response.json()
 
-    assert data["success"] is False
     assert data["error"]["code"] == "INVALID_ASSET_STATUS_TRANSITION"
 
 
@@ -295,7 +294,6 @@ async def test_admin_cannot_change_assigned_to_in_stock_via_status(
 
     data = response.json()
 
-    assert data["success"] is False
     assert data["error"]["code"] == "INVALID_ASSET_STATUS_TRANSITION"
 
 
@@ -341,7 +339,6 @@ async def test_admin_cannot_change_retired_asset_status(
 
     data = response.json()
 
-    assert data["success"] is False
     assert data["error"]["code"] == "INVALID_ASSET_STATUS_TRANSITION"
 
 
@@ -368,7 +365,6 @@ async def test_change_status_nonexistent_asset(
 
     data = response.json()
 
-    assert data["success"] is False
     assert data["error"]["code"] == "ASSET_NOT_FOUND"
 
 

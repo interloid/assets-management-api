@@ -1,5 +1,11 @@
 from fastapi import APIRouter, Response, status
 
+from app.constants.response import (
+    CONFLICT_RESPONSE,
+    INTERNAL_SERVER_ERROR_RESPONSE,
+    UNAUTHORIZED_RESPONSE,
+    VALIDATION_RESPONSE,
+)
 from app.core.config import settings
 from app.core.responses import success_response
 from app.dependencies.redis import RedisClient
@@ -17,7 +23,7 @@ from app.schemas.auth import (
     RegisterRequest,
     UserResponse,
 )
-from app.schemas.common import SuccessEnvelope
+from app.schemas.common import SuccessResponse
 from app.services.auth import AuthService
 
 router = APIRouter(
@@ -31,11 +37,16 @@ COOKIE_PATH = "/auth"
 @router.post(
     "/register",
     status_code=status.HTTP_201_CREATED,
+    responses={
+        **CONFLICT_RESPONSE,
+        **INTERNAL_SERVER_ERROR_RESPONSE,
+        **VALIDATION_RESPONSE,
+    },
 )
 async def register(
     data: RegisterRequest,
     session: DBSession,
-) -> SuccessEnvelope[UserResponse]:
+) -> SuccessResponse[UserResponse]:
 
     service = AuthService(session)
 
@@ -43,7 +54,6 @@ async def register(
 
     return success_response(
         status_code=status.HTTP_201_CREATED,
-        message="User registered successfully",
         data=UserResponse.model_validate(user).model_dump(mode="json"),
     )
 
@@ -51,11 +61,16 @@ async def register(
 @router.post(
     "/login",
     status_code=status.HTTP_200_OK,
+    responses={
+        **INTERNAL_SERVER_ERROR_RESPONSE,
+        **UNAUTHORIZED_RESPONSE,
+        **VALIDATION_RESPONSE,
+    },
 )
 async def login(
     payload: LoginRequest,
     session: DBSession,
-) -> SuccessEnvelope[LoginResponse]:
+) -> SuccessResponse[LoginResponse]:
     service = AuthService(session)
 
     result = await service.login(
@@ -69,7 +84,6 @@ async def login(
 
     response = success_response(
         status_code=status.HTTP_200_OK,
-        message="Login successful",
         data=data.model_dump(mode="json"),
     )
 
@@ -89,11 +103,16 @@ async def login(
 @router.post(
     "/refresh",
     status_code=status.HTTP_200_OK,
+    responses={
+        **INTERNAL_SERVER_ERROR_RESPONSE,
+        **UNAUTHORIZED_RESPONSE,
+        **VALIDATION_RESPONSE,
+    },
 )
 async def refresh(
     session: DBSession,
     refresh_token: RefreshToken = None,
-) -> SuccessEnvelope[LoginResponse]:
+) -> SuccessResponse[LoginResponse]:
     service = AuthService(session)
 
     result = await service.refresh(refresh_token)
@@ -105,7 +124,6 @@ async def refresh(
 
     response = success_response(
         status_code=status.HTTP_200_OK,
-        message="Token refreshed successfully",
         data=data.model_dump(mode="json"),
     )
 
@@ -125,6 +143,11 @@ async def refresh(
 @router.post(
     "/logout",
     status_code=status.HTTP_204_NO_CONTENT,
+    responses={
+        **INTERNAL_SERVER_ERROR_RESPONSE,
+        **UNAUTHORIZED_RESPONSE,
+        **VALIDATION_RESPONSE,
+    },
 )
 async def logout(
     response: Response,
@@ -149,6 +172,11 @@ async def logout(
 @router.post(
     "/logout-all",
     status_code=status.HTTP_204_NO_CONTENT,
+    responses={
+        **INTERNAL_SERVER_ERROR_RESPONSE,
+        **UNAUTHORIZED_RESPONSE,
+        **VALIDATION_RESPONSE,
+    },
 )
 async def logout_all(
     response: Response,
@@ -176,13 +204,16 @@ async def logout_all(
 @router.get(
     "/me",
     status_code=status.HTTP_200_OK,
+    responses={
+        **INTERNAL_SERVER_ERROR_RESPONSE,
+        **UNAUTHORIZED_RESPONSE,
+    },
 )
 async def get_me(
     current_user: CurrentUser,
-) -> SuccessEnvelope[UserResponse]:
+) -> SuccessResponse[UserResponse]:
     return success_response(
         status_code=status.HTTP_200_OK,
-        message="User retrieved successfully",
         data=UserResponse.model_validate(current_user).model_dump(
             mode="json",
         ),
@@ -192,12 +223,17 @@ async def get_me(
 @router.post(
     "/change-password",
     status_code=status.HTTP_200_OK,
+    responses={
+        **INTERNAL_SERVER_ERROR_RESPONSE,
+        **UNAUTHORIZED_RESPONSE,
+        **VALIDATION_RESPONSE,
+    },
 )
 async def change_password(
     data: ChangePasswordRequest,
     current_user: CurrentUser,
     session: DBSession,
-) -> SuccessEnvelope[None]:
+) -> SuccessResponse[None]:
     service = AuthService(session)
 
     await service.change_password(
@@ -208,6 +244,5 @@ async def change_password(
 
     return success_response(
         status_code=status.HTTP_200_OK,
-        message="Password changed successfully",
         data=None,
     )

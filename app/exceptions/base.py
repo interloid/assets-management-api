@@ -5,10 +5,14 @@ class AppError(Exception):
     headers: dict[str, str] | None = None
 
     def __init__(
-        self,
-        message: str | None = None,
-        headers: dict[str, str] | None = None,
+        self, message: str | None = None, headers: dict[str, str] | None = None
     ) -> None:
         self.message = message or self.message
         self.headers = headers or self.headers
         super().__init__(self.message)
+
+
+class ServiceUnavailableError(AppError):
+    status_code = 503
+    code = "SERVICE_UNAVAILABLE"
+    message = "One or more required services are unavailable"

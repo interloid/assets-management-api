@@ -120,7 +120,6 @@ async def test_admin_cannot_delete_assigned_asset(
 
     data = response.json()
 
-    assert data["success"] is False
     assert data["error"]["code"] == "ASSET_DELETE_CONFLICT"
 
 
@@ -163,7 +162,6 @@ async def test_admin_cannot_delete_repair_asset(
 
     data = response.json()
 
-    assert data["success"] is False
     assert data["error"]["code"] == "ASSET_DELETE_CONFLICT"
 
 
@@ -187,7 +185,6 @@ async def test_delete_nonexistent_asset(
 
     data = response.json()
 
-    assert data["success"] is False
     assert data["error"]["code"] == "ASSET_NOT_FOUND"
 
 

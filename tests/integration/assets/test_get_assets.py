@@ -151,7 +151,6 @@ async def test_user_cannot_get_other_users_asset(
 
     data = response.json()
 
-    assert data["success"] is False
     assert data["error"]["code"] == "ASSET_NOT_FOUND"
 
 
@@ -194,7 +193,6 @@ async def test_user_cannot_get_unassigned_asset(
 
     data = response.json()
 
-    assert data["success"] is False
     assert data["error"]["code"] == "ASSET_NOT_FOUND"
 
 
@@ -220,7 +218,6 @@ async def test_get_nonexistent_asset_returns_404(
 
     data = response.json()
 
-    assert data["success"] is False
     assert data["error"]["code"] == "ASSET_NOT_FOUND"
 
 

@@ -29,11 +29,6 @@ async def test_valid_registration(
 
     body = response.json()
 
-    assert body["success"] is True
-    assert body["statusCode"] == 201
-    assert body["message"] == "User registered successfully"
-    assert body["error"] is None
-
     data = body["data"]
 
     assert data["id"] == str(user.id)
@@ -64,12 +59,8 @@ async def test_duplicate_email(
 
     body = response.json()
 
-    assert body["success"] is False
-    assert body["statusCode"] == 409
-    assert body["message"] == "Email is already registered"
-    assert body["data"] is None
+    assert body["error"]["message"] == "Email is already registered"
     assert body["error"]["code"] == "EMAIL_ALREADY_REGISTERED"
-    assert body["error"]["details"] is None
 
 
 @pytest.mark.asyncio
@@ -93,12 +84,8 @@ async def test_invalid_email(
 
     body = response.json()
 
-    assert body["success"] is False
-    assert body["statusCode"] == 422
-    assert body["message"] == "Validation failed"
-    assert body["data"] is None
-    assert body["error"]["code"] == "INVALID_INPUT"
-    assert isinstance(body["error"]["details"], list)
+    assert body["error"]["message"] == "Invalid input"
+    assert body["error"]["code"] == "VALIDATION_ERROR"
 
     mock_register.assert_not_awaited()
 
@@ -124,12 +111,8 @@ async def test_missing_field(
 
     body = response.json()
 
-    assert body["success"] is False
-    assert body["statusCode"] == 422
-    assert body["message"] == "Validation failed"
-    assert body["data"] is None
-    assert body["error"]["code"] == "INVALID_INPUT"
-    assert isinstance(body["error"]["details"], list)
+    assert body["error"]["message"] == "Invalid input"
+    assert body["error"]["code"] == "VALIDATION_ERROR"
 
     mock_register.assert_not_awaited()
 
@@ -155,11 +138,7 @@ async def test_invalid_password(
 
     body = response.json()
 
-    assert body["success"] is False
-    assert body["statusCode"] == 422
-    assert body["message"] == "Validation failed"
-    assert body["data"] is None
-    assert body["error"]["code"] == "INVALID_INPUT"
-    assert isinstance(body["error"]["details"], list)
+    assert body["error"]["message"] == "Invalid input"
+    assert body["error"]["code"] == "VALIDATION_ERROR"
 
     mock_register.assert_not_awaited()

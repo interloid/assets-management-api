@@ -1,6 +1,5 @@
 import re
 from datetime import date
-from math import ceil
 from typing import Literal
 from uuid import UUID
 
@@ -23,12 +22,7 @@ from app.models.enums import AssetStatus, AssetType, UserRole
 from app.models.user import User
 from app.repositories.assets import AssetRepository
 from app.repositories.user import UserRepository
-from app.schemas.assets import (
-    AssetCreate,
-    AssetListResponse,
-    AssetResponse,
-    AssetUpdate,
-)
+from app.schemas.assets import AssetCreate, AssetUpdate
 
 ALLOWED_STATUS_TRANSITIONS: dict[AssetStatus, set[AssetStatus]] = {
     AssetStatus.IN_STOCK: {
@@ -47,10 +41,12 @@ ALLOWED_STATUS_TRANSITIONS: dict[AssetStatus, set[AssetStatus]] = {
     AssetStatus.RETIRED: set(),
 }
 
+
 ASSIGNMENT_ONLY_TRANSITIONS: set[tuple[AssetStatus, AssetStatus]] = {
     (AssetStatus.IN_STOCK, AssetStatus.ASSIGNED),
     (AssetStatus.ASSIGNED, AssetStatus.IN_STOCK),
 }
+
 
 MANUAL_STATUS_TRANSITIONS: dict[AssetStatus, set[AssetStatus]] = {
     current: {
@@ -153,7 +149,7 @@ class AssetService:
         search: str | None = None,
         sort: Literal["created_at", "purchase_date", "asset_tag"] = "created_at",
         order: Literal["asc", "desc"] = "desc",
-    ) -> AssetListResponse:
+    ) -> tuple[list[Asset], int]:
         assets, total = await self.asset_repository.list(
             page=page,
             size=size,
@@ -166,15 +162,7 @@ class AssetService:
             order=order,
         )
 
-        pages = ceil(total / size) if total else 0
-
-        return AssetListResponse(
-            items=[AssetResponse.model_validate(asset) for asset in assets],
-            page=page,
-            size=size,
-            total=total,
-            pages=pages,
-        )
+        return assets, total
 
     async def get_by_id(
         self,
@@ -320,7 +308,11 @@ class AssetService:
             allowed_map=MANUAL_STATUS_TRANSITIONS,
         )
 
-        await self.asset_repository.change_status(asset=asset, new_status=new_status)
+        await self.asset_repository.change_status(
+            asset=asset,
+            new_status=new_status,
+        )
+
         await self.session.commit()
 
         return asset

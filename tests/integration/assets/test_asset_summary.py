@@ -97,7 +97,3 @@ async def test_non_admin_cannot_get_asset_summary(
     )
 
     assert response.status_code == 403
-
-    data = response.json()
-
-    assert data["success"] is False

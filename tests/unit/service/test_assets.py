@@ -41,7 +41,7 @@ async def test_list_assets(
         return_value=([asset], 1),
     )
 
-    result = await service.list(
+    assets_result, total = await service.list(
         page=1,
         size=20,
     )
@@ -58,16 +58,13 @@ async def test_list_assets(
         order="desc",
     )
 
-    assert result.total == 1
-    assert result.page == 1
-    assert result.size == 20
-    assert result.pages == 1
-    assert len(result.items) == 1
-    assert result.items[0].asset_tag == "IL-LAP-0001"
+    assert total == 1
+    assert len(assets_result) == 1
+    assert assets_result[0].asset_tag == "IL-LAP-0001"
 
 
 @pytest.mark.asyncio
-async def test_list_assets_calculates_pages(
+async def test_list_assets_returns_total(
     mock_session,
 ) -> None:
     service = AssetService(mock_session)
@@ -94,15 +91,13 @@ async def test_list_assets_calculates_pages(
         return_value=(assets, 25),
     )
 
-    result = await service.list(
+    assets_result, total = await service.list(
         page=2,
         size=10,
     )
 
-    assert result.total == 25
-    assert result.page == 2
-    assert result.size == 10
-    assert result.pages == 3
+    assert assets_result == assets
+    assert total == 25
 
 
 @pytest.mark.asyncio
@@ -115,16 +110,13 @@ async def test_list_assets_empty_result(
         return_value=([], 0),
     )
 
-    result = await service.list(
+    assets_result, total = await service.list(
         page=1,
         size=20,
     )
 
-    assert result.items == []
-    assert result.total == 0
-    assert result.page == 1
-    assert result.size == 20
-    assert result.pages == 0
+    assert assets_result == []
+    assert total == 0
 
 
 @pytest.mark.asyncio
@@ -200,7 +192,9 @@ async def test_get_by_id_raises_when_asset_not_found(
     service.asset_repository.get_by_id = AsyncMock(
         return_value=None,
     )
+
     asset_id = uuid7()
+
     with pytest.raises(AssetNotFoundError):
         await service.get_by_id(
             asset_id=asset_id,
@@ -254,6 +248,7 @@ async def test_delete_asset(
     service.asset_repository.get_by_id = AsyncMock(
         return_value=asset,
     )
+
     service.asset_repository.delete = AsyncMock()
 
     await service.delete(asset.id)
@@ -261,9 +256,11 @@ async def test_delete_asset(
     service.asset_repository.get_by_id.assert_awaited_once_with(
         asset.id,
     )
+
     service.asset_repository.delete.assert_awaited_once_with(
         asset,
     )
+
     mock_session.commit.assert_awaited_once()
 
 
@@ -293,6 +290,7 @@ async def test_delete_asset_rejects_invalid_status(
     service.asset_repository.get_by_id = AsyncMock(
         return_value=asset,
     )
+
     service.asset_repository.delete = AsyncMock()
 
     with pytest.raises(AssetDeleteConflictError):
@@ -321,9 +319,11 @@ async def test_assign_asset(
     service.asset_repository.get_by_id = AsyncMock(
         return_value=asset,
     )
+
     service.user_repository.get_by_id = AsyncMock(
         return_value=created_user,
     )
+
     service.asset_repository.assign = AsyncMock()
 
     result = await service.assign(
@@ -334,10 +334,12 @@ async def test_assign_asset(
     service.user_repository.get_by_id.assert_awaited_once_with(
         created_user.id,
     )
+
     service.asset_repository.assign.assert_awaited_once_with(
         asset,
         created_user.id,
     )
+
     mock_session.commit.assert_awaited_once()
 
     assert result is asset
@@ -361,12 +363,15 @@ async def test_assign_asset_user_not_found(
     service.asset_repository.get_by_id = AsyncMock(
         return_value=asset,
     )
+
     service.user_repository.get_by_id = AsyncMock(
         return_value=None,
     )
+
     service.asset_repository.assign = AsyncMock()
 
     user_id = uuid7()
+
     with pytest.raises(AssetAssignmentUserNotFoundError):
         await service.assign(
             asset_id=asset.id,
@@ -396,9 +401,11 @@ async def test_assign_asset_user_inactive(
     service.asset_repository.get_by_id = AsyncMock(
         return_value=asset,
     )
+
     service.user_repository.get_by_id = AsyncMock(
         return_value=inactive_user,
     )
+
     service.asset_repository.assign = AsyncMock()
 
     with pytest.raises(AssetAssignmentUserInactiveError):
@@ -462,6 +469,7 @@ async def test_unassign_asset(
     service.asset_repository.get_by_id = AsyncMock(
         return_value=asset,
     )
+
     service.asset_repository.unassign = AsyncMock()
 
     result = await service.unassign(asset.id)
@@ -469,6 +477,7 @@ async def test_unassign_asset(
     service.asset_repository.unassign.assert_awaited_once_with(
         asset,
     )
+
     mock_session.commit.assert_awaited_once()
 
     assert result is asset
@@ -492,6 +501,7 @@ async def test_unassign_asset_rejects_invalid_transition(
     service.asset_repository.get_by_id = AsyncMock(
         return_value=asset,
     )
+
     service.asset_repository.unassign = AsyncMock()
 
     with pytest.raises(InvalidAssetStatusTransitionError):
@@ -519,6 +529,7 @@ async def test_change_status(
     service.asset_repository.get_by_id = AsyncMock(
         return_value=asset,
     )
+
     service.asset_repository.change_status = AsyncMock()
 
     result = await service.change_status(
@@ -530,6 +541,7 @@ async def test_change_status(
         asset=asset,
         new_status=AssetStatus.REPAIR,
     )
+
     mock_session.commit.assert_awaited_once()
 
     assert result is asset
@@ -553,6 +565,7 @@ async def test_change_status_rejects_assignment_transition(
     service.asset_repository.get_by_id = AsyncMock(
         return_value=asset,
     )
+
     service.asset_repository.change_status = AsyncMock()
 
     with pytest.raises(InvalidAssetStatusTransitionError):

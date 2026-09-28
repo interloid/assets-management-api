@@ -51,7 +51,6 @@ async def test_admin_can_unassign_assigned_asset(
 
     data = response.json()
 
-    assert data["success"] is True
     assert data["data"]["id"] == asset_id
     assert data["data"]["status"] == AssetStatus.IN_STOCK.value
     assert data["data"]["assigned_to"] is None
@@ -89,7 +88,6 @@ async def test_admin_cannot_unassign_non_assigned_asset(
 
     data = response.json()
 
-    assert data["success"] is False
     assert data["error"]["code"] == "INVALID_ASSET_STATUS_TRANSITION"
 
 
@@ -163,5 +161,4 @@ async def test_unassign_nonexistent_asset(
 
     data = response.json()
 
-    assert data["success"] is False
     assert data["error"]["code"] == "ASSET_NOT_FOUND"

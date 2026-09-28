@@ -6,18 +6,19 @@ from fastapi.responses import JSONResponse
 def success_response(
     *,
     status_code: int,
-    message: str,
     data: Any = None,
+    meta: dict[str, Any] | None = None,
 ) -> JSONResponse:
+    content: dict[str, Any] = {
+        "data": data,
+    }
+
+    if meta is not None:
+        content["meta"] = meta
+
     return JSONResponse(
         status_code=status_code,
-        content={
-            "success": True,
-            "statusCode": status_code,
-            "message": message,
-            "data": data,
-            "error": None,
-        },
+        content=content,
     )
 
 
@@ -29,17 +30,18 @@ def error_response(
     details: Any = None,
     headers: dict[str, str] | None = None,
 ) -> JSONResponse:
+    error: dict[str, Any] = {
+        "code": code,
+        "message": message,
+    }
+
+    if details is not None:
+        error["details"] = details
+
     return JSONResponse(
         status_code=status_code,
         content={
-            "success": False,
-            "statusCode": status_code,
-            "message": message,
-            "data": None,
-            "error": {
-                "code": code,
-                "details": details,
-            },
+            "error": error,
         },
         headers=headers,
     )

@@ -32,11 +32,6 @@ async def test_me_success(
 
     body = response.json()
 
-    assert body["success"] is True
-    assert body["statusCode"] == 200
-    assert body["message"] == "User retrieved successfully"
-    assert body["error"] is None
-
     data = body["data"]
 
     assert data["id"] == str(user.id)
@@ -58,12 +53,8 @@ async def test_me_missing_jwt(
 
     body = response.json()
 
-    assert body["success"] is False
-    assert body["statusCode"] == 401
-    assert body["message"] == "Authentication required"
-    assert body["data"] is None
+    assert body["error"]["message"] == "Authentication credentials were not provided"
     assert body["error"]["code"] == "AUTHENTICATION_REQUIRED"
-    assert body["error"]["details"] == ("Authentication credentials were not provided")
 
 
 @pytest.mark.asyncio
@@ -85,9 +76,5 @@ async def test_me_invalid_jwt(
 
     body = response.json()
 
-    assert body["success"] is False
-    assert body["statusCode"] == 401
-    assert body["message"] == "Invalid or expired token"
-    assert body["data"] is None
+    assert body["error"]["message"] == "Invalid or expired token"
     assert body["error"]["code"] == "INVALID_TOKEN"
-    assert body["error"]["details"] is None

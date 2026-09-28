@@ -37,16 +37,9 @@ class AssetResponse(BaseModel):
     updated_at: datetime
 
 
-class AssetListResponse(BaseModel):
-    items: list[AssetResponse]
-    page: int
-    size: int
-    total: int
-    pages: int
-
-
 class AssetUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
     type: AssetType | None = None
     notes: str | None = None
     purchase_date: date | None = None

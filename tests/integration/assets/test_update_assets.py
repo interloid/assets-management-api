@@ -177,7 +177,6 @@ async def test_update_asset_rejects_duplicate_serial_number(
 
     data = response.json()
 
-    assert data["success"] is False
     assert data["error"]["code"] == "SERIAL_NUMBER_ALREADY_EXISTS"
 
 
