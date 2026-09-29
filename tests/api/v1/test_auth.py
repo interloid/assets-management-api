@@ -13,7 +13,7 @@ async def test_register_then_login(
     user_payload,
 ) -> None:
     register_response = await integration_client.post(
-        "/auth/register",
+        "/api/v1/auth/register",
         json=user_payload,
     )
 
@@ -39,7 +39,7 @@ async def test_register_then_login(
     assert user.password_hash != user_payload["password"]
 
     login_response = await integration_client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "email": user_payload["email"],
             "password": user_payload["password"],
@@ -86,14 +86,14 @@ async def test_login_then_refresh(
     user_payload,
 ) -> None:
     register_response = await integration_client.post(
-        "/auth/register",
+        "/api/v1/auth/register",
         json=user_payload,
     )
 
     assert register_response.status_code == 201
 
     login_response = await integration_client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "email": user_payload["email"],
             "password": user_payload["password"],
@@ -131,7 +131,7 @@ async def test_login_then_refresh(
     )
 
     refresh_response = await integration_client.post(
-        "/auth/refresh",
+        "/api/v1/auth/refresh",
     )
 
     assert refresh_response.status_code == 200
@@ -186,7 +186,7 @@ async def test_refresh_token_reuse_revokes_family(
     user_payload,
 ) -> None:
     register_response = await integration_client.post(
-        "/auth/register",
+        "/api/v1/auth/register",
         json=user_payload,
     )
 
@@ -196,7 +196,7 @@ async def test_refresh_token_reuse_revokes_family(
     user_id = register_body["data"]["id"]
 
     login_response = await integration_client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "email": user_payload["email"],
             "password": user_payload["password"],
@@ -223,7 +223,7 @@ async def test_refresh_token_reuse_revokes_family(
     )
 
     first_refresh_response = await integration_client.post(
-        "/auth/refresh",
+        "/api/v1/auth/refresh",
     )
 
     assert first_refresh_response.status_code == 200
@@ -252,7 +252,7 @@ async def test_refresh_token_reuse_revokes_family(
     )
 
     reuse_response = await integration_client.post(
-        "/auth/refresh",
+        "/api/v1/auth/refresh",
     )
 
     assert reuse_response.status_code == 401
@@ -282,14 +282,14 @@ async def test_logout_refresh_rejected(
     user_payload,
 ) -> None:
     register_response = await integration_client.post(
-        "/auth/register",
+        "/api/v1/auth/register",
         json=user_payload,
     )
 
     assert register_response.status_code == 201
 
     login_response = await integration_client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "email": user_payload["email"],
             "password": user_payload["password"],
@@ -310,13 +310,13 @@ async def test_logout_refresh_rejected(
     integration_client.headers["Authorization"] = f"Bearer {access_token}"
 
     logout_response = await integration_client.post(
-        "/auth/logout",
+        "/api/v1/auth/logout",
     )
 
     assert logout_response.status_code == 204
 
     refresh_response = await integration_client.post(
-        "/auth/refresh",
+        "/api/v1/auth/refresh",
     )
 
     assert refresh_response.status_code == 401
@@ -329,14 +329,14 @@ async def test_logout_all_sessions_rejected(
     user_payload,
 ) -> None:
     register_response = await integration_client.post(
-        "/auth/register",
+        "/api/v1/auth/register",
         json=user_payload,
     )
 
     assert register_response.status_code == 201
 
     login_response_1 = await integration_client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "email": user_payload["email"],
             "password": user_payload["password"],
@@ -351,7 +351,7 @@ async def test_logout_all_sessions_rejected(
     refresh_token_1 = login_response_1.cookies["refresh_token"]
 
     login_response_2 = await integration_client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "email": user_payload["email"],
             "password": user_payload["password"],
@@ -373,7 +373,7 @@ async def test_logout_all_sessions_rejected(
     integration_client.headers["Authorization"] = f"Bearer {access_token_2}"
 
     logout_all_response = await integration_client.post(
-        "/auth/logout-all",
+        "/api/v1/auth/logout-all",
     )
 
     assert logout_all_response.status_code == 204
@@ -384,7 +384,7 @@ async def test_logout_all_sessions_rejected(
     )
 
     refresh_response_1 = await integration_client.post(
-        "/auth/refresh",
+        "/api/v1/auth/refresh",
     )
 
     assert refresh_response_1.status_code == 401
@@ -395,7 +395,7 @@ async def test_logout_all_sessions_rejected(
     )
 
     refresh_response_2 = await integration_client.post(
-        "/auth/refresh",
+        "/api/v1/auth/refresh",
     )
 
     assert refresh_response_2.status_code == 401
@@ -403,7 +403,7 @@ async def test_logout_all_sessions_rejected(
     integration_client.headers["Authorization"] = f"Bearer {access_token_1}"
 
     me_response_1 = await integration_client.get(
-        "/auth/me",
+        "/api/v1/users/me",
     )
 
     assert me_response_1.status_code == 401
@@ -411,7 +411,7 @@ async def test_logout_all_sessions_rejected(
     integration_client.headers["Authorization"] = f"Bearer {access_token_2}"
 
     me_response_2 = await integration_client.get(
-        "/auth/me",
+        "/api/v1/users/me",
     )
 
     assert me_response_2.status_code == 401
@@ -424,7 +424,7 @@ async def test_change_password_revokes_all_sessions(
     user_payload,
 ) -> None:
     register_response = await integration_client.post(
-        "/auth/register",
+        "/api/v1/auth/register",
         json=user_payload,
     )
 
@@ -434,7 +434,7 @@ async def test_change_password_revokes_all_sessions(
     user_id = register_body["data"]["id"]
 
     login_response_1 = await integration_client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "email": user_payload["email"],
             "password": user_payload["password"],
@@ -446,7 +446,7 @@ async def test_change_password_revokes_all_sessions(
     refresh_token_1 = login_response_1.cookies["refresh_token"]
 
     login_response_2 = await integration_client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "email": user_payload["email"],
             "password": user_payload["password"],
@@ -459,7 +459,7 @@ async def test_change_password_revokes_all_sessions(
     access_token = login_response_2.json()["data"]["access_token"]
 
     change_password_response = await integration_client.post(
-        "/auth/change-password",
+        "/api/v1/users/me/change-password",
         json={
             "current_password": user_payload["password"],
             "new_password": "NewPassword123",
@@ -473,7 +473,7 @@ async def test_change_password_revokes_all_sessions(
 
     change_password_body = change_password_response.json()
 
-    assert change_password_body["data"] is None
+    assert change_password_body["data"]["message"] == "Password changed successfully"
 
     result = await db_session.execute(
         select(RefreshToken).where(
@@ -493,7 +493,7 @@ async def test_change_password_revokes_all_sessions(
     )
 
     refresh_response_1 = await integration_client.post(
-        "/auth/refresh",
+        "/api/v1/auth/refresh",
     )
 
     assert refresh_response_1.status_code == 401
@@ -504,13 +504,13 @@ async def test_change_password_revokes_all_sessions(
     )
 
     refresh_response_2 = await integration_client.post(
-        "/auth/refresh",
+        "/api/v1/auth/refresh",
     )
 
     assert refresh_response_2.status_code == 401
 
     new_login_response = await integration_client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "email": user_payload["email"],
             "password": "NewPassword123",
@@ -525,7 +525,7 @@ async def test_change_password_revokes_all_sessions(
     assert new_login_body["data"]["token_type"] == "bearer"
 
     old_login_response = await integration_client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "email": user_payload["email"],
             "password": user_payload["password"],
@@ -541,14 +541,14 @@ async def test_register_duplicate_email(
     user_payload,
 ) -> None:
     first = await integration_client.post(
-        "/auth/register",
+        "/api/v1/auth/register",
         json=user_payload,
     )
 
     assert first.status_code == 201
 
     response = await integration_client.post(
-        "/auth/register",
+        "/api/v1/auth/register",
         json=user_payload,
     )
 
@@ -565,12 +565,12 @@ async def test_login_invalid_credentials(
     user_payload,
 ) -> None:
     await integration_client.post(
-        "/auth/register",
+        "/api/v1/auth/register",
         json=user_payload,
     )
 
     response = await integration_client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "email": user_payload["email"],
             "password": "WrongPassword123",
@@ -594,7 +594,7 @@ async def test_refresh_invalid_token(
     )
 
     response = await integration_client.post(
-        "/auth/refresh",
+        "/api/v1/auth/refresh",
     )
 
     assert response.status_code == 401
@@ -610,7 +610,7 @@ async def test_me_success(
     user_payload,
 ) -> None:
     response = await authenticated_client.get(
-        "/auth/me",
+        "/api/v1/users/me",
     )
 
     assert response.status_code == 200
@@ -627,7 +627,7 @@ async def test_me_missing_jwt(
     integration_client,
 ) -> None:
     response = await integration_client.get(
-        "/auth/me",
+        "/api/v1/users/me",
     )
 
     assert response.status_code == 401

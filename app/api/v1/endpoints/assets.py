@@ -25,16 +25,20 @@ from app.api.v1.schemas.assets import (
 from app.core.responses import success_response
 from app.modules.asset.services import AssetService
 from app.shared.models.enums import AssetStatus, AssetType
-from app.shared.schemas.common import PaginationMeta, SuccessResponse
+from app.shared.schemas.common import (
+    PaginatedSuccessResponse,
+    PaginationMeta,
+    SuccessResponse,
+)
 
 router = APIRouter(
     prefix="/assets",
-    tags=["Assets"],
 )
 
 
 @router.post(
     "",
+    tags=["Assets"],
     status_code=status.HTTP_201_CREATED,
     responses={
         **CONFLICT_RESPONSE,
@@ -63,6 +67,7 @@ async def create_asset(
 
 @router.get(
     "",
+    tags=["Assets"],
     status_code=status.HTTP_200_OK,
     responses={
         **FORBIDDEN_RESPONSE,
@@ -85,7 +90,7 @@ async def list_assets(
         default="created_at",
     ),
     order: Literal["asc", "desc"] = Query(default="desc"),
-) -> SuccessResponse[list[AssetResponse]]:
+) -> PaginatedSuccessResponse[list[AssetResponse]]:
     service = AssetService(session)
 
     assets, total = await service.list(
@@ -121,7 +126,8 @@ async def list_assets(
 
 
 @router.get(
-    "/summary",
+    "/stats",
+    tags=["Assets"],
     status_code=status.HTTP_200_OK,
     responses={
         **FORBIDDEN_RESPONSE,
@@ -129,7 +135,7 @@ async def list_assets(
         **UNAUTHORIZED_RESPONSE,
     },
 )
-async def get_asset_summary(
+async def get_asset_stats(
     session: DBSession,
     _admin_user: AdminUser,
 ) -> SuccessResponse[dict[str, int]]:
@@ -144,54 +150,8 @@ async def get_asset_summary(
 
 
 @router.get(
-    "/my",
-    status_code=status.HTTP_200_OK,
-    responses={
-        **INTERNAL_SERVER_ERROR_RESPONSE,
-        **UNAUTHORIZED_RESPONSE,
-        **VALIDATION_RESPONSE,
-    },
-)
-async def get_my_assets(
-    session: DBSession,
-    current_user: CurrentUser,
-    page: int = Query(default=1, ge=1),
-    size: int = Query(
-        default=20,
-        ge=1,
-        le=100,
-    ),
-) -> SuccessResponse[list[AssetResponse]]:
-    service = AssetService(session)
-
-    assets, total = await service.list(
-        page=page,
-        size=size,
-        assigned_to=current_user.id,
-    )
-
-    data = [
-        AssetResponse.model_validate(asset).model_dump(mode="json") for asset in assets
-    ]
-
-    total_pages = ceil(total / size) if total else 0
-
-    meta = PaginationMeta(
-        page=page,
-        size=size,
-        total_pages=total_pages,
-        total_items=total,
-    ).model_dump(mode="json")
-
-    return success_response(
-        status_code=status.HTTP_200_OK,
-        data=data,
-        meta=meta,
-    )
-
-
-@router.get(
-    "/{asset_id}",
+    "/{id}",
+    tags=["Assets"],
     status_code=status.HTTP_200_OK,
     responses={
         **INTERNAL_SERVER_ERROR_RESPONSE,
@@ -201,14 +161,14 @@ async def get_my_assets(
     },
 )
 async def get_by_id(
-    asset_id: UUID,
+    id: UUID,
     session: DBSession,
     current_user: CurrentUser,
 ) -> SuccessResponse[AssetResponse]:
     service = AssetService(session)
 
     asset = await service.get_by_id(
-        asset_id=asset_id,
+        asset_id=id,
         current_user=current_user,
     )
 
@@ -221,7 +181,8 @@ async def get_by_id(
 
 
 @router.patch(
-    "/{asset_id}",
+    "/{id}",
+    tags=["Assets Update"],
     status_code=status.HTTP_200_OK,
     responses={
         **FORBIDDEN_RESPONSE,
@@ -232,7 +193,7 @@ async def get_by_id(
     },
 )
 async def update_asset(
-    asset_id: UUID,
+    id: UUID,
     data: AssetUpdate,
     session: DBSession,
     _admin_user: AdminUser,
@@ -240,7 +201,7 @@ async def update_asset(
     service = AssetService(session)
 
     asset = await service.update(
-        asset_id=asset_id,
+        asset_id=id,
         data=data,
     )
 
@@ -253,7 +214,8 @@ async def update_asset(
 
 
 @router.delete(
-    "/{asset_id}",
+    "/{id}",
+    tags=["Assets"],
     status_code=status.HTTP_204_NO_CONTENT,
     responses={
         **CONFLICT_RESPONSE,
@@ -265,17 +227,18 @@ async def update_asset(
     },
 )
 async def delete_asset(
-    asset_id: UUID,
+    id: UUID,
     _current_user: AdminUser,
     session: DBSession,
 ) -> None:
     service = AssetService(session)
 
-    await service.delete(asset_id)
+    await service.delete(id)
 
 
 @router.post(
-    "/{asset_id}/assign",
+    "/{id}/assign",
+    tags=["Asset Assign/Un-Assign"],
     status_code=status.HTTP_200_OK,
     responses={
         **CONFLICT_RESPONSE,
@@ -287,7 +250,7 @@ async def delete_asset(
     },
 )
 async def assign_asset(
-    asset_id: UUID,
+    id: UUID,
     data: AssetAssign,
     session: DBSession,
     _admin_user: AdminUser,
@@ -295,7 +258,7 @@ async def assign_asset(
     service = AssetService(session)
 
     asset = await service.assign(
-        asset_id=asset_id,
+        asset_id=id,
         user_id=data.user_id,
     )
 
@@ -308,7 +271,8 @@ async def assign_asset(
 
 
 @router.post(
-    "/{asset_id}/unassign",
+    "/{id}/unassign",
+    tags=["Asset Assign/Un-Assign"],
     status_code=status.HTTP_200_OK,
     responses={
         **CONFLICT_RESPONSE,
@@ -320,13 +284,13 @@ async def assign_asset(
     },
 )
 async def unassign_asset(
-    asset_id: UUID,
+    id: UUID,
     session: DBSession,
     _admin_user: AdminUser,
 ) -> SuccessResponse[AssetResponse]:
     service = AssetService(session)
 
-    asset = await service.unassign(asset_id)
+    asset = await service.unassign(id)
 
     return success_response(
         status_code=status.HTTP_200_OK,
@@ -337,7 +301,8 @@ async def unassign_asset(
 
 
 @router.post(
-    "/{asset_id}/status",
+    "/{id}/status",
+    tags=["Assets Update"],
     status_code=status.HTTP_200_OK,
     responses={
         **CONFLICT_RESPONSE,
@@ -349,7 +314,7 @@ async def unassign_asset(
     },
 )
 async def change_status(
-    asset_id: UUID,
+    id: UUID,
     data: AssetStatusUpdate,
     session: DBSession,
     _admin_user: AdminUser,
@@ -357,7 +322,7 @@ async def change_status(
     service = AssetService(session)
 
     asset = await service.change_status(
-        asset_id,
+        id,
         data.status,
     )
 

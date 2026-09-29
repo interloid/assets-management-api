@@ -16,6 +16,8 @@ class Settings(BaseSettings):
 
     ASSET_TAG_COMPANY_PREFIX: str = Field(min_length=1, max_length=20)
 
+    SEED_USER_PASSWORD: str
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

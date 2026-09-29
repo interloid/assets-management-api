@@ -10,7 +10,7 @@ async def test_admin_list_users(
     integration_user,
 ) -> None:
     response = await integration_client.get(
-        "/users",
+        "/api/v1/users",
         headers={
             "Authorization": f"Bearer {admin_access_token}",
         },
@@ -49,7 +49,7 @@ async def test_admin_list_users_pagination(
     integration_user,
 ) -> None:
     response = await integration_client.get(
-        "/users?page=1&size=1",
+        "/api/v1/users?page=1&size=1",
         headers={
             "Authorization": f"Bearer {admin_access_token}",
         },
@@ -74,7 +74,7 @@ async def test_admin_list_users_search_by_email(
     integration_user,
 ) -> None:
     response = await integration_client.get(
-        f"/users?search={integration_user.email}",
+        f"/api/v1/users?search={integration_user.email}",
         headers={
             "Authorization": f"Bearer {admin_access_token}",
         },
@@ -100,7 +100,7 @@ async def test_admin_list_users_search_by_full_name(
     integration_user,
 ) -> None:
     response = await integration_client.get(
-        "/users?search=Refresh Token",
+        "/api/v1/users?search=Refresh Token",
         headers={
             "Authorization": f"Bearer {admin_access_token}",
         },
@@ -126,7 +126,7 @@ async def test_admin_list_users_search_is_case_insensitive(
     integration_user,
 ) -> None:
     response = await integration_client.get(
-        "/users?search=REFRESH TOKEN",
+        "/api/v1/users?search=REFRESH TOKEN",
         headers={
             "Authorization": f"Bearer {admin_access_token}",
         },
@@ -154,7 +154,7 @@ async def test_non_admin_cannot_list_users(
     )
 
     response = await integration_client.get(
-        "/users",
+        "/api/v1/users",
         headers={
             "Authorization": f"Bearer {access_token}",
         },
@@ -169,7 +169,7 @@ async def test_admin_list_users_rejects_size_above_100(
     admin_access_token,
 ) -> None:
     response = await integration_client.get(
-        "/users?size=101",
+        "/api/v1/users?size=101",
         headers={
             "Authorization": f"Bearer {admin_access_token}",
         },
@@ -183,7 +183,7 @@ async def test_unauthenticated_cannot_list_users(
     integration_client,
 ) -> None:
     response = await integration_client.get(
-        "/users",
+        "/api/v1/users",
     )
 
     assert response.status_code == 401

@@ -28,7 +28,7 @@ async def create_asset(
     }
 
     response = await client.post(
-        "/assets",
+        "/api/v1/assets",
         headers={"Authorization": f"Bearer {token}"},
         json=payload,
     )
@@ -101,7 +101,7 @@ async def test_create_asset_rejects_invalid_payload(
     payload: dict,
 ) -> None:
     response = await integration_client.post(
-        "/assets",
+        "/api/v1/assets",
         headers={"Authorization": f"Bearer {admin_access_token}"},
         json=payload,
     )
@@ -121,14 +121,14 @@ async def test_create_asset_rejects_duplicate_serial_number(
     }
 
     first = await integration_client.post(
-        "/assets",
+        "/api/v1/assets",
         headers={"Authorization": f"Bearer {admin_access_token}"},
         json=payload,
     )
     assert first.status_code == 201
 
     second = await integration_client.post(
-        "/assets",
+        "/api/v1/assets",
         headers={"Authorization": f"Bearer {admin_access_token}"},
         json=payload,
     )
@@ -143,7 +143,7 @@ async def test_non_admin_cannot_create_asset(
     integration_user: User,
 ) -> None:
     response = await integration_client.post(
-        "/assets",
+        "/api/v1/assets",
         headers={"Authorization": f"Bearer {user_token(integration_user)}"},
         json={
             "type": "laptop",
@@ -168,7 +168,7 @@ async def test_admin_can_list_assets(
         )
 
     response = await integration_client.get(
-        "/assets",
+        "/api/v1/assets",
         headers={"Authorization": f"Bearer {admin_access_token}"},
     )
 
@@ -196,7 +196,7 @@ async def test_list_assets_supports_pagination(
         )
 
     response = await integration_client.get(
-        "/assets?page=2&size=2",
+        "/api/v1/assets?page=2&size=2",
         headers={"Authorization": f"Bearer {admin_access_token}"},
     )
 
@@ -258,7 +258,7 @@ async def test_list_assets_filters(
     )
 
     response = await integration_client.get(
-        f"/assets?{query}",
+        f"/api/v1/assets?{query}",
         headers={"Authorization": f"Bearer {admin_access_token}"},
     )
 
@@ -291,7 +291,7 @@ async def test_list_assets_combines_filters_with_and(
     )
 
     response = await integration_client.get(
-        "/assets?type=laptop&asset_status=in_stock&search=development",
+        "/api/v1/assets?type=laptop&asset_status=in_stock&search=development",
         headers={"Authorization": f"Bearer {admin_access_token}"},
     )
 
@@ -314,7 +314,7 @@ async def test_list_assets_rejects_invalid_query_parameters(
         "sort=updated_at",
     ):
         response = await integration_client.get(
-            f"/assets?{query}",
+            f"/api/v1/assets?{query}",
             headers={"Authorization": f"Bearer {admin_access_token}"},
         )
 
@@ -327,7 +327,7 @@ async def test_non_admin_cannot_list_assets(
     integration_user: User,
 ) -> None:
     response = await integration_client.get(
-        "/assets",
+        "/api/v1/assets",
         headers={"Authorization": f"Bearer {user_token(integration_user)}"},
     )
 
@@ -346,7 +346,7 @@ async def test_admin_can_get_asset(
     )
 
     response = await integration_client.get(
-        f"/assets/{asset['id']}",
+        f"/api/v1/assets/{asset['id']}",
         headers={"Authorization": f"Bearer {admin_access_token}"},
     )
 
@@ -375,7 +375,7 @@ async def test_assigned_user_can_get_own_asset(
     )
 
     response = await integration_client.get(
-        f"/assets/{asset['id']}",
+        f"/api/v1/assets/{asset['id']}",
         headers={"Authorization": f"Bearer {user_token(integration_user)}"},
     )
 
@@ -413,7 +413,7 @@ async def test_user_cannot_get_asset_they_do_not_own(
         )
 
     response = await integration_client.get(
-        f"/assets/{asset['id']}",
+        f"/api/v1/assets/{asset['id']}",
         headers={"Authorization": f"Bearer {user_token(integration_user)}"},
     )
 
@@ -435,7 +435,7 @@ async def test_get_asset_rejects_invalid_or_missing_id(
     asset_id: str,
 ) -> None:
     response = await integration_client.get(
-        f"/assets/{asset_id}",
+        f"/api/v1/assets/{asset_id}",
         headers={"Authorization": f"Bearer {admin_access_token}"},
     )
 
@@ -458,7 +458,7 @@ async def test_admin_can_update_asset(
     )
 
     response = await integration_client.patch(
-        f"/assets/{asset['id']}",
+        f"/api/v1/assets/{asset['id']}",
         headers={"Authorization": f"Bearer {admin_access_token}"},
         json={"notes": "Updated notes"},
     )
@@ -479,7 +479,7 @@ async def test_update_asset_type_changes_asset_tag(
     )
 
     response = await integration_client.patch(
-        f"/assets/{asset['id']}",
+        f"/api/v1/assets/{asset['id']}",
         headers={"Authorization": f"Bearer {admin_access_token}"},
         json={"type": "monitor"},
     )
@@ -535,7 +535,7 @@ async def test_update_asset_rejects_invalid_changes(
         payload = {"serial_number": first["serial_number"]}
 
     response = await integration_client.patch(
-        f"/assets/{target_id}",
+        f"/api/v1/assets/{target_id}",
         headers={"Authorization": f"Bearer {admin_access_token}"},
         json=payload,
     )
@@ -559,7 +559,7 @@ async def test_non_admin_cannot_update_asset(
     )
 
     response = await integration_client.patch(
-        f"/assets/{asset['id']}",
+        f"/api/v1/assets/{asset['id']}",
         headers={"Authorization": f"Bearer {user_token(integration_user)}"},
         json={"notes": "Unauthorized"},
     )
@@ -596,7 +596,7 @@ async def test_admin_can_delete_allowed_asset_status(
     )
 
     response = await integration_client.delete(
-        f"/assets/{asset['id']}",
+        f"/api/v1/assets/{asset['id']}",
         headers={"Authorization": f"Bearer {admin_access_token}"},
     )
 
@@ -637,7 +637,7 @@ async def test_admin_cannot_delete_restricted_asset_status(
     )
 
     response = await integration_client.delete(
-        f"/assets/{asset['id']}",
+        f"/api/v1/assets/{asset['id']}",
         headers={"Authorization": f"Bearer {admin_access_token}"},
     )
 
@@ -652,7 +652,7 @@ async def test_delete_requires_admin_and_existing_asset(
     integration_user: User,
 ) -> None:
     response = await integration_client.delete(
-        f"/assets/{uuid4()}",
+        f"/api/v1/assets/{uuid4()}",
         headers={"Authorization": f"Bearer {admin_access_token}"},
     )
 
@@ -666,7 +666,7 @@ async def test_delete_requires_admin_and_existing_asset(
     )
 
     response = await integration_client.delete(
-        f"/assets/{asset['id']}",
+        f"/api/v1/assets/{asset['id']}",
         headers={"Authorization": f"Bearer {user_token(integration_user)}"},
     )
 
@@ -686,7 +686,7 @@ async def test_admin_can_assign_in_stock_asset(
     )
 
     response = await integration_client.post(
-        f"/assets/{asset['id']}/assign",
+        f"/api/v1/assets/{asset['id']}/assign",
         headers={"Authorization": f"Bearer {admin_access_token}"},
         json={"user_id": str(integration_user.id)},
     )
@@ -719,7 +719,7 @@ async def test_assign_rejects_invalid_asset_status(
     )
 
     response = await integration_client.post(
-        f"/assets/{asset['id']}/assign",
+        f"/api/v1/assets/{asset['id']}/assign",
         headers={"Authorization": f"Bearer {admin_access_token}"},
         json={"user_id": str(integration_user.id)},
     )
@@ -740,7 +740,7 @@ async def test_assign_rejects_invalid_user(
     )
 
     response = await integration_client.post(
-        f"/assets/{asset['id']}/assign",
+        f"/api/v1/assets/{asset['id']}/assign",
         headers={"Authorization": f"Bearer {admin_access_token}"},
         json={
             "user_id": "00000000-0000-0000-0000-000000000001",
@@ -758,7 +758,7 @@ async def test_assign_requires_admin_and_existing_asset(
     integration_user: User,
 ) -> None:
     response = await integration_client.post(
-        f"/assets/{uuid4()}/assign",
+        f"/api/v1/assets/{uuid4()}/assign",
         headers={"Authorization": f"Bearer {admin_access_token}"},
         json={"user_id": str(integration_user.id)},
     )
@@ -773,7 +773,7 @@ async def test_assign_requires_admin_and_existing_asset(
     )
 
     response = await integration_client.post(
-        f"/assets/{asset['id']}/assign",
+        f"/api/v1/assets/{asset['id']}/assign",
         headers={"Authorization": f"Bearer {user_token(integration_user)}"},
         json={"user_id": str(integration_user.id)},
     )
@@ -794,7 +794,7 @@ async def test_admin_can_unassign_assigned_asset(
     )
 
     assign_response = await integration_client.post(
-        f"/assets/{asset['id']}/assign",
+        f"/api/v1/assets/{asset['id']}/assign",
         headers={"Authorization": f"Bearer {admin_access_token}"},
         json={"user_id": str(integration_user.id)},
     )
@@ -802,7 +802,7 @@ async def test_admin_can_unassign_assigned_asset(
     assert assign_response.status_code == 200
 
     response = await integration_client.post(
-        f"/assets/{asset['id']}/unassign",
+        f"/api/v1/assets/{asset['id']}/unassign",
         headers={"Authorization": f"Bearer {admin_access_token}"},
     )
 
@@ -826,7 +826,7 @@ async def test_unassign_rejects_non_assigned_asset(
     )
 
     response = await integration_client.post(
-        f"/assets/{asset['id']}/unassign",
+        f"/api/v1/assets/{asset['id']}/unassign",
         headers={"Authorization": f"Bearer {admin_access_token}"},
     )
 
@@ -841,7 +841,7 @@ async def test_unassign_requires_admin_and_existing_asset(
     integration_user: User,
 ) -> None:
     response = await integration_client.post(
-        f"/assets/{uuid4()}/unassign",
+        f"/api/v1/assets/{uuid4()}/unassign",
         headers={"Authorization": f"Bearer {admin_access_token}"},
     )
 
@@ -855,13 +855,13 @@ async def test_unassign_requires_admin_and_existing_asset(
     )
 
     await integration_client.post(
-        f"/assets/{asset['id']}/assign",
+        f"/api/v1/assets/{asset['id']}/assign",
         headers={"Authorization": f"Bearer {admin_access_token}"},
         json={"user_id": str(integration_user.id)},
     )
 
     response = await integration_client.post(
-        f"/assets/{asset['id']}/unassign",
+        f"/api/v1/assets/{asset['id']}/unassign",
         headers={"Authorization": f"Bearer {user_token(integration_user)}"},
     )
 
@@ -904,7 +904,7 @@ async def test_admin_can_change_allowed_asset_status(
     )
 
     response = await integration_client.post(
-        f"/assets/{asset['id']}/status",
+        f"/api/v1/assets/{asset['id']}/status",
         headers={"Authorization": f"Bearer {admin_access_token}"},
         json={"status": target_status.value},
     )
@@ -950,7 +950,7 @@ async def test_admin_cannot_change_disallowed_asset_status(
     )
 
     response = await integration_client.post(
-        f"/assets/{asset['id']}/status",
+        f"/api/v1/assets/{asset['id']}/status",
         headers={"Authorization": f"Bearer {admin_access_token}"},
         json={"status": target_status.value},
     )
@@ -966,7 +966,7 @@ async def test_status_change_requires_admin_and_existing_asset(
     integration_user: User,
 ) -> None:
     response = await integration_client.post(
-        f"/assets/{uuid4()}/status",
+        f"/api/v1/assets/{uuid4()}/status",
         headers={"Authorization": f"Bearer {admin_access_token}"},
         json={"status": "repair"},
     )
@@ -981,7 +981,7 @@ async def test_status_change_requires_admin_and_existing_asset(
     )
 
     response = await integration_client.post(
-        f"/assets/{asset['id']}/status",
+        f"/api/v1/assets/{asset['id']}/status",
         headers={"Authorization": f"Bearer {user_token(integration_user)}"},
         json={"status": "repair"},
     )
@@ -1010,7 +1010,7 @@ async def test_user_can_list_my_assets(
     )
 
     response = await integration_client.get(
-        "/assets/my",
+        "/api/v1/users/me/assets",
         headers={"Authorization": f"Bearer {user_token(integration_user)}"},
     )
 
@@ -1065,7 +1065,7 @@ async def test_my_assets_returns_only_current_users_assets(
     )
 
     response = await integration_client.get(
-        "/assets/my",
+        "/api/v1/users/me/assets",
         headers={"Authorization": f"Bearer {user_token(integration_user)}"},
     )
 
@@ -1108,7 +1108,7 @@ async def test_my_assets_supports_pagination_and_requires_authentication(
     await db_session.commit()
 
     response = await integration_client.get(
-        "/assets/my?page=2&size=2",
+        "/api/v1/users/me/assets?page=2&size=2",
         headers={"Authorization": f"Bearer {user_token(integration_user)}"},
     )
 
@@ -1122,7 +1122,7 @@ async def test_my_assets_supports_pagination_and_requires_authentication(
     assert meta["total_pages"] == 3
     assert len(response.json()["data"]) == 2
 
-    unauthenticated = await integration_client.get("/assets/my")
+    unauthenticated = await integration_client.get("/api/v1/users/me/assets")
 
     assert unauthenticated.status_code == 401
 
@@ -1139,7 +1139,7 @@ async def test_admin_can_get_asset_summary(
     )
 
     response = await integration_client.get(
-        "/assets/summary",
+        "/api/v1/assets/stats",
         headers={"Authorization": f"Bearer {admin_access_token}"},
     )
 
@@ -1160,7 +1160,7 @@ async def test_non_admin_cannot_get_asset_summary(
     integration_user: User,
 ) -> None:
     response = await integration_client.get(
-        "/assets/summary",
+        "/api/v1/assets/stats",
         headers={"Authorization": f"Bearer {user_token(integration_user)}"},
     )
 
@@ -1194,7 +1194,7 @@ async def test_create_asset_rejects_duplicate_asset_tag(
     await db_session.commit()
 
     response = await integration_client.post(
-        "/assets",
+        "/api/v1/assets",
         headers={"Authorization": f"Bearer {admin_access_token}"},
         json={
             "type": "laptop",
@@ -1235,7 +1235,7 @@ async def test_update_asset_rejects_duplicate_asset_tag(
     assert counter is None
 
     response = await integration_client.patch(
-        f"/assets/{second['id']}",
+        f"/api/v1/assets/{second['id']}",
         headers={"Authorization": f"Bearer {admin_access_token}"},
         json={"type": "laptop"},
     )

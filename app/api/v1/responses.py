@@ -1,6 +1,9 @@
 from fastapi import status
 
-from app.shared.schemas.common import ErrorResponse
+from app.shared.schemas.common import (
+    ErrorResponse,
+    ValidationErrorResponse,
+)
 
 UNAUTHORIZED_RESPONSE = {
     status.HTTP_401_UNAUTHORIZED: {
@@ -32,7 +35,7 @@ CONFLICT_RESPONSE = {
 
 VALIDATION_RESPONSE = {
     status.HTTP_422_UNPROCESSABLE_CONTENT: {
-        "model": ErrorResponse,
+        "model": ValidationErrorResponse,
         "description": "Request validation failed",
     },
 }

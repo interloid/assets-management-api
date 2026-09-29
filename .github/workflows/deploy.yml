@@ -2,7 +2,7 @@ name: Deploy to FastAPI Cloud
 
 on:
   push:
-    branches: [feature/assets]
+    branches: [refactor/api-v1]
   workflow_dispatch:
 
 jobs:

@@ -21,7 +21,10 @@ class PaginationMeta(APIModel):
 
 class SuccessResponse(APIModel, Generic[DataT]):
     data: DataT
-    meta: PaginationMeta | None = None
+
+
+class PaginatedSuccessResponse(SuccessResponse[DataT], Generic[DataT]):
+    meta: PaginationMeta
 
 
 class ErrorDetail(APIModel):
@@ -32,8 +35,17 @@ class ErrorDetail(APIModel):
 class APIError(APIModel):
     code: str
     message: str
-    details: list[ErrorDetail] | None = None
+
+
+class ValidationAPIError(APIModel):
+    code: str
+    message: str
+    details: list[ErrorDetail]
 
 
 class ErrorResponse(APIModel):
     error: APIError
+
+
+class ValidationErrorResponse(APIModel):
+    error: ValidationAPIError

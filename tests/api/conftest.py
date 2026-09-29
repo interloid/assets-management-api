@@ -154,12 +154,12 @@ async def authenticated_client(
     user_payload: dict[str, str],
 ) -> AsyncGenerator[AsyncClient, None]:
     await integration_client.post(
-        "/auth/register",
+        "/api/v1/auth/register",
         json=user_payload,
     )
 
     response = await integration_client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={
             "email": user_payload["email"],
             "password": user_payload["password"],

@@ -2,7 +2,6 @@ from fastapi import APIRouter, Response, status
 
 from app.api.deps import DBSession
 from app.api.v1.dependencies import (
-    CurrentUser,
     LogoutAccessTokenPayload,
     LogoutAllContext,
     RefreshToken,
@@ -14,7 +13,6 @@ from app.api.v1.responses import (
     VALIDATION_RESPONSE,
 )
 from app.api.v1.schemas.auth import (
-    ChangePasswordRequest,
     LoginRequest,
     LoginResponse,
     RegisterRequest,
@@ -31,7 +29,7 @@ router = APIRouter(
     tags=["Authentication"],
 )
 
-COOKIE_PATH = "/auth"
+COOKIE_PATH = "/api/v1/auth"
 
 
 @router.post(
@@ -198,51 +196,4 @@ async def logout_all(
         secure=False,
         samesite="lax",
         path=COOKIE_PATH,
-    )
-
-
-@router.get(
-    "/me",
-    status_code=status.HTTP_200_OK,
-    responses={
-        **INTERNAL_SERVER_ERROR_RESPONSE,
-        **UNAUTHORIZED_RESPONSE,
-    },
-)
-async def get_me(
-    current_user: CurrentUser,
-) -> SuccessResponse[UserResponse]:
-    return success_response(
-        status_code=status.HTTP_200_OK,
-        data=UserResponse.model_validate(current_user).model_dump(
-            mode="json",
-        ),
-    )
-
-
-@router.post(
-    "/change-password",
-    status_code=status.HTTP_200_OK,
-    responses={
-        **INTERNAL_SERVER_ERROR_RESPONSE,
-        **UNAUTHORIZED_RESPONSE,
-        **VALIDATION_RESPONSE,
-    },
-)
-async def change_password(
-    data: ChangePasswordRequest,
-    current_user: CurrentUser,
-    session: DBSession,
-) -> SuccessResponse[None]:
-    service = AuthService(session)
-
-    await service.change_password(
-        user=current_user,
-        current_password=data.current_password,
-        new_password=data.new_password,
-    )
-
-    return success_response(
-        status_code=status.HTTP_200_OK,
-        data=None,
     )
