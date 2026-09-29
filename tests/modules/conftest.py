@@ -38,14 +38,6 @@ def auth_service(
     return service
 
 
-# @pytest.fixture
-# def login_payload() -> LoginRequest:
-#     return LoginRequest(
-#         email="test@example.com",
-#         password="Password123",
-#     )
-
-
 @pytest.fixture
 def active_user() -> SimpleNamespace:
     return SimpleNamespace(

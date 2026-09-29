@@ -533,3 +533,105 @@ async def test_change_password_revokes_all_sessions(
     )
 
     assert old_login_response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_register_duplicate_email(
+    integration_client,
+    user_payload,
+) -> None:
+    first = await integration_client.post(
+        "/auth/register",
+        json=user_payload,
+    )
+
+    assert first.status_code == 201
+
+    response = await integration_client.post(
+        "/auth/register",
+        json=user_payload,
+    )
+
+    assert response.status_code == 409
+
+    body = response.json()
+
+    assert body["error"]["code"] == "EMAIL_ALREADY_REGISTERED"
+
+
+@pytest.mark.asyncio
+async def test_login_invalid_credentials(
+    integration_client,
+    user_payload,
+) -> None:
+    await integration_client.post(
+        "/auth/register",
+        json=user_payload,
+    )
+
+    response = await integration_client.post(
+        "/auth/login",
+        json={
+            "email": user_payload["email"],
+            "password": "WrongPassword123",
+        },
+    )
+
+    assert response.status_code == 401
+
+    body = response.json()
+
+    assert body["error"]["code"] == "INVALID_CREDENTIALS"
+
+
+@pytest.mark.asyncio
+async def test_refresh_invalid_token(
+    integration_client,
+) -> None:
+    integration_client.cookies.set(
+        "refresh_token",
+        "invalid-refresh-token",
+    )
+
+    response = await integration_client.post(
+        "/auth/refresh",
+    )
+
+    assert response.status_code == 401
+
+    body = response.json()
+
+    assert body["error"]["code"] == "INVALID_TOKEN"
+
+
+@pytest.mark.asyncio
+async def test_me_success(
+    authenticated_client,
+    user_payload,
+) -> None:
+    response = await authenticated_client.get(
+        "/auth/me",
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()["data"]
+
+    assert data["email"] == user_payload["email"]
+    assert data["full_name"] == user_payload["full_name"]
+    assert data["role"] == "user"
+
+
+@pytest.mark.asyncio
+async def test_me_missing_jwt(
+    integration_client,
+) -> None:
+    response = await integration_client.get(
+        "/auth/me",
+    )
+
+    assert response.status_code == 401
+
+    body = response.json()
+
+    assert body["error"]["code"] == "AUTHENTICATION_REQUIRED"

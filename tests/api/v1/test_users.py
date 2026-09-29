@@ -176,3 +176,18 @@ async def test_admin_list_users_rejects_size_above_100(
     )
 
     assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_unauthenticated_cannot_list_users(
+    integration_client,
+) -> None:
+    response = await integration_client.get(
+        "/users",
+    )
+
+    assert response.status_code == 401
+
+    body = response.json()
+
+    assert body["error"]["code"] == "AUTHENTICATION_REQUIRED"
