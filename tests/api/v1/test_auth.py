@@ -323,6 +323,85 @@ async def test_logout_refresh_rejected(
 
 
 @pytest.mark.asyncio
+async def test_logout_rejects_refresh_token_from_different_user(
+    integration_client,
+    db_session: AsyncSession,
+    user_payload,
+) -> None:
+    register_response_1 = await integration_client.post(
+        "/api/v1/auth/register",
+        json=user_payload,
+    )
+
+    assert register_response_1.status_code == 201
+
+    login_response_1 = await integration_client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": user_payload["email"],
+            "password": user_payload["password"],
+        },
+    )
+
+    assert login_response_1.status_code == 200
+
+    access_token_1 = login_response_1.json()["data"]["access_token"]
+
+    user_b_payload = {
+        **user_payload,
+        "email": "other@example.com",
+        "full_name": "Other User",
+    }
+
+    register_response_2 = await integration_client.post(
+        "/api/v1/auth/register",
+        json=user_b_payload,
+    )
+
+    assert register_response_2.status_code == 201
+
+    login_response_2 = await integration_client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": user_b_payload["email"],
+            "password": user_b_payload["password"],
+        },
+    )
+
+    assert login_response_2.status_code == 200
+
+    refresh_token_2 = login_response_2.cookies["refresh_token"]
+
+    integration_client.headers["Authorization"] = f"Bearer {access_token_1}"
+    integration_client.cookies.set(
+        "refresh_token",
+        refresh_token_2,
+    )
+
+    logout_response = await integration_client.post(
+        "/api/v1/auth/logout",
+    )
+
+    assert logout_response.status_code == 401
+
+    body = logout_response.json()
+
+    assert body["error"]["code"] == "INVALID_TOKEN"
+
+    integration_client.headers.pop("Authorization", None)
+    integration_client.cookies.set(
+        "refresh_token",
+        refresh_token_2,
+    )
+
+    refresh_response = await integration_client.post(
+        "/api/v1/auth/refresh",
+    )
+
+    assert refresh_response.status_code == 200
+
+
+@pytest.mark.asyncio
 async def test_logout_all_sessions_rejected(
     integration_client,
     db_session: AsyncSession,

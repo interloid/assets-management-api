@@ -1,12 +1,11 @@
 # api/v1/system.py
 from fastapi import APIRouter, status
 
-from app.api.deps import DBSession
+from app.api.deps import DBSession, RedisClient
+from app.api.health.schemas import HealthResponse, HomeResponse
+from app.api.health.service import check_dependencies
+from app.api.responses import success_response
 from app.core.exceptions import ServiceUnavailableError
-from app.core.health import check_dependencies
-from app.core.redis_dependency import RedisClient
-from app.core.responses import success_response
-from app.core.schemas import HealthResponse, HomeResponse
 from app.shared.schemas.common import ErrorResponse, SuccessResponse
 
 router = APIRouter()
@@ -21,7 +20,12 @@ router = APIRouter()
 async def health_check(session: DBSession, redis_client: RedisClient):
     services = await check_dependencies(session, redis_client)
     if not all(s.status == "ok" for s in services.values()):
-        raise ServiceUnavailableError()
+        raise ServiceUnavailableError(
+            details={
+                "status": "degraded",
+                "services": services,
+            }
+        )
     return SuccessResponse(data=HealthResponse(status="ok", services=services))
 
 

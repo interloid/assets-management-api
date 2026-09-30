@@ -1,10 +1,10 @@
 import asyncio
 from datetime import date
 
+from app.core.database import AsyncSessionLocal, engine
 from sqlalchemy import select
 
 from app.core.config import settings
-from app.core.database import AsyncSessionLocal, engine
 from app.core.security import hash_password
 from app.modules.asset.models import Asset
 from app.modules.asset.tag.model import AssetTagCounter
@@ -12,7 +12,7 @@ from app.modules.auth.models import RefreshToken  # noqa: F401
 from app.modules.user.models import User
 from app.shared.models.enums import AssetStatus, AssetType, UserRole
 
-COMPANY_PREFIX = "IL"
+COMPANY_PREFIX = settings.ASSET_TAG_COMPANY_PREFIX
 
 ADMIN_EMAIL = "admin@example.com"
 ADMIN_PASSWORD = settings.SEED_USER_PASSWORD
@@ -124,7 +124,7 @@ ASSET_SEED_DATA = [
     {
         "type": AssetType.PHONE,
         "status": AssetStatus.IN_STOCK,
-        "serial_number": "SN-PHO-0001",
+        "serial_number": "SN-PHN-0001",
         "purchase_date": date(2026, 3, 1),
         "warranty_expiry": date(2028, 3, 1),
         "notes": "Company mobile phone",
@@ -132,7 +132,7 @@ ASSET_SEED_DATA = [
     {
         "type": AssetType.PHONE,
         "status": AssetStatus.ASSIGNED,
-        "serial_number": "SN-PHO-0002",
+        "serial_number": "SN-PHN-0002",
         "purchase_date": date(2026, 3, 2),
         "warranty_expiry": date(2028, 3, 2),
         "notes": "Company mobile phone",
@@ -140,7 +140,7 @@ ASSET_SEED_DATA = [
     {
         "type": AssetType.PHONE,
         "status": AssetStatus.ASSIGNED,
-        "serial_number": "SN-PHO-0003",
+        "serial_number": "SN-PHN-0003",
         "purchase_date": date(2026, 3, 3),
         "warranty_expiry": date(2028, 3, 3),
         "notes": "Company mobile phone",
@@ -148,7 +148,7 @@ ASSET_SEED_DATA = [
     {
         "type": AssetType.PHONE,
         "status": AssetStatus.REPAIR,
-        "serial_number": "SN-PHO-0004",
+        "serial_number": "SN-PHN-0004",
         "purchase_date": date(2025, 7, 1),
         "warranty_expiry": date(2027, 7, 1),
         "notes": "Phone with battery issue",
@@ -156,7 +156,7 @@ ASSET_SEED_DATA = [
     {
         "type": AssetType.PHONE,
         "status": AssetStatus.IN_STOCK,
-        "serial_number": "SN-PHO-0005",
+        "serial_number": "SN-PHN-0005",
         "purchase_date": date(2021, 6, 1),
         "warranty_expiry": date(2023, 6, 1),
         "notes": "Retired mobile phone",

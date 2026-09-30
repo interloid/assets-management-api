@@ -38,13 +38,6 @@ class UserListResponse(BaseModel):
     role: UserRole
 
 
-class UserListData(BaseModel):
-    items: list[UserListResponse]
-    total: int
-    page: int
-    size: int
-
-
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
@@ -65,7 +58,3 @@ class ChangePasswordRequest(BaseModel):
     new_password: str
 
     _validate_new_password = field_validator("new_password")(validate_password)
-
-
-class MessageResponse(BaseModel):
-    message: str

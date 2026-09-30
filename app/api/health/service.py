@@ -2,7 +2,7 @@ from redis.asyncio import Redis
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.schemas import ServiceStatus
+from app.api.health.schemas import ServiceStatus
 
 
 async def check_dependencies(

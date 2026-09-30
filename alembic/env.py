@@ -5,9 +5,12 @@ from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-import app.shared.models  # noqa: F401
 from alembic import context
 from app.core.config import settings
+from app.modules.asset.models import Asset  # noqa: F401
+from app.modules.asset.tag.model import AssetTagCounter  # noqa: F401
+from app.modules.auth.models import RefreshToken  # noqa: F401
+from app.modules.user.models import User  # noqa: F401
 from app.shared.models.base import Base
 
 # this is the Alembic Config object, which provides

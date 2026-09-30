@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from typing import Any
 
 from redis.asyncio import Redis
 from sqlalchemy.exc import IntegrityError
@@ -30,6 +31,7 @@ from app.modules.auth.exceptions import (
 )
 from app.modules.auth.jwt_blacklist import blacklist_access_token
 from app.modules.auth.repositories import RefreshTokenRepository
+from app.modules.user.exceptions import InvalidCurrentPasswordError
 from app.modules.user.models import User
 from app.modules.user.repositories import UserRepository
 
@@ -206,14 +208,9 @@ class AuthService:
     async def logout(
         self,
         refresh_token: str | None,
-        access_token_payload: dict,
-        redis_client: Redis,
+        access_token_payload: dict[str, Any] | None,
+        redis_client: Redis | None,
     ) -> None:
-        jti = access_token_payload["jti"]
-        exp = access_token_payload["exp"]
-
-        remaining_seconds = get_token_remaining_seconds(exp)
-
         if refresh_token:
             token_hash = hash_refresh_token(refresh_token)
 
@@ -222,15 +219,25 @@ class AuthService:
             )
 
             if stored_token is not None:
+                if access_token_payload is not None:
+                    if str(stored_token.user_id) != access_token_payload["sub"]:
+                        raise InvalidTokenError()
+
                 await self.refresh_token_repository.revoke(
                     stored_token.id,
                 )
 
-        await blacklist_access_token(
-            redis_client,
-            jti=jti,
-            expires_in=remaining_seconds,
-        )
+        if access_token_payload and redis_client:
+            jti = access_token_payload["jti"]
+            exp = access_token_payload["exp"]
+
+            remaining_seconds = get_token_remaining_seconds(exp)
+
+            await blacklist_access_token(
+                redis_client,
+                jti=jti,
+                expires_in=remaining_seconds,
+            )
 
         await self.session.commit()
 
@@ -279,7 +286,7 @@ class AuthService:
             current_password,
             user.password_hash,
         ):
-            raise InvalidCredentialsError()
+            raise InvalidCurrentPasswordError()
 
         if verify_password(new_password, user.password_hash):
             raise SamePasswordError()

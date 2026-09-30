@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Response, status
 
-from app.api.deps import DBSession
+from app.api.deps import DBSession, RedisClient
+from app.api.responses import success_response
 from app.api.v1.dependencies import (
     LogoutAccessTokenPayload,
     LogoutAllContext,
@@ -19,8 +20,6 @@ from app.api.v1.schemas.auth import (
     UserResponse,
 )
 from app.core.config import settings
-from app.core.redis_dependency import RedisClient
-from app.core.responses import success_response
 from app.modules.auth.services import AuthService
 from app.shared.schemas.common import SuccessResponse
 

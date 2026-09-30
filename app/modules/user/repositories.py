@@ -3,8 +3,8 @@ from uuid import UUID
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.utils import escape_like
 from app.modules.user.models import User
+from app.shared.utils.query import escape_like
 
 
 class UserRepository:

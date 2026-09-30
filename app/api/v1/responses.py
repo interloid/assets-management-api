@@ -5,6 +5,13 @@ from app.shared.schemas.common import (
     ValidationErrorResponse,
 )
 
+BAD_REQUEST_RESPONSE = {
+    status.HTTP_400_BAD_REQUEST: {
+        "model": ErrorResponse,
+        "description": "Current password is incorrect",
+    },
+}
+
 UNAUTHORIZED_RESPONSE = {
     status.HTTP_401_UNAUTHORIZED: {
         "model": ErrorResponse,

@@ -6,6 +6,7 @@ from uuid import UUID
 from fastapi import APIRouter, Query, status
 
 from app.api.deps import DBSession
+from app.api.responses import success_response
 from app.api.v1.dependencies import AdminUser, CurrentUser
 from app.api.v1.responses import (
     CONFLICT_RESPONSE,
@@ -22,7 +23,6 @@ from app.api.v1.schemas.assets import (
     AssetStatusUpdate,
     AssetUpdate,
 )
-from app.core.responses import success_response
 from app.modules.asset.services import AssetService
 from app.shared.models.enums import AssetStatus, AssetType
 from app.shared.schemas.common import (
@@ -79,7 +79,7 @@ async def create_asset(
 async def list_assets(
     session: DBSession,
     _admin_user: AdminUser,
-    page: int = Query(default=1, ge=1),
+    page: int = Query(default=1, ge=1, le=1000),
     size: int = Query(default=20, ge=1, le=100),
     asset_type: AssetType | None = Query(default=None, alias="type"),
     asset_status: AssetStatus | None = None,
@@ -238,7 +238,7 @@ async def delete_asset(
 
 @router.post(
     "/{id}/assign",
-    tags=["Asset Assign/Un-Assign"],
+    tags=["Assets Assign/Un-Assign"],
     status_code=status.HTTP_200_OK,
     responses={
         **CONFLICT_RESPONSE,
@@ -272,7 +272,7 @@ async def assign_asset(
 
 @router.post(
     "/{id}/unassign",
-    tags=["Asset Assign/Un-Assign"],
+    tags=["Assets Assign/Un-Assign"],
     status_code=status.HTTP_200_OK,
     responses={
         **CONFLICT_RESPONSE,

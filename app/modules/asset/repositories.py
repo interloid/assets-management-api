@@ -5,9 +5,9 @@ from uuid import UUID
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.utils import escape_like
 from app.modules.asset.models import Asset
 from app.shared.models.enums import AssetStatus, AssetType
+from app.shared.utils.query import escape_like
 
 SORT_COLUMNS = {
     "created_at": Asset.created_at,
@@ -94,7 +94,7 @@ class AssetRepository:
     async def get_by_id(
         self,
         asset_id: UUID,
-    ) -> Asset:
+    ) -> Asset | None:
         stmt = select(Asset).where(Asset.id == asset_id)
         result = await self.session.execute(stmt)
 

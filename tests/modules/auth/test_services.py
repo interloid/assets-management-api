@@ -15,6 +15,7 @@ from app.modules.auth.exceptions import (
     RefreshTokenReuseError,
     SamePasswordError,
 )
+from app.modules.user.exceptions import InvalidCurrentPasswordError
 
 
 @pytest.mark.asyncio
@@ -270,6 +271,7 @@ async def test_valid_logout(
     refresh_token = "valid refresh token"
 
     access_token_payload = {
+        "sub": str(created_refresh_token.user_id),
         "jti": "jti-123",
         "exp": int(datetime.now(timezone.utc).timestamp()) + 900,
     }
@@ -565,7 +567,6 @@ async def test_logout_all_idempotent(
         ),
     )
 
-    # First logout-all.
     await auth_service.logout_all(
         None,
         current_user,
@@ -574,14 +575,12 @@ async def test_logout_all_idempotent(
 
     assert current_user.token_version == 1
 
-    # Repeat logout-all using the same access token.
     await auth_service.logout_all(
         None,
         current_user,
         access_token_version,
     )
 
-    # Token version must not be incremented again.
     assert current_user.token_version == 1
 
     auth_service.refresh_token_repository.revoke_user.assert_awaited_once_with(
@@ -1043,7 +1042,7 @@ async def test_incorrect_current_password(
         with patch(
             "app.modules.auth.services.hash_password",
         ) as mock_hash_password:
-            with pytest.raises(InvalidCredentialsError):
+            with pytest.raises(InvalidCurrentPasswordError):
                 await auth_service.change_password(
                     created_user,
                     current_password,

@@ -11,8 +11,8 @@ from sqlalchemy.ext.asyncio import (
 )
 from uuid6 import uuid7
 
-from app.core.database import get_db
 from app.core.security import create_access_token
+from app.infrastructure.database import get_db
 from app.main import app
 from app.modules.user.models import User
 from app.shared.models.enums import UserRole

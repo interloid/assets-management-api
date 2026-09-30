@@ -3,8 +3,10 @@ from math import ceil
 from fastapi import APIRouter, Query, status
 
 from app.api.deps import DBSession
+from app.api.responses import success_response
 from app.api.v1.dependencies import AdminUser, CurrentUser
 from app.api.v1.responses import (
+    BAD_REQUEST_RESPONSE,
     INTERNAL_SERVER_ERROR_RESPONSE,
     UNAUTHORIZED_RESPONSE,
     VALIDATION_RESPONSE,
@@ -15,12 +17,10 @@ from app.api.v1.schemas.auth import (
     UserListResponse,
     UserResponse,
 )
-from app.core.responses import success_response
 from app.modules.asset.services import AssetService
 from app.modules.auth.services import AuthService
 from app.modules.user.services import UserService
 from app.shared.schemas.common import (
-    ErrorResponse,
     PaginatedSuccessResponse,
     PaginationMeta,
     SuccessResponse,
@@ -54,7 +54,14 @@ async def get_me(
 @router.post(
     "/me/change-password",
     status_code=status.HTTP_200_OK,
+    description=(
+        "Change the authenticated user's password. "
+        "A successful password change invalidates all existing sessions, "
+        "including the current session. The user must authenticate again "
+        "using the new password."
+    ),
     responses={
+        **BAD_REQUEST_RESPONSE,
         **INTERNAL_SERVER_ERROR_RESPONSE,
         **UNAUTHORIZED_RESPONSE,
         **VALIDATION_RESPONSE,
@@ -91,7 +98,7 @@ async def change_password(
 async def get_my_assets(
     session: DBSession,
     current_user: CurrentUser,
-    page: int = Query(default=1, ge=1),
+    page: int = Query(default=1, ge=1, le=1000),
     size: int = Query(
         default=20,
         ge=1,
@@ -130,30 +137,17 @@ async def get_my_assets(
     "",
     status_code=status.HTTP_200_OK,
     responses={
-        status.HTTP_401_UNAUTHORIZED: {
-            "model": ErrorResponse,
-            "description": "Authentication credentials are invalid or missing",
-        },
-        status.HTTP_403_FORBIDDEN: {
-            "model": ErrorResponse,
-            "description": "Admin access is required",
-        },
-        status.HTTP_422_UNPROCESSABLE_CONTENT: {
-            "model": ErrorResponse,
-            "description": "Request validation failed",
-        },
-        status.HTTP_500_INTERNAL_SERVER_ERROR: {
-            "model": ErrorResponse,
-            "description": "Internal server error",
-        },
+        **INTERNAL_SERVER_ERROR_RESPONSE,
+        **UNAUTHORIZED_RESPONSE,
+        **VALIDATION_RESPONSE,
     },
 )
 async def list_users(
     session: DBSession,
     admin_user: AdminUser,
-    page: int = Query(1, ge=1),
-    size: int = Query(20, ge=1, le=100),
-    search: str | None = Query(None),
+    page: int = Query(default=1, ge=1, le=1000),
+    size: int = Query(default=20, ge=1, le=100),
+    search: str | None = Query(default=None),
 ) -> PaginatedSuccessResponse[list[UserListResponse]]:
     service = UserService(session)
 

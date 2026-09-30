@@ -59,17 +59,20 @@ MANUAL_STATUS_TRANSITIONS: dict[AssetStatus, set[AssetStatus]] = {
 
 
 def get_constraint_name(exc: IntegrityError) -> str | None:
-    message = str(exc.orig)
+    cause = getattr(exc.orig, "__cause__", None)
+
+    if cause is None:
+        return None
 
     match = re.search(
-        r'violates unique constraint "([^"]+)"',
-        message,
+        r'unique constraint "([^"]+)"',
+        str(cause),
     )
 
-    if match:
-        return match.group(1)
+    if match is None:
+        return None
 
-    return None
+    return match.group(1)
 
 
 class AssetService:

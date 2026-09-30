@@ -1,13 +1,10 @@
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import Cookie, Depends
+from fastapi import Cookie, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from redis.asyncio import Redis
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import get_db
-from app.core.redis_dependency import get_redis
+from app.api.deps import DBSession, RedisClient
 from app.core.security import decode_access_token
 from app.modules.auth.exceptions import (
     AuthorizationError,
@@ -19,14 +16,21 @@ from app.modules.user.models import User
 from app.modules.user.repositories import UserRepository
 from app.shared.models.enums import UserRole
 
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-    session: AsyncSession = Depends(get_db),
-    redis_client: Redis = Depends(get_redis),
+    session: DBSession,
+    redis_client: RedisClient,
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
 ):
+    if credentials is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication credentials were not provided",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     token = credentials.credentials
 
     payload = decode_access_token(token)
@@ -38,10 +42,7 @@ async def get_current_user(
     except (KeyError, ValueError, TypeError) as exc:
         raise InvalidTokenError() from exc
 
-    if await is_access_token_blacklisted(
-        redis_client,
-        jti,
-    ):
+    if await is_access_token_blacklisted(redis_client, jti):
         raise InvalidTokenError()
 
     repository = UserRepository(session)
@@ -60,35 +61,16 @@ async def get_current_user(
     return user
 
 
-async def get_current_access_token(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-    redis_client: Redis = Depends(get_redis),
-) -> dict[str, Any]:
-    token = credentials.credentials
-
-    payload = decode_access_token(token)
+def get_logout_access_token(
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
+) -> dict[str, Any] | None:
+    if credentials is None:
+        return None
 
     try:
-        jti = payload["jti"]
-        payload["exp"]
-    except (KeyError, TypeError) as exc:
-        raise InvalidTokenError() from exc
-
-    if await is_access_token_blacklisted(
-        redis_client,
-        jti,
-    ):
-        raise InvalidTokenError()
-
-    return payload
-
-
-def get_logout_access_token(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-) -> dict[str, Any]:
-    token = credentials.credentials
-
-    payload = decode_access_token(token)
+        payload = decode_access_token(credentials.credentials)
+    except InvalidTokenError:
+        return None
 
     try:
         payload["jti"]
@@ -100,8 +82,8 @@ def get_logout_access_token(
 
 
 async def get_logout_all_context(
+    session: DBSession,
     credentials: HTTPAuthorizationCredentials = Depends(security),
-    session: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     token = credentials.credentials
 
@@ -155,10 +137,6 @@ AdminUser = Annotated[
     Depends(require_admin),
 ]
 
-AccessTokenPayload = Annotated[
-    dict[str, Any],
-    Depends(get_current_access_token),
-]
 
 LogoutAccessTokenPayload = Annotated[
     dict[str, Any],
