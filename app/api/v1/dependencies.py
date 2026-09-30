@@ -11,7 +11,10 @@ from app.modules.auth.exceptions import (
     InvalidTokenError,
     UserInactiveError,
 )
-from app.modules.auth.jwt_blacklist import is_access_token_blacklisted
+from app.modules.auth.jwt_blacklist import (
+    is_access_token_blacklisted,
+    is_access_token_family_blacklisted,
+)
 from app.modules.user.models import User
 from app.modules.user.repositories import UserRepository
 from app.shared.models.enums import UserRole
@@ -39,10 +42,18 @@ async def get_current_user(
         user_id = UUID(payload["sub"])
         jti = payload["jti"]
         token_version = int(payload["token_version"])
+        family_id = payload["family_id"]
+
     except (KeyError, ValueError, TypeError) as exc:
         raise InvalidTokenError() from exc
 
     if await is_access_token_blacklisted(redis_client, jti):
+        raise InvalidTokenError()
+
+    if await is_access_token_family_blacklisted(
+        redis_client,
+        family_id,
+    ):
         raise InvalidTokenError()
 
     repository = UserRepository(session)
@@ -67,14 +78,12 @@ def get_logout_access_token(
     if credentials is None:
         return None
 
-    try:
-        payload = decode_access_token(credentials.credentials)
-    except InvalidTokenError:
-        return None
+    payload = decode_access_token(credentials.credentials)
 
     try:
         payload["jti"]
         payload["exp"]
+        payload["family_id"]
     except (KeyError, TypeError) as exc:
         raise InvalidTokenError() from exc
 
@@ -83,8 +92,11 @@ def get_logout_access_token(
 
 async def get_logout_all_context(
     session: DBSession,
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-) -> dict[str, Any]:
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
+) -> dict[str, Any] | None:
+    if credentials is None:
+        return None
+
     token = credentials.credentials
 
     payload = decode_access_token(token)
@@ -94,6 +106,7 @@ async def get_logout_all_context(
         token_version = int(payload["token_version"])
         payload["jti"]
         payload["exp"]
+        payload["family_id"]
     except (KeyError, ValueError, TypeError) as exc:
         raise InvalidTokenError() from exc
 
@@ -110,6 +123,7 @@ async def get_logout_all_context(
     return {
         "user": user,
         "token_version": token_version,
+        "family_id": payload["family_id"],
     }
 
 
@@ -144,6 +158,6 @@ LogoutAccessTokenPayload = Annotated[
 ]
 
 LogoutAllContext = Annotated[
-    dict[str, Any],
+    dict[str, Any] | None,
     Depends(get_logout_all_context),
 ]

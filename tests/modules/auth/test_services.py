@@ -25,7 +25,6 @@ async def test_valid_credentials(
     login_payload,
     active_user,
 ) -> None:
-
     auth_service.user_repository.get_by_email = AsyncMock(
         return_value=active_user,
     )
@@ -50,9 +49,7 @@ async def test_valid_credentials(
             return_value="refresh-token-hash",
         ) as mock_hash_refresh_token,
     ):
-        result = await auth_service.login(
-            login_payload,
-        )
+        result = await auth_service.login(login_payload)
 
     auth_service.user_repository.get_by_email.assert_awaited_once_with(
         login_payload.email,
@@ -63,11 +60,14 @@ async def test_valid_credentials(
         active_user.password_hash,
     )
 
-    mock_create_access_token.assert_called_once_with(
-        user_id=str(active_user.id),
-        role=active_user.role.value,
-        token_version=active_user.token_version,
-    )
+    mock_create_access_token.assert_called_once()
+
+    create_access_token_kwargs = mock_create_access_token.call_args.kwargs
+
+    assert create_access_token_kwargs["user_id"] == str(active_user.id)
+    assert create_access_token_kwargs["role"] == active_user.role.value
+    assert create_access_token_kwargs["token_version"] == active_user.token_version
+    assert create_access_token_kwargs["family_id"]
 
     mock_generate_refresh_token.assert_called_once()
 
@@ -76,6 +76,15 @@ async def test_valid_credentials(
     )
 
     auth_service.refresh_token_repository.create.assert_awaited_once()
+
+    create_refresh_token_kwargs = (
+        auth_service.refresh_token_repository.create.await_args.kwargs
+    )
+
+    assert (
+        str(create_refresh_token_kwargs["family_id"])
+        == (create_access_token_kwargs["family_id"])
+    )
 
     mock_session.commit.assert_awaited_once()
 
@@ -89,7 +98,6 @@ async def test_unknown_email(
     mock_session,
     login_payload,
 ) -> None:
-
     auth_service.user_repository.get_by_email = AsyncMock(
         return_value=None,
     )
@@ -106,9 +114,7 @@ async def test_unknown_email(
         ) as mock_generate_refresh_token,
     ):
         with pytest.raises(InvalidCredentialsError):
-            await auth_service.login(
-                login_payload,
-            )
+            await auth_service.login(login_payload)
 
     auth_service.user_repository.get_by_email.assert_awaited_once_with(
         login_payload.email,
@@ -132,7 +138,6 @@ async def test_incorrect_password(
     login_payload,
     active_user,
 ) -> None:
-
     auth_service.user_repository.get_by_email = AsyncMock(
         return_value=active_user,
     )
@@ -150,9 +155,7 @@ async def test_incorrect_password(
         ) as mock_generate_refresh_token,
     ):
         with pytest.raises(InvalidCredentialsError):
-            await auth_service.login(
-                login_payload,
-            )
+            await auth_service.login(login_payload)
 
     mock_verify_password.assert_called_once_with(
         login_payload.password,
@@ -171,7 +174,6 @@ async def test_inactive_user(
     login_payload,
     inactive_user,
 ) -> None:
-
     auth_service.user_repository.get_by_email = AsyncMock(
         return_value=inactive_user,
     )
@@ -189,9 +191,7 @@ async def test_inactive_user(
         ) as mock_generate_refresh_token,
     ):
         with pytest.raises(InvalidCredentialsError):
-            await auth_service.login(
-                login_payload,
-            )
+            await auth_service.login(login_payload)
 
     mock_verify_password.assert_called_once_with(
         login_payload.password,
@@ -211,7 +211,6 @@ async def test_refresh_token_created(
     login_payload,
     active_user,
 ) -> None:
-
     auth_service.user_repository.get_by_email = AsyncMock(
         return_value=active_user,
     )
@@ -226,7 +225,7 @@ async def test_refresh_token_created(
         patch(
             "app.modules.auth.services.create_access_token",
             return_value="access-token",
-        ),
+        ) as mock_create_access_token,
         patch(
             "app.modules.auth.services.generate_refresh_token",
             return_value="refresh-token",
@@ -236,9 +235,7 @@ async def test_refresh_token_created(
             return_value="hashed-refresh-token",
         ) as mock_hash_refresh_token,
     ):
-        result = await auth_service.login(
-            login_payload,
-        )
+        result = await auth_service.login(login_payload)
 
     mock_generate_refresh_token.assert_called_once()
 
@@ -250,9 +247,11 @@ async def test_refresh_token_created(
 
     create_kwargs = auth_service.refresh_token_repository.create.await_args.kwargs
 
+    access_token_kwargs = mock_create_access_token.call_args.kwargs
+
     assert create_kwargs["user_id"] == active_user.id
     assert create_kwargs["token_hash"] == "hashed-refresh-token"
-    assert create_kwargs["family_id"] is not None
+    assert str(create_kwargs["family_id"]) == (access_token_kwargs["family_id"])
     assert create_kwargs["expires_at"] is not None
 
     mock_session.commit.assert_awaited_once()
@@ -274,6 +273,7 @@ async def test_valid_logout(
         "sub": str(created_refresh_token.user_id),
         "jti": "jti-123",
         "exp": int(datetime.now(timezone.utc).timestamp()) + 900,
+        "family_id": str(created_refresh_token.family_id),
     }
 
     with (
@@ -282,15 +282,15 @@ async def test_valid_logout(
             return_value="hashed_refresh_token",
         ) as mock_hash,
         patch(
-            "app.modules.auth.services.blacklist_access_token",
+            "app.modules.auth.services.blacklist_access_token_family",
             new_callable=AsyncMock,
-        ) as mock_blacklist,
+        ) as mock_blacklist_family,
     ):
         auth_service.refresh_token_repository.get_by_hash = AsyncMock(
             return_value=created_refresh_token,
         )
 
-        auth_service.refresh_token_repository.revoke = AsyncMock()
+        auth_service.refresh_token_repository.revoke_family = AsyncMock()
 
         await auth_service.logout(
             refresh_token,
@@ -304,11 +304,11 @@ async def test_valid_logout(
         "hashed_refresh_token",
     )
 
-    auth_service.refresh_token_repository.revoke.assert_awaited_once_with(
-        created_refresh_token.id,
+    auth_service.refresh_token_repository.revoke_family.assert_awaited_once_with(
+        created_refresh_token.family_id,
     )
 
-    mock_blacklist.assert_awaited_once()
+    mock_blacklist_family.assert_awaited_once()
 
     mock_session.commit.assert_awaited_once()
 
@@ -320,22 +320,30 @@ async def test_logout_empty_refresh_token(
 ) -> None:
     mock_redis = AsyncMock()
 
+    family_id = uuid7()
+
     access_token_payload = {
         "jti": "jti-123",
         "exp": int(datetime.now(timezone.utc).timestamp()) + 900,
+        "family_id": str(family_id),
     }
 
     with patch(
-        "app.modules.auth.services.blacklist_access_token",
+        "app.modules.auth.services.blacklist_access_token_family",
         new_callable=AsyncMock,
-    ) as mock_blacklist:
+    ) as mock_blacklist_family:
         await auth_service.logout(
             None,
             access_token_payload,
             mock_redis,
         )
 
-    mock_blacklist.assert_awaited_once()
+    mock_blacklist_family.assert_awaited_once()
+
+    blacklist_kwargs = mock_blacklist_family.call_args.kwargs
+
+    assert blacklist_kwargs["family_id"] == str(family_id)
+
     mock_session.commit.assert_awaited_once()
 
 
@@ -347,10 +355,12 @@ async def test_logout_refresh_token_not_found(
     mock_redis = AsyncMock()
 
     refresh_token = "invalid_refresh_token"
+    family_id = uuid7()
 
     access_token_payload = {
         "jti": "jti-123",
         "exp": int(datetime.now(timezone.utc).timestamp()) + 900,
+        "family_id": str(family_id),
     }
 
     with (
@@ -359,9 +369,9 @@ async def test_logout_refresh_token_not_found(
             return_value="hashed_refresh_token",
         ) as mock_hash,
         patch(
-            "app.modules.auth.services.blacklist_access_token",
+            "app.modules.auth.services.blacklist_access_token_family",
             new_callable=AsyncMock,
-        ) as mock_blacklist,
+        ) as mock_blacklist_family,
     ):
         auth_service.refresh_token_repository.get_by_hash = AsyncMock(
             return_value=None,
@@ -379,7 +389,11 @@ async def test_logout_refresh_token_not_found(
         "hashed_refresh_token",
     )
 
-    mock_blacklist.assert_awaited_once()
+    mock_blacklist_family.assert_awaited_once()
+
+    blacklist_kwargs = mock_blacklist_family.call_args.kwargs
+
+    assert blacklist_kwargs["family_id"] == str(family_id)
 
     mock_session.commit.assert_awaited_once()
 
@@ -398,6 +412,8 @@ async def test_logout_all_success(
     )
 
     access_token_version = 0
+
+    valid_stored_token.user_id = current_user.id
 
     with patch(
         "app.modules.auth.services.hash_refresh_token",
@@ -447,8 +463,6 @@ async def test_logout_all_empty_refresh_token(
     auth_service,
     mock_session,
 ) -> None:
-    refresh_token = None
-
     current_user = SimpleNamespace(
         id="user-123",
         token_version=0,
@@ -467,7 +481,7 @@ async def test_logout_all_empty_refresh_token(
     )
 
     await auth_service.logout_all(
-        refresh_token,
+        None,
         current_user,
         access_token_version,
     )
@@ -499,12 +513,10 @@ async def test_logout_all_refresh_token_not_found(
 
     access_token_version = 0
 
-    with (
-        patch(
-            "app.modules.auth.services.hash_refresh_token",
-            return_value="hashed_refresh_token",
-        ) as mock_hash,
-    ):
+    with patch(
+        "app.modules.auth.services.hash_refresh_token",
+        return_value="hashed_refresh_token",
+    ) as mock_hash:
         auth_service.refresh_token_repository.get_by_hash = AsyncMock(
             return_value=None,
         )
@@ -549,7 +561,6 @@ async def test_logout_all_idempotent(
     auth_service,
     mock_session,
 ) -> None:
-
     current_user = SimpleNamespace(
         id="user-123",
         token_version=0,
@@ -622,7 +633,7 @@ async def test_valid_refresh(
         patch(
             "app.modules.auth.services.create_access_token",
             return_value="new-access-token",
-        ),
+        ) as mock_create_access_token,
     ):
         result = await auth_service.refresh(refresh_token)
 
@@ -652,6 +663,10 @@ async def test_valid_refresh(
     assert create_kwargs["token_hash"] == "new-token-hash"
     assert create_kwargs["family_id"] == valid_stored_token.family_id
     assert create_kwargs["expires_at"] is not None
+
+    access_token_kwargs = mock_create_access_token.call_args.kwargs
+
+    assert access_token_kwargs["family_id"] == str(valid_stored_token.family_id)
 
     mock_session.commit.assert_awaited_once()
     mock_session.rollback.assert_not_awaited()
@@ -749,7 +764,6 @@ async def test_expired_refresh_token(
     refresh_token,
     expired_stored_token,
 ) -> None:
-
     refresh_token_repository.get_by_hash.return_value = expired_stored_token
 
     with patch(
@@ -774,7 +788,6 @@ async def test_invalid_refresh_token(
     mock_session,
     refresh_token,
 ) -> None:
-
     refresh_token_repository.get_by_hash.return_value = None
 
     with patch(
@@ -805,7 +818,6 @@ async def test_refresh_token_reuse_detection(
     refresh_token,
     revoked_stored_token,
 ) -> None:
-
     refresh_token_repository.get_by_hash.return_value = revoked_stored_token
 
     with patch(
@@ -833,7 +845,9 @@ async def test_valid_registration(
     register_user_payload,
     created_user,
 ) -> None:
-    auth_service.user_repository.get_by_email = AsyncMock(return_value=None)
+    auth_service.user_repository.get_by_email = AsyncMock(
+        return_value=None,
+    )
     auth_service.user_repository.create = AsyncMock(
         return_value=created_user,
     )
@@ -1057,13 +1071,10 @@ async def test_incorrect_current_password(
     mock_hash_password.assert_not_called()
 
     auth_service.user_repository.update_password.assert_not_awaited()
-
     auth_service.refresh_token_repository.revoke_user.assert_not_awaited()
-
     auth_service.user_repository.increment_token_version.assert_not_awaited()
 
     mock_session.commit.assert_not_awaited()
-
     mock_session.rollback.assert_not_awaited()
 
 
@@ -1109,9 +1120,7 @@ async def test_same_password_rejected(
     mock_hash_password.assert_not_called()
 
     auth_service.user_repository.update_password.assert_not_awaited()
-
     auth_service.refresh_token_repository.revoke_user.assert_not_awaited()
-
     auth_service.user_repository.increment_token_version.assert_not_awaited()
 
     mock_session.commit.assert_not_awaited()
@@ -1205,6 +1214,8 @@ async def test_get_current_user_success(
     created_user.id = uuid7()
     created_user.token_version = 0
 
+    family_id = str(uuid7())
+
     mock_credentials = type(
         "Credentials",
         (),
@@ -1221,6 +1232,7 @@ async def test_get_current_user_success(
                 "sub": str(created_user.id),
                 "jti": "jti-123",
                 "token_version": 0,
+                "family_id": family_id,
             },
         ),
         patch(
@@ -1228,6 +1240,11 @@ async def test_get_current_user_success(
             new_callable=AsyncMock,
             return_value=False,
         ) as mock_blacklist,
+        patch(
+            "app.api.v1.dependencies.is_access_token_family_blacklisted",
+            new_callable=AsyncMock,
+            return_value=False,
+        ) as mock_family_blacklist,
         patch(
             "app.api.v1.dependencies.UserRepository",
             return_value=mock_repository,
@@ -1246,6 +1263,11 @@ async def test_get_current_user_success(
         "jti-123",
     )
 
+    mock_family_blacklist.assert_awaited_once_with(
+        mock_redis,
+        family_id,
+    )
+
     mock_repository.get_by_id.assert_awaited_once_with(
         created_user.id,
     )
@@ -1261,6 +1283,8 @@ async def test_get_current_user_redis_miss(
 
     created_user.id = uuid7()
     created_user.token_version = 3
+
+    family_id = str(uuid7())
 
     mock_credentials = type(
         "Credentials",
@@ -1278,10 +1302,16 @@ async def test_get_current_user_redis_miss(
                 "sub": str(created_user.id),
                 "jti": "jti-123",
                 "token_version": 3,
+                "family_id": family_id,
             },
         ),
         patch(
             "app.api.v1.dependencies.is_access_token_blacklisted",
+            new_callable=AsyncMock,
+            return_value=False,
+        ),
+        patch(
+            "app.api.v1.dependencies.is_access_token_family_blacklisted",
             new_callable=AsyncMock,
             return_value=False,
         ),
@@ -1313,6 +1343,8 @@ async def test_get_current_user_token_version_mismatch(
     created_user.id = uuid7()
     created_user.token_version = 2
 
+    family_id = str(uuid7())
+
     mock_credentials = type(
         "Credentials",
         (),
@@ -1328,6 +1360,7 @@ async def test_get_current_user_token_version_mismatch(
                 "sub": str(created_user.id),
                 "jti": "jti-123",
                 "token_version": 1,
+                "family_id": family_id,
             },
         ),
         patch(
@@ -1336,12 +1369,15 @@ async def test_get_current_user_token_version_mismatch(
             return_value=False,
         ),
         patch(
+            "app.api.v1.dependencies.is_access_token_family_blacklisted",
+            new_callable=AsyncMock,
+            return_value=False,
+        ),
+        patch(
             "app.api.v1.dependencies.UserRepository",
             return_value=mock_repository,
         ),
     ):
-        from app.modules.auth.exceptions import InvalidTokenError
-
         with pytest.raises(InvalidTokenError):
             await get_current_user(
                 credentials=mock_credentials,

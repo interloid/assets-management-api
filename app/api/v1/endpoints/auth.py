@@ -183,11 +183,12 @@ async def logout_all(
 ) -> None:
     service = AuthService(session)
 
-    await service.logout_all(
-        refresh_token,
-        logout_all_context["user"],
-        logout_all_context["token_version"],
-    )
+    if logout_all_context is not None:
+        await service.logout_all(
+            refresh_token,
+            logout_all_context["user"],
+            logout_all_context["token_version"],
+        )
 
     response.delete_cookie(
         key="refresh_token",

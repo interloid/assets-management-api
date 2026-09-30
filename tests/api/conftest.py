@@ -138,6 +138,7 @@ async def admin_access_token(
         user_id=str(integration_admin.id),
         role=integration_admin.role.value,
         token_version=integration_admin.token_version,
+        family_id=str(uuid7()),
     )
 
 

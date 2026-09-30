@@ -42,6 +42,7 @@ def user_token(user: User) -> str:
         user_id=str(user.id),
         role=user.role.value,
         token_version=user.token_version,
+        family_id=str(uuid4()),
     )
 
 
@@ -176,10 +177,10 @@ async def test_admin_can_list_assets(
 
     body = response.json()
 
-    assert body["meta"]["page"] == 1
-    assert body["meta"]["size"] == 20
-    assert body["meta"]["total_items"] == 3
-    assert body["meta"]["total_pages"] == 1
+    assert body["pagination"]["page"] == 1
+    assert body["pagination"]["size"] == 20
+    assert body["pagination"]["total_items"] == 3
+    assert body["pagination"]["total_pages"] == 1
     assert len(body["data"]) == 3
 
 
@@ -202,12 +203,12 @@ async def test_list_assets_supports_pagination(
 
     assert response.status_code == 200
 
-    meta = response.json()["meta"]
+    pagination = response.json()["pagination"]
 
-    assert meta["page"] == 2
-    assert meta["size"] == 2
-    assert meta["total_items"] == 5
-    assert meta["total_pages"] == 3
+    assert pagination["page"] == 2
+    assert pagination["size"] == 2
+    assert pagination["total_items"] == 5
+    assert pagination["total_pages"] == 3
     assert len(response.json()["data"]) == 2
 
 
@@ -1018,7 +1019,7 @@ async def test_user_can_list_my_assets(
 
     body = response.json()
 
-    assert body["meta"]["total_items"] == 1
+    assert body["pagination"]["total_items"] == 1
     assert len(body["data"]) == 1
 
 
@@ -1114,12 +1115,12 @@ async def test_my_assets_supports_pagination_and_requires_authentication(
 
     assert response.status_code == 200
 
-    meta = response.json()["meta"]
+    pagination = response.json()["pagination"]
 
-    assert meta["page"] == 2
-    assert meta["size"] == 2
-    assert meta["total_items"] == 5
-    assert meta["total_pages"] == 3
+    assert pagination["page"] == 2
+    assert pagination["size"] == 2
+    assert pagination["total_items"] == 5
+    assert pagination["total_pages"] == 3
     assert len(response.json()["data"]) == 2
 
     unauthenticated = await integration_client.get("/api/v1/users/me/assets")

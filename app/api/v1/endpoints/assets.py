@@ -111,7 +111,7 @@ async def list_assets(
 
     total_pages = ceil(total / size) if total else 0
 
-    meta = PaginationMeta(
+    pagination = PaginationMeta(
         page=page,
         size=size,
         total_pages=total_pages,
@@ -121,7 +121,7 @@ async def list_assets(
     return success_response(
         status_code=status.HTTP_200_OK,
         data=data,
-        meta=meta,
+        pagination=pagination,
     )
 
 

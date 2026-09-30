@@ -16,7 +16,6 @@ from app.core.security import (
     TIMING_HASH,
     create_access_token,
     generate_refresh_token,
-    get_token_remaining_seconds,
     hash_password,
     hash_refresh_token,
     verify_password,
@@ -29,7 +28,7 @@ from app.modules.auth.exceptions import (
     SamePasswordError,
     UserInactiveError,
 )
-from app.modules.auth.jwt_blacklist import blacklist_access_token
+from app.modules.auth.jwt_blacklist import blacklist_access_token_family
 from app.modules.auth.repositories import RefreshTokenRepository
 from app.modules.user.exceptions import InvalidCurrentPasswordError
 from app.modules.user.models import User
@@ -66,18 +65,11 @@ class AuthService:
 
         return user
 
-    async def login(
-        self,
-        payload: LoginRequest,
-    ) -> LoginResult:
+    async def login(self, payload: LoginRequest) -> LoginResult:
         user = await self.user_repository.get_by_email(payload.email)
 
         password_hash = user.password_hash if user is not None else TIMING_HASH
-
-        password_valid = verify_password(
-            payload.password,
-            password_hash,
-        )
+        password_valid = verify_password(payload.password, password_hash)
 
         if user is None or not password_valid:
             raise InvalidCredentialsError()
@@ -85,10 +77,13 @@ class AuthService:
         if not user.is_active:
             raise InvalidCredentialsError()
 
+        family_id = uuid7()
+
         access_token = create_access_token(
             user_id=str(user.id),
             role=user.role.value,
             token_version=user.token_version,
+            family_id=str(family_id),
         )
 
         refresh_token = generate_refresh_token()
@@ -97,8 +92,6 @@ class AuthService:
         expires_at = datetime.now(timezone.utc) + timedelta(
             days=settings.REFRESH_TOKEN_EXPIRE_DAYS
         )
-
-        family_id = uuid7()
 
         await self.refresh_token_repository.create(
             user_id=user.id,
@@ -196,6 +189,7 @@ class AuthService:
             user_id=str(user.id),
             role=user.role.value,
             token_version=user.token_version,
+            family_id=str(family_id),
         )
 
         await self.session.commit()
@@ -211,32 +205,39 @@ class AuthService:
         access_token_payload: dict[str, Any] | None,
         redis_client: Redis | None,
     ) -> None:
+        family_id = None
+
+        if access_token_payload is not None:
+            family_id = access_token_payload["family_id"]
+
         if refresh_token:
             token_hash = hash_refresh_token(refresh_token)
 
-            stored_token = await self.refresh_token_repository.get_by_hash(
-                token_hash,
-            )
+            stored_token = await self.refresh_token_repository.get_by_hash(token_hash)
 
             if stored_token is not None:
-                if access_token_payload is not None:
-                    if str(stored_token.user_id) != access_token_payload["sub"]:
-                        raise InvalidTokenError()
+                if (
+                    access_token_payload is not None
+                    and str(stored_token.user_id) != access_token_payload["sub"]
+                ):
+                    raise InvalidTokenError()
 
-                await self.refresh_token_repository.revoke(
-                    stored_token.id,
+                refresh_family_id = str(stored_token.family_id)
+
+                if family_id is not None and refresh_family_id != family_id:
+                    raise InvalidTokenError()
+
+                family_id = refresh_family_id
+
+                await self.refresh_token_repository.revoke_family(
+                    stored_token.family_id
                 )
 
-        if access_token_payload and redis_client:
-            jti = access_token_payload["jti"]
-            exp = access_token_payload["exp"]
-
-            remaining_seconds = get_token_remaining_seconds(exp)
-
-            await blacklist_access_token(
+        if family_id is not None and redis_client:
+            await blacklist_access_token_family(
                 redis_client,
-                jti=jti,
-                expires_in=remaining_seconds,
+                family_id=family_id,
+                expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
             )
 
         await self.session.commit()

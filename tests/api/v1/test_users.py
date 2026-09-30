@@ -1,3 +1,5 @@
+from uuid import uuid4
+
 import pytest
 
 from app.core.security import create_access_token
@@ -21,12 +23,12 @@ async def test_admin_list_users(
     body = response.json()
 
     assert "data" in body
-    assert "meta" in body
+    assert "pagination" in body
 
-    assert body["meta"]["page"] == 1
-    assert body["meta"]["size"] == 20
-    assert body["meta"]["total_items"] == 2
-    assert body["meta"]["total_pages"] == 1
+    assert body["pagination"]["page"] == 1
+    assert body["pagination"]["size"] == 20
+    assert body["pagination"]["total_items"] == 2
+    assert body["pagination"]["total_pages"] == 1
 
     assert len(body["data"]) == 2
 
@@ -59,10 +61,10 @@ async def test_admin_list_users_pagination(
 
     body = response.json()
 
-    assert body["meta"]["page"] == 1
-    assert body["meta"]["size"] == 1
-    assert body["meta"]["total_items"] == 2
-    assert body["meta"]["total_pages"] == 2
+    assert body["pagination"]["page"] == 1
+    assert body["pagination"]["size"] == 1
+    assert body["pagination"]["total_items"] == 2
+    assert body["pagination"]["total_pages"] == 2
 
     assert len(body["data"]) == 1
 
@@ -84,8 +86,8 @@ async def test_admin_list_users_search_by_email(
 
     body = response.json()
 
-    assert body["meta"]["total_items"] == 1
-    assert body["meta"]["total_pages"] == 1
+    assert body["pagination"]["total_items"] == 1
+    assert body["pagination"]["total_pages"] == 1
 
     user = body["data"][0]
 
@@ -110,8 +112,8 @@ async def test_admin_list_users_search_by_full_name(
 
     body = response.json()
 
-    assert body["meta"]["total_items"] == 1
-    assert body["meta"]["total_pages"] == 1
+    assert body["pagination"]["total_items"] == 1
+    assert body["pagination"]["total_pages"] == 1
 
     user = body["data"][0]
 
@@ -136,8 +138,8 @@ async def test_admin_list_users_search_is_case_insensitive(
 
     body = response.json()
 
-    assert body["meta"]["total_items"] == 1
-    assert body["meta"]["total_pages"] == 1
+    assert body["pagination"]["total_items"] == 1
+    assert body["pagination"]["total_pages"] == 1
 
     assert body["data"][0]["id"] == str(integration_user.id)
 
@@ -151,6 +153,7 @@ async def test_non_admin_cannot_list_users(
         user_id=str(integration_user.id),
         role=integration_user.role.value,
         token_version=integration_user.token_version,
+        family_id=str(uuid4()),
     )
 
     response = await integration_client.get(

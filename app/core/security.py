@@ -37,6 +37,7 @@ def create_access_token(
     user_id: str,
     role: str,
     token_version: int,
+    family_id: str,
 ) -> str:
     now = datetime.now(timezone.utc)
     expires_at = now + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -48,10 +49,13 @@ def create_access_token(
         "exp": expires_at,
         "jti": str(uuid7()),
         "token_version": token_version,
+        "family_id": family_id,
     }
 
     return jwt.encode(
-        payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM
+        payload,
+        settings.JWT_SECRET_KEY,
+        algorithm=settings.JWT_ALGORITHM,
     )
 
 
@@ -69,6 +73,7 @@ def decode_access_token(token: str) -> dict[str, Any]:
                     "exp",
                     "jti",
                     "token_version",
+                    "family_id",
                 ],
             },
         )

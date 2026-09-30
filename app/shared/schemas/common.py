@@ -24,7 +24,7 @@ class SuccessResponse(APIModel, Generic[DataT]):
 
 
 class PaginatedSuccessResponse(SuccessResponse[DataT], Generic[DataT]):
-    meta: PaginationMeta
+    pagintion: PaginationMeta
 
 
 class ErrorDetail(APIModel):

@@ -7,14 +7,14 @@ def success_response(
     *,
     status_code: int,
     data: Any = None,
-    meta: dict[str, Any] | None = None,
+    pagination: dict[str, Any] | None = None,
 ) -> JSONResponse:
     content: dict[str, Any] = {
         "data": data,
     }
 
-    if meta is not None:
-        content["meta"] = meta
+    if pagination is not None:
+        content["pagination"] = pagination
 
     return JSONResponse(
         status_code=status_code,
