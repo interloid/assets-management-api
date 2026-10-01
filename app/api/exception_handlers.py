@@ -63,7 +63,7 @@ def http_exception_handler(_request: Request, exc: StarletteHTTPException):
     if exc.status_code == 401:
         return error_response(
             status_code=401,
-            message="Authentication credentials were not provided",
+            message="Authentication credentials are required",
             code="AUTHENTICATION_REQUIRED",
             headers=exc.headers,
         )

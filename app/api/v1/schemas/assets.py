@@ -69,3 +69,11 @@ class AssetStatusUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     status: AssetStatus
+
+
+class AssetStatsResponse(BaseModel):
+    total: int
+    in_stock: int
+    assigned: int
+    repair: int
+    retired: int

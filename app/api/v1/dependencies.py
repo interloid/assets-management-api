@@ -5,21 +5,24 @@ from fastapi import Cookie, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.api.deps import DBSession, RedisClient
-from app.core.security import decode_access_token
+from app.core.exceptions import InvalidAccessTokenError
+from app.core.security import (
+    decode_access_token,
+    decode_access_token_allow_expired,
+    validate_logout_token_expiry,
+)
 from app.modules.auth.exceptions import (
     AuthorizationError,
-    InvalidTokenError,
     UserInactiveError,
 )
 from app.modules.auth.jwt_blacklist import (
-    is_access_token_blacklisted,
     is_access_token_family_blacklisted,
 )
 from app.modules.user.models import User
 from app.modules.user.repositories import UserRepository
 from app.shared.models.enums import UserRole
 
-security = HTTPBearer(auto_error=False)
+security = HTTPBearer(auto_error=False, bearerFormat="JWT")
 
 
 async def get_current_user(
@@ -40,31 +43,27 @@ async def get_current_user(
 
     try:
         user_id = UUID(payload["sub"])
-        jti = payload["jti"]
         token_version = int(payload["token_version"])
         family_id = payload["family_id"]
 
     except (KeyError, ValueError, TypeError) as exc:
-        raise InvalidTokenError() from exc
-
-    if await is_access_token_blacklisted(redis_client, jti):
-        raise InvalidTokenError()
+        raise InvalidAccessTokenError() from exc
 
     if await is_access_token_family_blacklisted(
         redis_client,
         family_id,
     ):
-        raise InvalidTokenError()
+        raise InvalidAccessTokenError()
 
     repository = UserRepository(session)
 
     user = await repository.get_by_id(user_id)
 
     if user is None:
-        raise InvalidTokenError()
+        raise InvalidAccessTokenError()
 
     if token_version != user.token_version:
-        raise InvalidTokenError()
+        raise InvalidAccessTokenError()
 
     if not user.is_active:
         raise UserInactiveError()
@@ -78,44 +77,58 @@ def get_logout_access_token(
     if credentials is None:
         return None
 
-    payload = decode_access_token(credentials.credentials)
+    payload = decode_access_token_allow_expired(credentials.credentials)
 
     try:
         payload["jti"]
-        payload["exp"]
+        exp = payload["exp"]
         payload["family_id"]
     except (KeyError, TypeError) as exc:
-        raise InvalidTokenError() from exc
+        raise InvalidAccessTokenError() from exc
+
+    validate_logout_token_expiry(exp)
 
     return payload
 
 
 async def get_logout_all_context(
     session: DBSession,
+    redis_client: RedisClient,
     credentials: HTTPAuthorizationCredentials | None = Depends(security),
-) -> dict[str, Any] | None:
+) -> dict[str, Any]:
     if credentials is None:
-        return None
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication credentials were not provided",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
     token = credentials.credentials
 
-    payload = decode_access_token(token)
+    payload = decode_access_token_allow_expired(token)
 
     try:
         user_id = UUID(payload["sub"])
         token_version = int(payload["token_version"])
-        payload["jti"]
-        payload["exp"]
-        payload["family_id"]
+        exp = payload["exp"]
+        family_id = payload["family_id"]
     except (KeyError, ValueError, TypeError) as exc:
-        raise InvalidTokenError() from exc
+        raise InvalidAccessTokenError() from exc
+
+    validate_logout_token_expiry(exp)
+
+    if await is_access_token_family_blacklisted(
+        redis_client,
+        family_id,
+    ):
+        raise InvalidAccessTokenError()
 
     repository = UserRepository(session)
 
     user = await repository.get_by_id(user_id)
 
     if user is None:
-        raise InvalidTokenError()
+        raise InvalidAccessTokenError()
 
     if not user.is_active:
         raise UserInactiveError()

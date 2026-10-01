@@ -1,11 +1,11 @@
 import asyncio
 from datetime import date
 
-from app.core.database import AsyncSessionLocal, engine
 from sqlalchemy import select
 
 from app.core.config import settings
 from app.core.security import hash_password
+from app.infrastructure.database import AsyncSessionLocal, engine
 from app.modules.asset.models import Asset
 from app.modules.asset.tag.model import AssetTagCounter
 from app.modules.auth.models import RefreshToken  # noqa: F401
@@ -208,7 +208,7 @@ ASSET_SEED_DATA = [
 ASSET_TYPE_PREFIX = {
     AssetType.LAPTOP: "LAP",
     AssetType.MONITOR: "MON",
-    AssetType.PHONE: "PHO",
+    AssetType.PHONE: "PHN",
     AssetType.ACCESSORY: "ACC",
 }
 

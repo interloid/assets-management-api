@@ -7,11 +7,12 @@ from sqlalchemy.exc import IntegrityError
 from uuid6 import uuid7
 
 from app.api.v1.dependencies import get_current_user
+from app.core.exceptions import InvalidAccessTokenError
 from app.core.security import TIMING_HASH
 from app.modules.auth.exceptions import (
     EmailAlreadyRegisteredError,
     InvalidCredentialsError,
-    InvalidTokenError,
+    InvalidRefreshTokenError,
     RefreshTokenReuseError,
     SamePasswordError,
 )
@@ -49,7 +50,10 @@ async def test_valid_credentials(
             return_value="refresh-token-hash",
         ) as mock_hash_refresh_token,
     ):
-        result = await auth_service.login(login_payload)
+        access_token, refresh_token = await auth_service.login(
+            email=login_payload.email,
+            password=login_payload.password,
+        )
 
     auth_service.user_repository.get_by_email.assert_awaited_once_with(
         login_payload.email,
@@ -88,8 +92,8 @@ async def test_valid_credentials(
 
     mock_session.commit.assert_awaited_once()
 
-    assert result.access_token == "access-token"
-    assert result.refresh_token == "refresh-token"
+    assert access_token == "access-token"
+    assert refresh_token == "refresh-token"
 
 
 @pytest.mark.asyncio
@@ -114,7 +118,10 @@ async def test_unknown_email(
         ) as mock_generate_refresh_token,
     ):
         with pytest.raises(InvalidCredentialsError):
-            await auth_service.login(login_payload)
+            await auth_service.login(
+                email=login_payload.email,
+                password=login_payload.password,
+            )
 
     auth_service.user_repository.get_by_email.assert_awaited_once_with(
         login_payload.email,
@@ -155,7 +162,10 @@ async def test_incorrect_password(
         ) as mock_generate_refresh_token,
     ):
         with pytest.raises(InvalidCredentialsError):
-            await auth_service.login(login_payload)
+            await auth_service.login(
+                email=login_payload.email,
+                password=login_payload.password,
+            )
 
     mock_verify_password.assert_called_once_with(
         login_payload.password,
@@ -191,7 +201,10 @@ async def test_inactive_user(
         ) as mock_generate_refresh_token,
     ):
         with pytest.raises(InvalidCredentialsError):
-            await auth_service.login(login_payload)
+            await auth_service.login(
+                email=login_payload.email,
+                password=login_payload.password,
+            )
 
     mock_verify_password.assert_called_once_with(
         login_payload.password,
@@ -235,7 +248,10 @@ async def test_refresh_token_created(
             return_value="hashed-refresh-token",
         ) as mock_hash_refresh_token,
     ):
-        result = await auth_service.login(login_payload)
+        access_token, refresh_token = await auth_service.login(
+            email=login_payload.email,
+            password=login_payload.password,
+        )
 
     mock_generate_refresh_token.assert_called_once()
 
@@ -256,8 +272,8 @@ async def test_refresh_token_created(
 
     mock_session.commit.assert_awaited_once()
 
-    assert result.access_token == "access-token"
-    assert result.refresh_token == "refresh-token"
+    assert access_token == "access-token"
+    assert refresh_token == "refresh-token"
 
 
 @pytest.mark.asyncio
@@ -635,10 +651,12 @@ async def test_valid_refresh(
             return_value="new-access-token",
         ) as mock_create_access_token,
     ):
-        result = await auth_service.refresh(refresh_token)
+        access_token, new_refresh_token = await auth_service.refresh(
+            refresh_token,
+        )
 
-    assert result.access_token == "new-access-token"
-    assert result.refresh_token == "new-refresh-token"
+    assert access_token == "new-access-token"
+    assert new_refresh_token == "new-refresh-token"
 
     refresh_token_repository.get_by_hash.assert_awaited_once_with(
         "old-token-hash",
@@ -770,7 +788,7 @@ async def test_expired_refresh_token(
         "app.modules.auth.services.hash_refresh_token",
         return_value="old-token-hash",
     ):
-        with pytest.raises(InvalidTokenError):
+        with pytest.raises(InvalidRefreshTokenError):
             await auth_service.refresh(refresh_token)
 
     refresh_token_repository.revoke.assert_not_awaited()
@@ -794,7 +812,7 @@ async def test_invalid_refresh_token(
         "app.modules.auth.services.hash_refresh_token",
         return_value="invalid-token-hash",
     ):
-        with pytest.raises(InvalidTokenError):
+        with pytest.raises(InvalidRefreshTokenError):
             await auth_service.refresh(refresh_token)
 
     refresh_token_repository.get_by_hash.assert_awaited_once_with(
@@ -856,7 +874,11 @@ async def test_valid_registration(
         "app.modules.auth.services.hash_password",
         return_value="hashed-password",
     ) as mock_hash_password:
-        result = await auth_service.register(register_user_payload)
+        result = await auth_service.register(
+            email=register_user_payload.email,
+            password=register_user_payload.password,
+            full_name=register_user_payload.full_name,
+        )
 
     auth_service.user_repository.get_by_email.assert_awaited_once_with(
         str(register_user_payload.email),
@@ -891,7 +913,11 @@ async def test_duplicate_email(
     auth_service.user_repository.create = AsyncMock()
 
     with pytest.raises(EmailAlreadyRegisteredError):
-        await auth_service.register(register_user_payload)
+        await auth_service.register(
+            email=register_user_payload.email,
+            password=register_user_payload.password,
+            full_name=register_user_payload.full_name,
+        )
 
     auth_service.user_repository.get_by_email.assert_awaited_once_with(
         str(register_user_payload.email),
@@ -921,7 +947,11 @@ async def test_password_hashed(
         "app.modules.auth.services.hash_password",
         return_value="hashed-password",
     ) as mock_hash_password:
-        await auth_service.register(register_user_payload)
+        await auth_service.register(
+            email=register_user_payload.email,
+            password=register_user_payload.password,
+            full_name=register_user_payload.full_name,
+        )
 
     mock_hash_password.assert_called_once_with(
         register_user_payload.password,
@@ -965,7 +995,11 @@ async def test_integrity_error_handled(
     mock_session.commit.side_effect = integrity_error
 
     with pytest.raises(EmailAlreadyRegisteredError):
-        await auth_service.register(register_user_payload)
+        await auth_service.register(
+            email=register_user_payload.email,
+            password=register_user_payload.password,
+            full_name=register_user_payload.full_name,
+        )
 
     auth_service.user_repository.get_by_email.assert_awaited_once_with(
         str(register_user_payload.email),
@@ -1236,11 +1270,6 @@ async def test_get_current_user_success(
             },
         ),
         patch(
-            "app.api.v1.dependencies.is_access_token_blacklisted",
-            new_callable=AsyncMock,
-            return_value=False,
-        ) as mock_blacklist,
-        patch(
             "app.api.v1.dependencies.is_access_token_family_blacklisted",
             new_callable=AsyncMock,
             return_value=False,
@@ -1257,11 +1286,6 @@ async def test_get_current_user_success(
         )
 
     assert result is created_user
-
-    mock_blacklist.assert_awaited_once_with(
-        mock_redis,
-        "jti-123",
-    )
 
     mock_family_blacklist.assert_awaited_once_with(
         mock_redis,
@@ -1304,11 +1328,6 @@ async def test_get_current_user_redis_miss(
                 "token_version": 3,
                 "family_id": family_id,
             },
-        ),
-        patch(
-            "app.api.v1.dependencies.is_access_token_blacklisted",
-            new_callable=AsyncMock,
-            return_value=False,
         ),
         patch(
             "app.api.v1.dependencies.is_access_token_family_blacklisted",
@@ -1364,11 +1383,6 @@ async def test_get_current_user_token_version_mismatch(
             },
         ),
         patch(
-            "app.api.v1.dependencies.is_access_token_blacklisted",
-            new_callable=AsyncMock,
-            return_value=False,
-        ),
-        patch(
             "app.api.v1.dependencies.is_access_token_family_blacklisted",
             new_callable=AsyncMock,
             return_value=False,
@@ -1378,7 +1392,7 @@ async def test_get_current_user_token_version_mismatch(
             return_value=mock_repository,
         ),
     ):
-        with pytest.raises(InvalidTokenError):
+        with pytest.raises(InvalidAccessTokenError):
             await get_current_user(
                 credentials=mock_credentials,
                 session=mock_session,

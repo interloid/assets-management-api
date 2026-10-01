@@ -185,7 +185,7 @@ assets-management-api/
 * Refresh-token family tracking
 * Refresh-token reuse detection
 * Logout of the current session
-* Access-token blacklisting using Redis
+* Access-token family invalidation using Redis
 * Logout of all sessions
 * Token-version based access-token invalidation
 * Change password
@@ -202,8 +202,6 @@ assets-management-api/
 | `POST`  | `/api/v1/auth/refresh`             | Rotate the refresh token and issue a new access token |
 | `POST`  | `/api/v1/auth/logout`              | Logout the current session                            |
 | `POST`  | `/api/v1/auth/logout-all`          | Invalidate all user sessions                          |
-| `GET`   | `/api/v1/users/me`                 | Get the currently authenticated user                  |
-| `PATCH` | `/api/v1/users/me/change-password` | Change the current user's password                    |
 
 Access tokens contain the user's identity, role, token version, JWT ID, issued-at time, and expiration time.
 
@@ -290,7 +288,7 @@ Status transitions are controlled by a centralized transition map, with `retired
 | `DELETE` | `/api/v1/assets/{id}`          | Delete an asset                          |
 | `POST`   | `/api/v1/assets/{id}/assign`   | Assign an asset to a user                |
 | `POST`   | `/api/v1/assets/{id}/unassign` | Unassign an asset                        |
-| `PATCH`  | `/api/v1/assets/{id}/status`   | Change asset status                      |
+| `POST`   | `/api/v1/assets/{id}/status`   | Change asset status                      |
 | `GET`    | `/api/v1/users/me/assets`      | List assets assigned to the current user |
 
 ## Asset Listing
@@ -347,7 +345,7 @@ Duplicate asset tags and serial numbers are handled using database unique constr
 | Method  | Endpoint                           | Access        | Description                         |
 | ------- | ---------------------------------- | ------------- | ----------------------------------- |
 | `GET`   | `/api/v1/users/me`                 | Authenticated | Get current user                    |
-| `PATCH` | `/api/v1/users/me/change-password` | Authenticated | Change password                     |
+| `PATCH` | `/api/v1/users/me/password`        | Authenticated | Change password                     |
 | `GET`   | `/api/v1/users`                    | Admin         | List users                          |
 | `GET`   | `/api/v1/users/me/assets`          | Authenticated | List current user's assigned assets |
 
@@ -378,11 +376,11 @@ Successful non-paginated responses use:
 ```json
 {
   "data": [],
-  "meta": {
+  "pagination": {
     "page": 1,
     "size": 20,
-    "totalItems": 100,
-    "totalPages": 5
+    "total_items": 100,
+    "total_pages": 5
   }
 }
 ```

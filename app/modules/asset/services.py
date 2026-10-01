@@ -1,4 +1,3 @@
-import re
 from datetime import date
 from typing import Literal
 from uuid import UUID
@@ -6,7 +5,6 @@ from uuid import UUID
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.v1.schemas.assets import AssetCreate, AssetUpdate
 from app.modules.asset.exceptions import (
     AssetAssignmentUserInactiveError,
     AssetAssignmentUserNotFoundError,
@@ -64,15 +62,7 @@ def get_constraint_name(exc: IntegrityError) -> str | None:
     if cause is None:
         return None
 
-    match = re.search(
-        r'unique constraint "([^"]+)"',
-        str(cause),
-    )
-
-    if match is None:
-        return None
-
-    return match.group(1)
+    return getattr(cause, "constraint_name", None)
 
 
 class AssetService:
@@ -97,28 +87,36 @@ class AssetService:
                 new_status=new_status.value,
             )
 
-    async def create(self, data: AssetCreate) -> Asset:
+    async def create(
+        self,
+        *,
+        asset_type: AssetType,
+        serial_number: str,
+        purchase_date: date,
+        warranty_expiry: date,
+        notes: str | None,
+    ) -> Asset:
         company_prefix = get_company_prefix()
 
         number = await self.asset_tag_counter_repository.get_next_number(
             company_prefix=company_prefix,
-            asset_type=data.type,
+            asset_type=asset_type,
         )
 
         asset_tag = build_asset_tag(
-            asset_type=data.type,
+            asset_type=asset_type,
             number=number,
         )
 
         asset = Asset(
             asset_tag=asset_tag,
-            type=data.type,
-            serial_number=data.serial_number,
+            type=asset_type,
+            serial_number=serial_number,
             status=AssetStatus.IN_STOCK,
             assigned_to=None,
-            purchase_date=data.purchase_date,
-            warranty_expiry=data.warranty_expiry,
-            notes=data.notes,
+            purchase_date=purchase_date,
+            warranty_expiry=warranty_expiry,
+            notes=notes,
         )
 
         try:
@@ -189,14 +187,12 @@ class AssetService:
     async def update(
         self,
         asset_id: UUID,
-        data: AssetUpdate,
+        update_data: dict,
     ) -> Asset:
         asset = await self.asset_repository.get_by_id(asset_id)
 
         if asset is None:
             raise AssetNotFoundError()
-
-        update_data = data.model_dump(exclude_unset=True)
 
         try:
             if "type" in update_data:
@@ -320,8 +316,8 @@ class AssetService:
 
         return asset
 
-    async def summary(self) -> dict[str, int]:
-        counts = await self.asset_repository.summary()
+    async def stats(self) -> dict[str, int]:
+        counts = await self.asset_repository.stats()
 
         in_stock = counts.get(AssetStatus.IN_STOCK, 0)
         assigned = counts.get(AssetStatus.ASSIGNED, 0)

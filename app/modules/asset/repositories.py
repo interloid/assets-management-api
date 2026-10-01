@@ -161,7 +161,7 @@ class AssetRepository:
 
         return asset
 
-    async def summary(self) -> dict[AssetStatus, int]:
+    async def stats(self) -> dict[AssetStatus, int]:
         stmt = select(
             Asset.status,
             func.count(Asset.id).label("count"),

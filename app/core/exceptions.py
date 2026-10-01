@@ -23,4 +23,11 @@ class AppError(Exception):
 class ServiceUnavailableError(AppError):
     status_code = 503
     code = "SERVICE_UNAVAILABLE"
-    message = "One or more required services are unavailable"
+    message = "A required service is currently unavailable"
+
+
+class InvalidAccessTokenError(AppError):
+    status_code = 401
+    code = "INVALID_ACCESS_TOKEN"
+    message = "The access token is invalid or expired"
+    headers = {"WWW-Authenticate": "Bearer"}

@@ -4,24 +4,22 @@ from app.core.exceptions import AppError
 class AssetAlreadyExistsError(AppError):
     status_code = 409
     code = "ASSET_ALREADY_EXISTS"
-    message = "Asset already exists"
+    message = "An asset with the provided details already exists"
 
 
 class AssetTagAlreadyExistsError(AssetAlreadyExistsError):
     code = "ASSET_TAG_ALREADY_EXISTS"
-    message = "Asset tag already exists"
+    message = "An asset with this asset tag already exists"
 
 
 class SerialNumberAlreadyExistsError(AssetAlreadyExistsError):
     code = "SERIAL_NUMBER_ALREADY_EXISTS"
-    message = "Serial number already exists"
+    message = "An asset with this serial number already exists"
 
 
 class AssetNotFoundError(AppError):
     status_code = 404
-
     code = "ASSET_NOT_FOUND"
-
     message = "Asset not found"
 
 
@@ -34,7 +32,9 @@ class InvalidAssetStatusTransitionError(AppError):
         current_status: str,
         new_status: str,
     ) -> None:
-        self.message = f"Cannot change status from '{current_status}' to '{new_status}'"
+        self.message = (
+            f"Asset status cannot be changed from '{current_status}' to '{new_status}'"
+        )
         super().__init__()
 
 
@@ -47,10 +47,10 @@ class AssetDeleteConflictError(AppError):
 class AssetAssignmentUserNotFoundError(AppError):
     status_code = 404
     code = "ASSET_ASSIGNMENT_USER_NOT_FOUND"
-    message = "Assignment user not found"
+    message = "The user assigned to this asset was not found"
 
 
 class AssetAssignmentUserInactiveError(AppError):
     status_code = 409
     code = "ASSET_ASSIGNMENT_USER_INACTIVE"
-    message = "Assignment user is inactive"
+    message = "The user assigned to this asset is inactive"

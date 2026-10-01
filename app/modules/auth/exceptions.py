@@ -8,14 +8,14 @@ class AuthenticationError(AppError):
     headers = {"WWW-Authenticate": "Bearer"}
 
 
+class InvalidRefreshTokenError(AuthenticationError):
+    code = "INVALID_REFRESH_TOKEN"
+    message = "The refresh token is invalid or expired"
+
+
 class InvalidCredentialsError(AuthenticationError):
     code = "INVALID_CREDENTIALS"
     message = "Invalid email or password"
-
-
-class InvalidTokenError(AuthenticationError):
-    code = "INVALID_TOKEN"
-    message = "Invalid or expired token"
 
 
 class RefreshTokenReuseError(AuthenticationError):
@@ -31,7 +31,7 @@ class UserInactiveError(AuthenticationError):
 class EmailAlreadyRegisteredError(AppError):
     status_code = 409
     code = "EMAIL_ALREADY_REGISTERED"
-    message = "Email is already registered"
+    message = "An account with this email address already exists"
 
 
 class AuthorizationError(AppError):
@@ -43,4 +43,4 @@ class AuthorizationError(AppError):
 class SamePasswordError(AppError):
     status_code = 400
     code = "SAME_PASSWORD"
-    message = "New password and current password cannot be the same"
+    message = "The new password must be different from the current password"

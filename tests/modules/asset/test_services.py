@@ -579,12 +579,12 @@ async def test_change_status_rejects_assignment_transition(
 
 
 @pytest.mark.asyncio
-async def test_summary(
+async def test_stats(
     mock_session,
 ) -> None:
     service = AssetService(mock_session)
 
-    service.asset_repository.summary = AsyncMock(
+    service.asset_repository.stats = AsyncMock(
         return_value={
             AssetStatus.IN_STOCK: 5,
             AssetStatus.ASSIGNED: 3,
@@ -593,9 +593,9 @@ async def test_summary(
         },
     )
 
-    result = await service.summary()
+    result = await service.stats()
 
-    service.asset_repository.summary.assert_awaited_once()
+    service.asset_repository.stats.assert_awaited_once()
 
     assert result == {
         "total": 11,

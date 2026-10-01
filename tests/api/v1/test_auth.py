@@ -386,7 +386,7 @@ async def test_logout_rejects_refresh_token_from_different_user(
 
     body = logout_response.json()
 
-    assert body["error"]["code"] == "INVALID_TOKEN"
+    assert body["error"]["code"] == "INVALID_ACCESS_TOKEN"
 
     integration_client.headers.pop("Authorization", None)
     integration_client.cookies.set(
@@ -537,8 +537,8 @@ async def test_change_password_revokes_all_sessions(
     refresh_token_2 = login_response_2.cookies["refresh_token"]
     access_token = login_response_2.json()["data"]["access_token"]
 
-    change_password_response = await integration_client.post(
-        "/api/v1/users/me/change-password",
+    change_password_response = await integration_client.patch(
+        "/api/v1/users/me/password",
         json={
             "current_password": user_payload["password"],
             "new_password": "NewPassword123",
@@ -680,7 +680,7 @@ async def test_refresh_invalid_token(
 
     body = response.json()
 
-    assert body["error"]["code"] == "INVALID_TOKEN"
+    assert body["error"]["code"] == "INVALID_REFRESH_TOKEN"
 
 
 @pytest.mark.asyncio

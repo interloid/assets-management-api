@@ -9,6 +9,7 @@ from app.shared.models.enums import UserRole
 
 
 class RegisterRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     email: EmailStr
     password: str
     full_name: str
@@ -39,6 +40,7 @@ class UserListResponse(BaseModel):
 
 
 class LoginRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     email: EmailStr
     password: str
 
@@ -54,6 +56,7 @@ class LoginResult(BaseModel):
 
 
 class ChangePasswordRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     current_password: str
     new_password: str
 

@@ -10,6 +10,7 @@ from app.api.v1.dependencies import (
 from app.api.v1.responses import (
     CONFLICT_RESPONSE,
     INTERNAL_SERVER_ERROR_RESPONSE,
+    LOGOUT_UNAUTHORIZED_RESPONSE,
     UNAUTHORIZED_RESPONSE,
     VALIDATION_RESPONSE,
 )
@@ -44,10 +45,13 @@ async def register(
     data: RegisterRequest,
     session: DBSession,
 ) -> SuccessResponse[UserResponse]:
-
     service = AuthService(session)
 
-    user = await service.register(data)
+    user = await service.register(
+        email=str(data.email),
+        password=data.password,
+        full_name=data.full_name,
+    )
 
     return success_response(
         status_code=status.HTTP_201_CREATED,
@@ -70,12 +74,13 @@ async def login(
 ) -> SuccessResponse[LoginResponse]:
     service = AuthService(session)
 
-    result = await service.login(
-        payload,
+    access_token, refresh_token = await service.login(
+        email=payload.email,
+        password=payload.password,
     )
 
     data = LoginResponse(
-        access_token=result.access_token,
+        access_token=access_token,
         token_type="bearer",
     )
 
@@ -86,7 +91,7 @@ async def login(
 
     response.set_cookie(
         key="refresh_token",
-        value=result.refresh_token,
+        value=refresh_token,
         httponly=True,
         secure=False,
         samesite="lax",
@@ -112,10 +117,10 @@ async def refresh(
 ) -> SuccessResponse[LoginResponse]:
     service = AuthService(session)
 
-    result = await service.refresh(refresh_token)
+    access_token, new_refresh_token = await service.refresh(refresh_token)
 
     data = LoginResponse(
-        access_token=result.access_token,
+        access_token=access_token,
         token_type="bearer",
     )
 
@@ -126,7 +131,7 @@ async def refresh(
 
     response.set_cookie(
         key="refresh_token",
-        value=result.refresh_token,
+        value=new_refresh_token,
         httponly=True,
         secure=False,
         samesite="lax",
@@ -142,7 +147,7 @@ async def refresh(
     status_code=status.HTTP_204_NO_CONTENT,
     responses={
         **INTERNAL_SERVER_ERROR_RESPONSE,
-        **UNAUTHORIZED_RESPONSE,
+        **LOGOUT_UNAUTHORIZED_RESPONSE,
         **VALIDATION_RESPONSE,
     },
 )
@@ -183,12 +188,11 @@ async def logout_all(
 ) -> None:
     service = AuthService(session)
 
-    if logout_all_context is not None:
-        await service.logout_all(
-            refresh_token,
-            logout_all_context["user"],
-            logout_all_context["token_version"],
-        )
+    await service.logout_all(
+        refresh_token,
+        logout_all_context["user"],
+        logout_all_context["token_version"],
+    )
 
     response.delete_cookie(
         key="refresh_token",

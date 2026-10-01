@@ -1,12 +1,13 @@
 from math import ceil
 
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, Query, Response, status
 
 from app.api.deps import DBSession
 from app.api.responses import success_response
 from app.api.v1.dependencies import AdminUser, CurrentUser
 from app.api.v1.responses import (
     BAD_REQUEST_RESPONSE,
+    FORBIDDEN_RESPONSE,
     INTERNAL_SERVER_ERROR_RESPONSE,
     UNAUTHORIZED_RESPONSE,
     VALIDATION_RESPONSE,
@@ -31,6 +32,8 @@ router = APIRouter(
     tags=["Users"],
 )
 
+COOKIE_PATH = "/api/v1/auth"
+
 
 @router.get(
     "/me",
@@ -51,8 +54,8 @@ async def get_me(
     )
 
 
-@router.post(
-    "/me/change-password",
+@router.patch(
+    "/me/password",
     status_code=status.HTTP_200_OK,
     description=(
         "Change the authenticated user's password. "
@@ -68,6 +71,7 @@ async def get_me(
     },
 )
 async def change_password(
+    response: Response,
     data: ChangePasswordRequest,
     current_user: CurrentUser,
     session: DBSession,
@@ -78,6 +82,14 @@ async def change_password(
         user=current_user,
         current_password=data.current_password,
         new_password=data.new_password,
+    )
+
+    response.delete_cookie(
+        key="refresh_token",
+        httponly=True,
+        secure=False,
+        samesite="lax",
+        path=COOKIE_PATH,
     )
 
     return success_response(
@@ -137,6 +149,7 @@ async def get_my_assets(
     "",
     status_code=status.HTTP_200_OK,
     responses={
+        **FORBIDDEN_RESPONSE,
         **INTERNAL_SERVER_ERROR_RESPONSE,
         **UNAUTHORIZED_RESPONSE,
         **VALIDATION_RESPONSE,

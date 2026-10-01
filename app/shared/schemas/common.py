@@ -1,4 +1,4 @@
-from typing import Generic, TypeVar
+from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel, ConfigDict
 
@@ -24,7 +24,7 @@ class SuccessResponse(APIModel, Generic[DataT]):
 
 
 class PaginatedSuccessResponse(SuccessResponse[DataT], Generic[DataT]):
-    pagintion: PaginationMeta
+    pagination: PaginationMeta
 
 
 class ErrorDetail(APIModel):
@@ -37,6 +37,12 @@ class APIError(APIModel):
     message: str
 
 
+class DetailedAPIError(APIModel):
+    code: str
+    message: str
+    details: dict[str, Any]
+
+
 class ValidationAPIError(APIModel):
     code: str
     message: str
@@ -45,6 +51,10 @@ class ValidationAPIError(APIModel):
 
 class ErrorResponse(APIModel):
     error: APIError
+
+
+class DetailedErrorResponse(APIModel):
+    error: DetailedAPIError
 
 
 class ValidationErrorResponse(APIModel):

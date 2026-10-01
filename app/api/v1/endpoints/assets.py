@@ -20,6 +20,7 @@ from app.api.v1.schemas.assets import (
     AssetAssign,
     AssetCreate,
     AssetResponse,
+    AssetStatsResponse,
     AssetStatusUpdate,
     AssetUpdate,
 )
@@ -55,7 +56,13 @@ async def create_asset(
 ) -> SuccessResponse[AssetResponse]:
     service = AssetService(session)
 
-    asset = await service.create(data)
+    asset = await service.create(
+        asset_type=data.type,
+        serial_number=data.serial_number,
+        purchase_date=data.purchase_date,
+        warranty_expiry=data.warranty_expiry,
+        notes=data.notes,
+    )
 
     return success_response(
         status_code=status.HTTP_201_CREATED,
@@ -82,7 +89,10 @@ async def list_assets(
     page: int = Query(default=1, ge=1, le=1000),
     size: int = Query(default=20, ge=1, le=100),
     asset_type: AssetType | None = Query(default=None, alias="type"),
-    asset_status: AssetStatus | None = None,
+    asset_status: AssetStatus | None = Query(
+        default=None,
+        alias="status",
+    ),
     assigned_to: UUID | None = None,
     warranty_expiring_before: date | None = None,
     search: str | None = None,
@@ -138,10 +148,10 @@ async def list_assets(
 async def get_asset_stats(
     session: DBSession,
     _admin_user: AdminUser,
-) -> SuccessResponse[dict[str, int]]:
+) -> SuccessResponse[AssetStatsResponse]:
     service = AssetService(session)
 
-    result = await service.summary()
+    result = await service.stats()
 
     return success_response(
         status_code=status.HTTP_200_OK,
@@ -185,6 +195,7 @@ async def get_by_id(
     tags=["Assets Update"],
     status_code=status.HTTP_200_OK,
     responses={
+        **CONFLICT_RESPONSE,
         **FORBIDDEN_RESPONSE,
         **INTERNAL_SERVER_ERROR_RESPONSE,
         **NOT_FOUND_RESPONSE,
@@ -200,9 +211,11 @@ async def update_asset(
 ) -> SuccessResponse[AssetResponse]:
     service = AssetService(session)
 
+    update_data = data.model_dump(exclude_unset=True)
+
     asset = await service.update(
         asset_id=id,
-        data=data,
+        update_data=update_data,
     )
 
     return success_response(
@@ -238,7 +251,7 @@ async def delete_asset(
 
 @router.post(
     "/{id}/assign",
-    tags=["Assets Assign/Un-Assign"],
+    tags=["Asset Assignment"],
     status_code=status.HTTP_200_OK,
     responses={
         **CONFLICT_RESPONSE,
@@ -272,7 +285,7 @@ async def assign_asset(
 
 @router.post(
     "/{id}/unassign",
-    tags=["Assets Assign/Un-Assign"],
+    tags=["Asset Assignment"],
     status_code=status.HTTP_200_OK,
     responses={
         **CONFLICT_RESPONSE,
