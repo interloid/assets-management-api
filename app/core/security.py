@@ -8,12 +8,13 @@ from pwdlib import PasswordHash
 from uuid6 import uuid7
 
 from app.core.config import settings
-from app.exceptions.auth import InvalidTokenError
+from app.core.exceptions import InvalidAccessTokenError
 
 password_hash = PasswordHash.recommended()
 
 
 TIMING_HASH = "$argon2id$v=19$m=65536,t=3,p=4$91VoC3BeweKJ+9VtlmV6fg$+Na3rOKaPG06lZZsQBNTHhA0YPMBm/WwRLm655fxaC0"
+MAX_LOGOUT_GRACE_SECONDS = settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60
 
 
 def hash_password(password: str) -> str:
@@ -37,6 +38,7 @@ def create_access_token(
     user_id: str,
     role: str,
     token_version: int,
+    family_id: str,
 ) -> str:
     now = datetime.now(timezone.utc)
     expires_at = now + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -48,10 +50,13 @@ def create_access_token(
         "exp": expires_at,
         "jti": str(uuid7()),
         "token_version": token_version,
+        "family_id": family_id,
     }
 
     return jwt.encode(
-        payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM
+        payload,
+        settings.JWT_SECRET_KEY,
+        algorithm=settings.JWT_ALGORITHM,
     )
 
 
@@ -69,14 +74,48 @@ def decode_access_token(token: str) -> dict[str, Any]:
                     "exp",
                     "jti",
                     "token_version",
+                    "family_id",
                 ],
             },
         )
 
     except jwt.InvalidTokenError as exc:
-        raise InvalidTokenError() from exc
+        raise InvalidAccessTokenError() from exc
 
     return payload
+
+
+def decode_access_token_allow_expired(token: str) -> dict[str, Any]:
+    try:
+        payload = jwt.decode(
+            token,
+            settings.JWT_SECRET_KEY,
+            algorithms=[settings.JWT_ALGORITHM],
+            options={
+                "require": [
+                    "sub",
+                    "role",
+                    "iat",
+                    "exp",
+                    "jti",
+                    "token_version",
+                    "family_id",
+                ],
+                "verify_exp": False,
+            },
+        )
+
+    except jwt.InvalidTokenError as exc:
+        raise InvalidAccessTokenError() from exc
+
+    return payload
+
+
+def validate_logout_token_expiry(exp: int | float) -> None:
+    now = datetime.now(timezone.utc).timestamp()
+
+    if exp < now - MAX_LOGOUT_GRACE_SECONDS:
+        raise InvalidAccessTokenError()
 
 
 def get_token_remaining_seconds(exp: int | float) -> int:

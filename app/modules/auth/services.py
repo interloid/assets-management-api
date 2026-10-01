@@ -1,0 +1,309 @@
+from datetime import datetime, timedelta, timezone
+from typing import Any
+from uuid import UUID
+
+from redis.asyncio import Redis
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
+from uuid6 import uuid7
+
+from app.core.config import settings
+from app.core.exceptions import InvalidAccessTokenError
+from app.core.security import (
+    TIMING_HASH,
+    create_access_token,
+    generate_refresh_token,
+    hash_password,
+    hash_refresh_token,
+    verify_password,
+)
+from app.modules.auth.exceptions import (
+    EmailAlreadyRegisteredError,
+    InvalidCredentialsError,
+    InvalidRefreshTokenError,
+    RefreshTokenReuseError,
+    SamePasswordError,
+    UserInactiveError,
+)
+from app.modules.auth.jwt_blacklist import blacklist_access_token_family
+from app.modules.auth.repositories import RefreshTokenRepository
+from app.modules.user.exceptions import InvalidCurrentPasswordError
+from app.modules.user.models import User
+from app.modules.user.repositories import UserRepository
+
+
+class AuthService:
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+        self.user_repository = UserRepository(session)
+        self.refresh_token_repository = RefreshTokenRepository(session)
+
+    async def register(
+        self,
+        *,
+        email: str,
+        password: str,
+        full_name: str,
+    ) -> User:
+        existing_user = await self.user_repository.get_by_email(email)
+
+        if existing_user is not None:
+            raise EmailAlreadyRegisteredError()
+
+        password_hash = hash_password(password)
+
+        try:
+            user = await self.user_repository.create(
+                email=email,
+                password_hash=password_hash,
+                full_name=full_name,
+            )
+
+            await self.session.commit()
+
+        except IntegrityError as exc:
+            await self.session.rollback()
+
+            raise EmailAlreadyRegisteredError() from exc
+
+        return user
+
+    async def login(
+        self,
+        *,
+        email: str,
+        password: str,
+    ) -> tuple[str, str]:
+        user = await self.user_repository.get_by_email(email)
+
+        password_hash = user.password_hash if user is not None else TIMING_HASH
+        password_valid = verify_password(password, password_hash)
+
+        if user is None or not password_valid:
+            raise InvalidCredentialsError()
+
+        if not user.is_active:
+            raise InvalidCredentialsError()
+
+        family_id = uuid7()
+
+        access_token = create_access_token(
+            user_id=str(user.id),
+            role=user.role.value,
+            token_version=user.token_version,
+            family_id=str(family_id),
+        )
+
+        refresh_token = generate_refresh_token()
+        refresh_token_hash = hash_refresh_token(refresh_token)
+
+        expires_at = datetime.now(timezone.utc) + timedelta(
+            days=settings.REFRESH_TOKEN_EXPIRE_DAYS
+        )
+
+        await self.refresh_token_repository.create(
+            user_id=user.id,
+            token_hash=refresh_token_hash,
+            family_id=family_id,
+            expires_at=expires_at,
+        )
+
+        await self.session.commit()
+
+        return access_token, refresh_token
+
+    async def refresh(
+        self,
+        refresh_token: str,
+    ) -> tuple[str, str]:
+        if not refresh_token:
+            raise InvalidRefreshTokenError()
+
+        token_hash = hash_refresh_token(refresh_token)
+
+        stored_token = await self.refresh_token_repository.get_by_hash(
+            token_hash,
+            for_update=True,
+        )
+
+        if stored_token is None:
+            raise InvalidRefreshTokenError()
+
+        now = datetime.now(timezone.utc)
+
+        if stored_token.revoked_at is not None:
+            await self.refresh_token_repository.revoke_family(
+                stored_token.family_id,
+            )
+
+            user = await self.user_repository.get_by_id(
+                stored_token.user_id,
+            )
+
+            if user is not None:
+                await self.user_repository.increment_token_version(user)
+
+            await self.session.commit()
+
+            raise RefreshTokenReuseError()
+
+        if stored_token.expires_at <= now:
+            await self.session.rollback()
+
+            raise InvalidRefreshTokenError()
+
+        user = await self.user_repository.get_by_id(
+            stored_token.user_id,
+        )
+
+        if user is None:
+            await self.session.rollback()
+            raise InvalidRefreshTokenError()
+
+        if not user.is_active:
+            await self.session.rollback()
+
+            raise UserInactiveError()
+
+        family_id = stored_token.family_id
+
+        new_refresh_token = generate_refresh_token()
+
+        new_refresh_token_hash = hash_refresh_token(
+            new_refresh_token,
+        )
+
+        new_expires_at = now + timedelta(
+            days=settings.REFRESH_TOKEN_EXPIRE_DAYS,
+        )
+
+        await self.refresh_token_repository.revoke(
+            stored_token.id,
+        )
+
+        await self.refresh_token_repository.create(
+            user_id=user.id,
+            token_hash=new_refresh_token_hash,
+            family_id=family_id,
+            expires_at=new_expires_at,
+        )
+
+        access_token = create_access_token(
+            user_id=str(user.id),
+            role=user.role.value,
+            token_version=user.token_version,
+            family_id=str(family_id),
+        )
+
+        await self.session.commit()
+
+        return access_token, new_refresh_token
+
+    async def logout(
+        self,
+        refresh_token: str | None,
+        access_token_payload: dict[str, Any] | None,
+        redis_client: Redis | None,
+    ) -> None:
+        family_id = None
+
+        if access_token_payload is not None:
+            family_id = UUID(access_token_payload["family_id"])
+
+        if refresh_token:
+            token_hash = hash_refresh_token(refresh_token)
+
+            stored_token = await self.refresh_token_repository.get_by_hash(
+                token_hash,
+            )
+
+            if stored_token is not None:
+                if (
+                    access_token_payload is not None
+                    and str(stored_token.user_id) != access_token_payload["sub"]
+                ):
+                    raise InvalidAccessTokenError()
+
+                refresh_family_id = stored_token.family_id
+
+                if family_id is not None and refresh_family_id != family_id:
+                    raise InvalidAccessTokenError()
+
+                family_id = refresh_family_id
+
+        if family_id is not None:
+            await self.refresh_token_repository.revoke_family(
+                family_id,
+            )
+
+            if redis_client:
+                await blacklist_access_token_family(
+                    redis_client,
+                    family_id=str(family_id),
+                    expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+                )
+
+        await self.session.commit()
+
+    async def logout_all(
+        self,
+        refresh_token: str | None,
+        current_user: User,
+        access_token_version: int,
+    ) -> None:
+        # Stale token: already invalidated by a newer token version.
+        if access_token_version < current_user.token_version:
+            return
+
+        # Future token version: inconsistent with server state, so reject it.
+        if access_token_version > current_user.token_version:
+            raise InvalidAccessTokenError()
+
+        if refresh_token:
+            token_hash = hash_refresh_token(refresh_token)
+
+            stored_token = await self.refresh_token_repository.get_by_hash(
+                token_hash,
+            )
+
+            if stored_token is not None:  # 2
+                if stored_token.user_id != current_user.id:
+                    raise InvalidRefreshTokenError()
+
+        await self.refresh_token_repository.revoke_user(
+            current_user.id,
+        )
+
+        await self.user_repository.increment_token_version(
+            current_user,
+        )
+
+        await self.session.commit()
+
+    async def change_password(
+        self,
+        user: User,
+        current_password: str,
+        new_password: str,
+    ) -> None:
+        if not verify_password(
+            current_password,
+            user.password_hash,
+        ):
+            raise InvalidCurrentPasswordError()
+
+        if verify_password(new_password, user.password_hash):
+            raise SamePasswordError()
+
+        new_password_hash = hash_password(new_password)
+
+        await self.user_repository.update_password(
+            user,
+            new_password_hash,
+        )
+
+        await self.refresh_token_repository.revoke_user(user.id)
+
+        await self.user_repository.increment_token_version(user)
+
+        await self.session.commit()
