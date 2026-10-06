@@ -3,7 +3,6 @@ from fastapi import APIRouter, status
 from app.api.deps import DBSession, RedisClient
 from app.api.health.schemas import HealthResponse, HomeResponse
 from app.api.health.service import check_dependencies
-from app.api.responses import success_response
 from app.core.exceptions import ServiceUnavailableError
 from app.shared.schemas.common import DetailedErrorResponse, SuccessResponse
 
@@ -42,7 +41,7 @@ async def health_check(session: DBSession, redis_client: RedisClient):
     status_code=status.HTTP_200_OK,
 )
 async def home() -> SuccessResponse[HomeResponse]:
-    return success_response(
+    return SuccessResponse(
         status_code=status.HTTP_200_OK,
         data=HomeResponse(
             name="Assets Management API",

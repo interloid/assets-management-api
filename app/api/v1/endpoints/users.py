@@ -3,7 +3,6 @@ from math import ceil
 from fastapi import APIRouter, Query, Response, status
 
 from app.api.deps import DBSession
-from app.api.responses import success_response
 from app.api.v1.dependencies import AdminUser, CurrentUser
 from app.api.v1.responses import (
     BAD_REQUEST_RESPONSE,
@@ -18,6 +17,7 @@ from app.api.v1.schemas.auth import (
     UserListResponse,
     UserResponse,
 )
+from app.core.config import settings
 from app.modules.asset.services import AssetService
 from app.modules.auth.services import AuthService
 from app.modules.user.services import UserService
@@ -46,7 +46,7 @@ COOKIE_PATH = "/api/v1/auth"
 async def get_me(
     current_user: CurrentUser,
 ) -> SuccessResponse[UserResponse]:
-    return success_response(
+    return SuccessResponse(
         status_code=status.HTTP_200_OK,
         data=UserResponse.model_validate(current_user).model_dump(
             mode="json",
@@ -84,18 +84,20 @@ async def change_password(
         new_password=data.new_password,
     )
 
+    result = SuccessResponse(
+        status_code=status.HTTP_200_OK,
+        data={"message": "Password changed successfully"},
+    )
+
     response.delete_cookie(
         key="refresh_token",
         httponly=True,
-        secure=False,
+        secure=settings.ENVIRONMENT == "production",
         samesite="lax",
         path=COOKIE_PATH,
     )
 
-    return success_response(
-        status_code=status.HTTP_200_OK,
-        data={"message": "Password changed successfully"},
-    )
+    return result
 
 
 @router.get(
@@ -138,7 +140,7 @@ async def get_my_assets(
         total_items=total,
     ).model_dump(mode="json")
 
-    return success_response(
+    return PaginatedSuccessResponse(
         status_code=status.HTTP_200_OK,
         data=data,
         pagination=pagination,
@@ -183,7 +185,7 @@ async def list_users(
         total_items=total,
     ).model_dump(mode="json")
 
-    return success_response(
+    return PaginatedSuccessResponse(
         status_code=status.HTTP_200_OK,
         data=data,
         pagination=pagination,

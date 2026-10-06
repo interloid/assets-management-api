@@ -166,7 +166,7 @@ AdminUser = Annotated[
 
 
 LogoutAccessTokenPayload = Annotated[
-    dict[str, Any],
+    dict[str, Any] | None,
     Depends(get_logout_access_token),
 ]
 

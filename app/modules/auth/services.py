@@ -266,7 +266,7 @@ class AuthService:
                 token_hash,
             )
 
-            if stored_token is not None:  # 2
+            if stored_token is not None:
                 if stored_token.user_id != current_user.id:
                     raise InvalidRefreshTokenError()
 

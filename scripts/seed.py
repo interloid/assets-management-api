@@ -77,7 +77,7 @@ ASSET_SEED_DATA = [
         "serial_number": "SN-LAP-0005",
         "purchase_date": date(2022, 4, 20),
         "warranty_expiry": date(2025, 4, 20),
-        "notes": "Retired laptop",
+        "notes": "Dell laptop",
     },
     # Monitors
     {
@@ -118,7 +118,7 @@ ASSET_SEED_DATA = [
         "serial_number": "SN-MON-0005",
         "purchase_date": date(2021, 3, 15),
         "warranty_expiry": date(2024, 3, 15),
-        "notes": "Retired monitor",
+        "notes": "48-inch Monitor",
     },
     # Phones
     {
@@ -127,7 +127,7 @@ ASSET_SEED_DATA = [
         "serial_number": "SN-PHN-0001",
         "purchase_date": date(2026, 3, 1),
         "warranty_expiry": date(2028, 3, 1),
-        "notes": "Company mobile phone",
+        "notes": "Samsung mobile phone",
     },
     {
         "type": AssetType.PHONE,
@@ -135,7 +135,7 @@ ASSET_SEED_DATA = [
         "serial_number": "SN-PHN-0002",
         "purchase_date": date(2026, 3, 2),
         "warranty_expiry": date(2028, 3, 2),
-        "notes": "Company mobile phone",
+        "notes": "Vivo mobile phone",
     },
     {
         "type": AssetType.PHONE,
@@ -159,7 +159,7 @@ ASSET_SEED_DATA = [
         "serial_number": "SN-PHN-0005",
         "purchase_date": date(2021, 6, 1),
         "warranty_expiry": date(2023, 6, 1),
-        "notes": "Retired mobile phone",
+        "notes": "Company mobile phone",
     },
     # Accessories
     {
@@ -168,7 +168,7 @@ ASSET_SEED_DATA = [
         "serial_number": "SN-ACC-0001",
         "purchase_date": date(2026, 4, 1),
         "warranty_expiry": date(2028, 4, 1),
-        "notes": "USB-C docking station",
+        "notes": "USB docking station",
     },
     {
         "type": AssetType.ACCESSORY,
@@ -200,7 +200,7 @@ ASSET_SEED_DATA = [
         "serial_number": "SN-ACC-0005",
         "purchase_date": date(2021, 8, 1),
         "warranty_expiry": date(2023, 8, 1),
-        "notes": "Retired accessory",
+        "notes": "USB-C docking station",
     },
 ]
 

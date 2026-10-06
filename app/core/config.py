@@ -5,10 +5,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    ENVIRONMENT: str = "development"
     DATABASE_URL: PostgresDsn
     REDIS_URL: RedisDsn
 
-    JWT_SECRET_KEY: str
+    JWT_SECRET_KEY: str = Field(min_length=32)
     JWT_ALGORITHM: Literal["HS256"]
 
     ACCESS_TOKEN_EXPIRE_MINUTES: PositiveInt
@@ -19,8 +20,7 @@ class Settings(BaseSettings):
     SEED_USER_PASSWORD: str
 
     model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
+        env_file=".env", env_file_encoding="utf-8", extra="ignore"
     )
 
 

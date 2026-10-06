@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Response, status
 
 from app.api.deps import DBSession, RedisClient
-from app.api.responses import success_response
 from app.api.v1.dependencies import (
     LogoutAccessTokenPayload,
     LogoutAllContext,
@@ -53,7 +52,7 @@ async def register(
         full_name=data.full_name,
     )
 
-    return success_response(
+    return SuccessResponse(
         status_code=status.HTTP_201_CREATED,
         data=UserResponse.model_validate(user).model_dump(mode="json"),
     )
@@ -69,6 +68,7 @@ async def register(
     },
 )
 async def login(
+    response: Response,
     payload: LoginRequest,
     session: DBSession,
 ) -> SuccessResponse[LoginResponse]:
@@ -84,22 +84,20 @@ async def login(
         token_type="bearer",
     )
 
-    response = success_response(
-        status_code=status.HTTP_200_OK,
-        data=data.model_dump(mode="json"),
-    )
-
     response.set_cookie(
         key="refresh_token",
         value=refresh_token,
         httponly=True,
-        secure=False,
+        secure=settings.ENVIRONMENT == "production",
         samesite="lax",
         max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
         path=COOKIE_PATH,
     )
 
-    return response
+    return SuccessResponse(
+        status_code=status.HTTP_200_OK,
+        data=data.model_dump(mode="json"),
+    )
 
 
 @router.post(
@@ -112,6 +110,7 @@ async def login(
     },
 )
 async def refresh(
+    response: Response,
     session: DBSession,
     refresh_token: RefreshToken = None,
 ) -> SuccessResponse[LoginResponse]:
@@ -124,22 +123,20 @@ async def refresh(
         token_type="bearer",
     )
 
-    response = success_response(
-        status_code=status.HTTP_200_OK,
-        data=data.model_dump(mode="json"),
-    )
-
     response.set_cookie(
         key="refresh_token",
         value=new_refresh_token,
         httponly=True,
-        secure=False,
+        secure=settings.ENVIRONMENT == "production",
         samesite="lax",
         max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
         path=COOKIE_PATH,
     )
 
-    return response
+    return SuccessResponse(
+        status_code=status.HTTP_200_OK,
+        data=data.model_dump(mode="json"),
+    )
 
 
 @router.post(
@@ -165,7 +162,7 @@ async def logout(
     response.delete_cookie(
         key="refresh_token",
         httponly=True,
-        secure=False,
+        secure=settings.ENVIRONMENT == "production",
         samesite="lax",
         path=COOKIE_PATH,
     )
@@ -197,7 +194,7 @@ async def logout_all(
     response.delete_cookie(
         key="refresh_token",
         httponly=True,
-        secure=False,
+        secure=settings.ENVIRONMENT == "production",
         samesite="lax",
         path=COOKIE_PATH,
     )

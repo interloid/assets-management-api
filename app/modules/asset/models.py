@@ -56,7 +56,7 @@ class Asset(
 
     assigned_to: Mapped[UUID | None] = mapped_column(
         PG_UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="SET NULL"),
+        ForeignKey("users.id", ondelete="RESTRICT"),
         nullable=True,
         index=True,
     )

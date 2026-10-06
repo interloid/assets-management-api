@@ -217,7 +217,7 @@ async def test_list_assets_supports_pagination(
     "query, expected_serial",
     [
         ("type=laptop", "SN-FILTER-LAPTOP"),
-        ("asset_status=in_stock", "SN-FILTER-STATUS"),
+        ("status=in_stock", "SN-FILTER-STATUS"),
         ("search=dell", "SN-FILTER-SEARCH"),
         (
             "warranty_expiring_before=2026-12-31",
@@ -292,7 +292,7 @@ async def test_list_assets_combines_filters_with_and(
     )
 
     response = await integration_client.get(
-        "/api/v1/assets?type=laptop&asset_status=in_stock&search=development",
+        "/api/v1/assets?type=laptop&status=in_stock&search=development",
         headers={"Authorization": f"Bearer {admin_access_token}"},
     )
 

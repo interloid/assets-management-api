@@ -93,7 +93,7 @@ class AssetService:
         asset_type: AssetType,
         serial_number: str,
         purchase_date: date,
-        warranty_expiry: date,
+        warranty_expiry: date | None,
         notes: str | None,
     ) -> Asset:
         company_prefix = get_company_prefix()

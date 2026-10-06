@@ -6,7 +6,6 @@ from uuid import UUID
 from fastapi import APIRouter, Query, status
 
 from app.api.deps import DBSession
-from app.api.responses import success_response
 from app.api.v1.dependencies import AdminUser, CurrentUser
 from app.api.v1.responses import (
     CONFLICT_RESPONSE,
@@ -64,7 +63,7 @@ async def create_asset(
         notes=data.notes,
     )
 
-    return success_response(
+    return SuccessResponse(
         status_code=status.HTTP_201_CREATED,
         data=AssetResponse.model_validate(
             asset,
@@ -128,7 +127,7 @@ async def list_assets(
         total_items=total,
     ).model_dump(mode="json")
 
-    return success_response(
+    return PaginatedSuccessResponse(
         status_code=status.HTTP_200_OK,
         data=data,
         pagination=pagination,
@@ -153,7 +152,7 @@ async def get_asset_stats(
 
     result = await service.stats()
 
-    return success_response(
+    return SuccessResponse(
         status_code=status.HTTP_200_OK,
         data=result,
     )
@@ -182,7 +181,7 @@ async def get_by_id(
         current_user=current_user,
     )
 
-    return success_response(
+    return SuccessResponse(
         status_code=status.HTTP_200_OK,
         data=AssetResponse.model_validate(
             asset,
@@ -218,7 +217,7 @@ async def update_asset(
         update_data=update_data,
     )
 
-    return success_response(
+    return SuccessResponse(
         status_code=status.HTTP_200_OK,
         data=AssetResponse.model_validate(
             asset,
@@ -275,7 +274,7 @@ async def assign_asset(
         user_id=data.user_id,
     )
 
-    return success_response(
+    return SuccessResponse(
         status_code=status.HTTP_200_OK,
         data=AssetResponse.model_validate(
             asset,
@@ -305,7 +304,7 @@ async def unassign_asset(
 
     asset = await service.unassign(id)
 
-    return success_response(
+    return SuccessResponse(
         status_code=status.HTTP_200_OK,
         data=AssetResponse.model_validate(
             asset,
@@ -339,7 +338,7 @@ async def change_status(
         data.status,
     )
 
-    return success_response(
+    return SuccessResponse(
         status_code=status.HTTP_200_OK,
         data=AssetResponse.model_validate(
             asset,

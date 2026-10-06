@@ -32,6 +32,7 @@ class RefreshToken(BaseModel, CreatedAtMixin):
     family_id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True),
         nullable=False,
+        index=True,
     )
 
     expires_at: Mapped[datetime] = mapped_column(
