@@ -218,6 +218,26 @@ async def test_list_assets_supports_pagination(
 
 
 @pytest.mark.asyncio
+async def test_list_assets_returns_empty_results(
+    integration_client: AsyncClient,
+    admin_access_token: str,
+) -> None:
+    integration_client.cookies.set("access_token", admin_access_token)
+
+    response = await integration_client.get(
+        "/api/v1/assets?search=NO-MATCHING-ASSET",
+    )
+
+    assert response.status_code == 200
+
+    body = response.json()
+
+    assert body["data"] == []
+    assert body["pagination"]["total_items"] == 0
+    assert body["pagination"]["total_pages"] == 0
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "query, expected_serial",
     [
