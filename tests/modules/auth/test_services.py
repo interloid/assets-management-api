@@ -3,6 +3,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from fastapi import Response
 from sqlalchemy.exc import IntegrityError
 from uuid6 import uuid7
 
@@ -1249,7 +1250,7 @@ async def test_get_current_user_success(
     created_user.id = uuid7()
     created_user.token_version = 0
 
-    family_id = str(uuid7())
+    family_id = uuid7()
 
     mock_repository = AsyncMock()
     mock_repository.get_by_id.return_value = created_user
@@ -1261,7 +1262,7 @@ async def test_get_current_user_success(
                 "sub": str(created_user.id),
                 "jti": "jti-123",
                 "token_version": 0,
-                "family_id": family_id,
+                "family_id": str(family_id),
             },
         ),
         patch(
@@ -1276,8 +1277,10 @@ async def test_get_current_user_success(
     ):
         result = await get_current_user(
             access_token=token,
+            refresh_token="valid-refresh-token",
             session=mock_session,
             redis_client=mock_redis,
+            response=Response(),
         )
 
     assert result is created_user
@@ -1330,8 +1333,10 @@ async def test_get_current_user_redis_miss(
     ):
         result = await get_current_user(
             access_token=token,
+            refresh_token="valid-refresh-token",
             session=mock_session,
             redis_client=mock_redis,
+            response=Response(),
         )
 
     assert result is created_user
@@ -1380,6 +1385,7 @@ async def test_get_current_user_token_version_mismatch(
                 access_token="valid-access-token",
                 session=mock_session,
                 redis_client=mock_redis,
+                response=Response(),
             )
 
     mock_repository.get_by_id.assert_awaited_once_with(
