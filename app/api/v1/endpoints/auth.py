@@ -86,7 +86,7 @@ async def login(
         value=access_token,
         httponly=True,
         secure=settings.ENVIRONMENT == "production",
-        samesite="lax",
+        samesite="none",
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         path=ACCESS_TOKEN_COOKIE_PATH,
     )
@@ -96,7 +96,7 @@ async def login(
         value=refresh_token,
         httponly=True,
         secure=settings.ENVIRONMENT == "production",
-        samesite="lax",
+        samesite="none",
         max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
         path=REFRESH_TOKEN_COOKIE_PATH,
     )
@@ -127,7 +127,7 @@ async def refresh(
         value=access_token,
         httponly=True,
         secure=settings.ENVIRONMENT == "production",
-        samesite="lax",
+        samesite="none",
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         path=ACCESS_TOKEN_COOKIE_PATH,
     )
@@ -137,7 +137,7 @@ async def refresh(
         value=new_refresh_token,
         httponly=True,
         secure=settings.ENVIRONMENT == "production",
-        samesite="lax",
+        samesite="none",
         max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
         path=REFRESH_TOKEN_COOKIE_PATH,
     )

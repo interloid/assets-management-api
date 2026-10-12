@@ -19,7 +19,7 @@ class Settings(BaseSettings):
 
     SEED_USER_PASSWORD: str
 
-    CORS_ORIGIN: list[str]
+    CORS_ORIGINS: str
 
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", extra="ignore"
