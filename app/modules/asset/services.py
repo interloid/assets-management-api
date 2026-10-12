@@ -234,10 +234,13 @@ class AssetService:
         return asset
 
     async def delete(self, asset_id: UUID) -> None:
-        asset = await self.asset_repository.get_by_id(asset_id)
+        asset = await self.asset_repository.get_by_id_including_deleted(asset_id)
 
         if asset is None:
             raise AssetNotFoundError()
+
+        if asset.deleted_at is not None:
+            return
 
         if asset.status not in {
             AssetStatus.IN_STOCK,

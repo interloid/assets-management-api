@@ -1,9 +1,10 @@
-from datetime import date
+from datetime import date, datetime
 from typing import Literal
 from uuid import UUID
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.modules.asset.models import Asset
 from app.shared.models.enums import AssetStatus, AssetType
@@ -39,7 +40,7 @@ class AssetRepository:
         sort: Literal["created_at", "purchase_date", "asset_tag"] = "created_at",
         order: Literal["asc", "desc"] = "desc",
     ) -> tuple[list[Asset], int]:
-        filters = []
+        filters = [Asset.deleted_at.is_(None)]
 
         if asset_type is not None:
             filters.append(Asset.type == asset_type)
@@ -73,6 +74,7 @@ class AssetRepository:
         offset = (page - 1) * size
         query = (
             select(Asset, func.count().over().label("total_count"))
+            .options(selectinload(Asset.assigned_user))
             .where(*filters)
             .order_by(*order_clauses)
             .offset(offset)
@@ -95,7 +97,25 @@ class AssetRepository:
         self,
         asset_id: UUID,
     ) -> Asset | None:
-        stmt = select(Asset).where(Asset.id == asset_id)
+        stmt = (
+            select(Asset)
+            .options(selectinload(Asset.assigned_user))
+            .where(Asset.id == asset_id, Asset.deleted_at.is_(None))
+        )
+        result = await self.session.execute(stmt)
+
+        return result.scalar_one_or_none()
+
+    async def get_by_id_including_deleted(
+        self,
+        asset_id: UUID,
+    ) -> Asset | None:
+        stmt = (
+            select(Asset)
+            .options(selectinload(Asset.assigned_user))
+            .where(Asset.id == asset_id)
+        )
+
         result = await self.session.execute(stmt)
 
         return result.scalar_one_or_none()
@@ -117,7 +137,9 @@ class AssetRepository:
         self,
         asset: Asset,
     ) -> None:
-        await self.session.delete(asset)
+        if asset.deleted_at is not None:
+            return
+        asset.deleted_at = datetime.now()
         await self.session.flush()
 
     async def assign(
@@ -162,10 +184,14 @@ class AssetRepository:
         return asset
 
     async def stats(self) -> dict[AssetStatus, int]:
-        stmt = select(
-            Asset.status,
-            func.count(Asset.id).label("count"),
-        ).group_by(Asset.status)
+        stmt = (
+            select(
+                Asset.status,
+                func.count(Asset.id).label("count"),
+            )
+            .where(Asset.deleted_at.is_(None))
+            .group_by(Asset.status)
+        )
 
         result = await self.session.execute(stmt)
 

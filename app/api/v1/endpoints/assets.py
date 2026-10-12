@@ -64,7 +64,6 @@ async def create_asset(
     )
 
     return SuccessResponse(
-        status_code=status.HTTP_201_CREATED,
         data=AssetResponse.model_validate(
             asset,
         ).model_dump(mode="json"),
@@ -128,7 +127,6 @@ async def list_assets(
     ).model_dump(mode="json")
 
     return PaginatedSuccessResponse(
-        status_code=status.HTTP_200_OK,
         data=data,
         pagination=pagination,
     )
@@ -153,7 +151,6 @@ async def get_asset_stats(
     result = await service.stats()
 
     return SuccessResponse(
-        status_code=status.HTTP_200_OK,
         data=result,
     )
 
@@ -182,7 +179,6 @@ async def get_by_id(
     )
 
     return SuccessResponse(
-        status_code=status.HTTP_200_OK,
         data=AssetResponse.model_validate(
             asset,
         ).model_dump(mode="json"),
@@ -218,7 +214,6 @@ async def update_asset(
     )
 
     return SuccessResponse(
-        status_code=status.HTTP_200_OK,
         data=AssetResponse.model_validate(
             asset,
         ).model_dump(mode="json"),
@@ -275,7 +270,6 @@ async def assign_asset(
     )
 
     return SuccessResponse(
-        status_code=status.HTTP_200_OK,
         data=AssetResponse.model_validate(
             asset,
         ).model_dump(mode="json"),
@@ -305,7 +299,6 @@ async def unassign_asset(
     asset = await service.unassign(id)
 
     return SuccessResponse(
-        status_code=status.HTTP_200_OK,
         data=AssetResponse.model_validate(
             asset,
         ).model_dump(mode="json"),
@@ -339,7 +332,6 @@ async def change_status(
     )
 
     return SuccessResponse(
-        status_code=status.HTTP_200_OK,
         data=AssetResponse.model_validate(
             asset,
         ).model_dump(mode="json"),

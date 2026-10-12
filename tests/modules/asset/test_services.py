@@ -245,7 +245,7 @@ async def test_delete_asset(
         purchase_date=date(2026, 1, 1),
     )
 
-    service.asset_repository.get_by_id = AsyncMock(
+    service.asset_repository.get_by_id_including_deleted = AsyncMock(
         return_value=asset,
     )
 
@@ -253,7 +253,7 @@ async def test_delete_asset(
 
     await service.delete(asset.id)
 
-    service.asset_repository.get_by_id.assert_awaited_once_with(
+    service.asset_repository.get_by_id_including_deleted.assert_awaited_once_with(
         asset.id,
     )
 
@@ -287,7 +287,7 @@ async def test_delete_asset_rejects_invalid_status(
         purchase_date=date(2026, 1, 1),
     )
 
-    service.asset_repository.get_by_id = AsyncMock(
+    service.asset_repository.get_by_id_including_deleted = AsyncMock(
         return_value=asset,
     )
 

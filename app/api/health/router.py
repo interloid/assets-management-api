@@ -42,7 +42,6 @@ async def health_check(session: DBSession, redis_client: RedisClient):
 )
 async def home() -> SuccessResponse[HomeResponse]:
     return SuccessResponse(
-        status_code=status.HTTP_200_OK,
         data=HomeResponse(
             name="Assets Management API",
             version="1.0.0",

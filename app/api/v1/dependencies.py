@@ -2,7 +2,6 @@ from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import Cookie, Depends, HTTPException, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.api.deps import DBSession, RedisClient
 from app.core.exceptions import InvalidAccessTokenError
@@ -22,22 +21,27 @@ from app.modules.user.models import User
 from app.modules.user.repositories import UserRepository
 from app.shared.models.enums import UserRole
 
-security = HTTPBearer(auto_error=False, bearerFormat="JWT")
+RefreshToken = Annotated[
+    str | None,
+    Cookie(alias="refresh_token"),
+]
+
+AccessToken = Annotated[str | None, Cookie(alias="access_token")]
 
 
 async def get_current_user(
     session: DBSession,
     redis_client: RedisClient,
-    credentials: HTTPAuthorizationCredentials | None = Depends(security),
+    access_token: AccessToken = None,
 ):
-    if credentials is None:
+    if access_token is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication credentials were not provided",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    token = credentials.credentials
+    token = access_token
 
     payload = decode_access_token(token)
 
@@ -72,12 +76,12 @@ async def get_current_user(
 
 
 def get_logout_access_token(
-    credentials: HTTPAuthorizationCredentials | None = Depends(security),
+    access_token: AccessToken = None,
 ) -> dict[str, Any] | None:
-    if credentials is None:
+    if access_token is None:
         return None
 
-    payload = decode_access_token_allow_expired(credentials.credentials)
+    payload = decode_access_token_allow_expired(access_token)
 
     try:
         payload["jti"]
@@ -94,16 +98,16 @@ def get_logout_access_token(
 async def get_logout_all_context(
     session: DBSession,
     redis_client: RedisClient,
-    credentials: HTTPAuthorizationCredentials | None = Depends(security),
+    access_token: AccessToken = None,
 ) -> dict[str, Any]:
-    if credentials is None:
+    if access_token is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication credentials were not provided",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    token = credentials.credentials
+    token = access_token
 
     payload = decode_access_token_allow_expired(token)
 
@@ -149,13 +153,8 @@ def require_admin(
     return current_user
 
 
-RefreshToken = Annotated[
-    str | None,
-    Cookie(alias="refresh_token"),
-]
-
 CurrentUser = Annotated[
-    User,
+    User | None,
     Depends(get_current_user),
 ]
 

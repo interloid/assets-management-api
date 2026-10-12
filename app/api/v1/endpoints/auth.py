@@ -15,7 +15,6 @@ from app.api.v1.responses import (
 )
 from app.api.v1.schemas.auth import (
     LoginRequest,
-    LoginResponse,
     RegisterRequest,
     UserResponse,
 )
@@ -28,7 +27,11 @@ router = APIRouter(
     tags=["Authentication"],
 )
 
-COOKIE_PATH = "/api/v1/auth"
+ACCESS_TOKEN_COOKIE = "access_token"
+REFRESH_TOKEN_COOKIE = "refresh_token"
+
+ACCESS_TOKEN_COOKIE_PATH = "/"
+REFRESH_TOKEN_COOKIE_PATH = "/api/v1/auth"
 
 
 @router.post(
@@ -53,7 +56,6 @@ async def register(
     )
 
     return SuccessResponse(
-        status_code=status.HTTP_201_CREATED,
         data=UserResponse.model_validate(user).model_dump(mode="json"),
     )
 
@@ -71,7 +73,7 @@ async def login(
     response: Response,
     payload: LoginRequest,
     session: DBSession,
-) -> SuccessResponse[LoginResponse]:
+):
     service = AuthService(session)
 
     access_token, refresh_token = await service.login(
@@ -79,24 +81,24 @@ async def login(
         password=payload.password,
     )
 
-    data = LoginResponse(
-        access_token=access_token,
-        token_type="bearer",
+    response.set_cookie(
+        key=ACCESS_TOKEN_COOKIE,
+        value=access_token,
+        httponly=True,
+        secure=settings.ENVIRONMENT == "production",
+        samesite="lax",
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        path=ACCESS_TOKEN_COOKIE_PATH,
     )
 
     response.set_cookie(
-        key="refresh_token",
+        key=REFRESH_TOKEN_COOKIE,
         value=refresh_token,
         httponly=True,
         secure=settings.ENVIRONMENT == "production",
         samesite="lax",
         max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
-        path=COOKIE_PATH,
-    )
-
-    return SuccessResponse(
-        status_code=status.HTTP_200_OK,
-        data=data.model_dump(mode="json"),
+        path=REFRESH_TOKEN_COOKIE_PATH,
     )
 
 
@@ -113,29 +115,29 @@ async def refresh(
     response: Response,
     session: DBSession,
     refresh_token: RefreshToken = None,
-) -> SuccessResponse[LoginResponse]:
+):
     service = AuthService(session)
 
     access_token, new_refresh_token = await service.refresh(refresh_token)
 
-    data = LoginResponse(
-        access_token=access_token,
-        token_type="bearer",
+    response.set_cookie(
+        key=ACCESS_TOKEN_COOKIE,
+        value=access_token,
+        httponly=True,
+        secure=settings.ENVIRONMENT == "production",
+        samesite="lax",
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        path=ACCESS_TOKEN_COOKIE_PATH,
     )
 
     response.set_cookie(
-        key="refresh_token",
+        key=REFRESH_TOKEN_COOKIE,
         value=new_refresh_token,
         httponly=True,
         secure=settings.ENVIRONMENT == "production",
         samesite="lax",
         max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
-        path=COOKIE_PATH,
-    )
-
-    return SuccessResponse(
-        status_code=status.HTTP_200_OK,
-        data=data.model_dump(mode="json"),
+        path=REFRESH_TOKEN_COOKIE_PATH,
     )
 
 
@@ -160,11 +162,13 @@ async def logout(
     await service.logout(refresh_token, access_token, redis_client)
 
     response.delete_cookie(
-        key="refresh_token",
-        httponly=True,
-        secure=settings.ENVIRONMENT == "production",
-        samesite="lax",
-        path=COOKIE_PATH,
+        key=ACCESS_TOKEN_COOKIE,
+        path=ACCESS_TOKEN_COOKIE_PATH,
+    )
+
+    response.delete_cookie(
+        key=REFRESH_TOKEN_COOKIE,
+        path=REFRESH_TOKEN_COOKIE_PATH,
     )
 
 
@@ -181,20 +185,20 @@ async def logout_all(
     response: Response,
     session: DBSession,
     logout_all_context: LogoutAllContext,
-    refresh_token: RefreshToken = None,
 ) -> None:
     service = AuthService(session)
 
     await service.logout_all(
-        refresh_token,
         logout_all_context["user"],
         logout_all_context["token_version"],
     )
 
     response.delete_cookie(
-        key="refresh_token",
-        httponly=True,
-        secure=settings.ENVIRONMENT == "production",
-        samesite="lax",
-        path=COOKIE_PATH,
+        key=ACCESS_TOKEN_COOKIE,
+        path=ACCESS_TOKEN_COOKIE_PATH,
+    )
+
+    response.delete_cookie(
+        key=REFRESH_TOKEN_COOKIE,
+        path=REFRESH_TOKEN_COOKIE_PATH,
     )

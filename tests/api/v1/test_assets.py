@@ -27,9 +27,9 @@ async def create_asset(
         **extra,
     }
 
+    client.cookies.set("access_token", token)
     response = await client.post(
         "/api/v1/assets",
-        headers={"Authorization": f"Bearer {token}"},
         json=payload,
     )
 
@@ -69,6 +69,7 @@ async def test_admin_can_create_asset(
     integration_client: AsyncClient,
     admin_access_token: str,
 ) -> None:
+
     data = await create_asset(
         integration_client,
         admin_access_token,
@@ -76,7 +77,7 @@ async def test_admin_can_create_asset(
     )
 
     assert data["status"] == "in_stock"
-    assert data["assigned_to"] is None
+    assert data["assigned_user"] is None
     assert data["asset_tag"].startswith("IL-LAP-")
 
 
@@ -101,11 +102,14 @@ async def test_create_asset_rejects_invalid_payload(
     admin_access_token: str,
     payload: dict,
 ) -> None:
+    integration_client.cookies.set("access_token", admin_access_token)
     response = await integration_client.post(
         "/api/v1/assets",
-        headers={"Authorization": f"Bearer {admin_access_token}"},
         json=payload,
     )
+
+    print(response.status_code)
+    print(response.json())
 
     assert response.status_code == 422
 
@@ -115,6 +119,7 @@ async def test_create_asset_rejects_duplicate_serial_number(
     integration_client: AsyncClient,
     admin_access_token: str,
 ) -> None:
+    integration_client.cookies.set("access_token", admin_access_token)
     payload = {
         "type": "laptop",
         "serial_number": "SN-CREATE-DUPLICATE",
@@ -123,14 +128,12 @@ async def test_create_asset_rejects_duplicate_serial_number(
 
     first = await integration_client.post(
         "/api/v1/assets",
-        headers={"Authorization": f"Bearer {admin_access_token}"},
         json=payload,
     )
     assert first.status_code == 201
 
     second = await integration_client.post(
         "/api/v1/assets",
-        headers={"Authorization": f"Bearer {admin_access_token}"},
         json=payload,
     )
 
@@ -143,9 +146,9 @@ async def test_non_admin_cannot_create_asset(
     integration_client: AsyncClient,
     integration_user: User,
 ) -> None:
+    integration_client.cookies.set("access_token", user_token(integration_user))
     response = await integration_client.post(
         "/api/v1/assets",
-        headers={"Authorization": f"Bearer {user_token(integration_user)}"},
         json={
             "type": "laptop",
             "serial_number": "SN-CREATE-UNAUTHORIZED",
@@ -161,6 +164,8 @@ async def test_admin_can_list_assets(
     integration_client: AsyncClient,
     admin_access_token: str,
 ) -> None:
+    integration_client.cookies.set("access_token", admin_access_token)
+
     for index in range(3):
         await create_asset(
             integration_client,
@@ -170,7 +175,6 @@ async def test_admin_can_list_assets(
 
     response = await integration_client.get(
         "/api/v1/assets",
-        headers={"Authorization": f"Bearer {admin_access_token}"},
     )
 
     assert response.status_code == 200
@@ -189,6 +193,8 @@ async def test_list_assets_supports_pagination(
     integration_client: AsyncClient,
     admin_access_token: str,
 ) -> None:
+    integration_client.cookies.set("access_token", admin_access_token)
+
     for index in range(5):
         await create_asset(
             integration_client,
@@ -198,7 +204,6 @@ async def test_list_assets_supports_pagination(
 
     response = await integration_client.get(
         "/api/v1/assets?page=2&size=2",
-        headers={"Authorization": f"Bearer {admin_access_token}"},
     )
 
     assert response.status_code == 200
@@ -231,6 +236,8 @@ async def test_list_assets_filters(
     query: str,
     expected_serial: str,
 ) -> None:
+    integration_client.cookies.set("access_token", admin_access_token)
+
     await create_asset(
         integration_client,
         admin_access_token,
@@ -260,7 +267,6 @@ async def test_list_assets_filters(
 
     response = await integration_client.get(
         f"/api/v1/assets?{query}",
-        headers={"Authorization": f"Bearer {admin_access_token}"},
     )
 
     assert response.status_code == 200
@@ -276,6 +282,8 @@ async def test_list_assets_combines_filters_with_and(
     integration_client: AsyncClient,
     admin_access_token: str,
 ) -> None:
+    integration_client.cookies.set("access_token", admin_access_token)
+
     await create_asset(
         integration_client,
         admin_access_token,
@@ -293,7 +301,6 @@ async def test_list_assets_combines_filters_with_and(
 
     response = await integration_client.get(
         "/api/v1/assets?type=laptop&status=in_stock&search=development",
-        headers={"Authorization": f"Bearer {admin_access_token}"},
     )
 
     assert response.status_code == 200
@@ -309,6 +316,8 @@ async def test_list_assets_rejects_invalid_query_parameters(
     integration_client: AsyncClient,
     admin_access_token: str,
 ) -> None:
+    integration_client.cookies.set("access_token", admin_access_token)
+
     for query in (
         "page=0",
         "size=101",
@@ -316,7 +325,6 @@ async def test_list_assets_rejects_invalid_query_parameters(
     ):
         response = await integration_client.get(
             f"/api/v1/assets?{query}",
-            headers={"Authorization": f"Bearer {admin_access_token}"},
         )
 
         assert response.status_code == 422
@@ -327,9 +335,10 @@ async def test_non_admin_cannot_list_assets(
     integration_client: AsyncClient,
     integration_user: User,
 ) -> None:
+    integration_client.cookies.set("access_token", user_token(integration_user))
+
     response = await integration_client.get(
         "/api/v1/assets",
-        headers={"Authorization": f"Bearer {user_token(integration_user)}"},
     )
 
     assert response.status_code == 403
@@ -340,6 +349,8 @@ async def test_admin_can_get_asset(
     integration_client: AsyncClient,
     admin_access_token: str,
 ) -> None:
+    integration_client.cookies.set("access_token", admin_access_token)
+
     asset = await create_asset(
         integration_client,
         admin_access_token,
@@ -348,7 +359,6 @@ async def test_admin_can_get_asset(
 
     response = await integration_client.get(
         f"/api/v1/assets/{asset['id']}",
-        headers={"Authorization": f"Bearer {admin_access_token}"},
     )
 
     assert response.status_code == 200
@@ -362,6 +372,7 @@ async def test_assigned_user_can_get_own_asset(
     integration_user: User,
     db_session,
 ) -> None:
+
     asset = await create_asset(
         integration_client,
         admin_access_token,
@@ -374,14 +385,14 @@ async def test_assigned_user_can_get_own_asset(
         AssetStatus.ASSIGNED,
         integration_user.id,
     )
+    integration_client.cookies.set("access_token", user_token(integration_user))
 
     response = await integration_client.get(
         f"/api/v1/assets/{asset['id']}",
-        headers={"Authorization": f"Bearer {user_token(integration_user)}"},
     )
 
     assert response.status_code == 200
-    assert response.json()["data"]["assigned_to"] == str(integration_user.id)
+    assert response.json()["data"]["assigned_user"]["id"] == str(integration_user.id)
 
 
 @pytest.mark.asyncio
@@ -397,6 +408,7 @@ async def test_user_cannot_get_asset_they_do_not_own(
     db_session,
     assigned: bool,
 ) -> None:
+
     serial_number = "SN-GET-NO-OWNER" if not assigned else "SN-GET-OTHER"
 
     asset = await create_asset(
@@ -412,10 +424,10 @@ async def test_user_cannot_get_asset_they_do_not_own(
             AssetStatus.ASSIGNED,
             asset_owner.id,
         )
+    integration_client.cookies.set("access_token", user_token(integration_user))
 
     response = await integration_client.get(
         f"/api/v1/assets/{asset['id']}",
-        headers={"Authorization": f"Bearer {user_token(integration_user)}"},
     )
 
     assert response.status_code == 404
@@ -435,9 +447,10 @@ async def test_get_asset_rejects_invalid_or_missing_id(
     admin_access_token: str,
     asset_id: str,
 ) -> None:
+    integration_client.cookies.set("access_token", admin_access_token)
+
     response = await integration_client.get(
         f"/api/v1/assets/{asset_id}",
-        headers={"Authorization": f"Bearer {admin_access_token}"},
     )
 
     if asset_id == "not-a-valid-uuid":
@@ -452,6 +465,8 @@ async def test_admin_can_update_asset(
     integration_client: AsyncClient,
     admin_access_token: str,
 ) -> None:
+    integration_client.cookies.set("access_token", admin_access_token)
+
     asset = await create_asset(
         integration_client,
         admin_access_token,
@@ -460,7 +475,6 @@ async def test_admin_can_update_asset(
 
     response = await integration_client.patch(
         f"/api/v1/assets/{asset['id']}",
-        headers={"Authorization": f"Bearer {admin_access_token}"},
         json={"notes": "Updated notes"},
     )
 
@@ -473,6 +487,8 @@ async def test_update_asset_type_changes_asset_tag(
     integration_client: AsyncClient,
     admin_access_token: str,
 ) -> None:
+    integration_client.cookies.set("access_token", admin_access_token)
+
     asset = await create_asset(
         integration_client,
         admin_access_token,
@@ -481,7 +497,6 @@ async def test_update_asset_type_changes_asset_tag(
 
     response = await integration_client.patch(
         f"/api/v1/assets/{asset['id']}",
-        headers={"Authorization": f"Bearer {admin_access_token}"},
         json={"type": "monitor"},
     )
 
@@ -517,6 +532,8 @@ async def test_update_asset_rejects_invalid_changes(
     expected_status: int,
     expected_code: str | None,
 ) -> None:
+    integration_client.cookies.set("access_token", admin_access_token)
+
     first = await create_asset(
         integration_client,
         admin_access_token,
@@ -537,7 +554,6 @@ async def test_update_asset_rejects_invalid_changes(
 
     response = await integration_client.patch(
         f"/api/v1/assets/{target_id}",
-        headers={"Authorization": f"Bearer {admin_access_token}"},
         json=payload,
     )
 
@@ -553,15 +569,17 @@ async def test_non_admin_cannot_update_asset(
     admin_access_token: str,
     integration_user: User,
 ) -> None:
+    integration_client.cookies.set("access_token", admin_access_token)
+
     asset = await create_asset(
         integration_client,
         admin_access_token,
         serial_number="SN-UPDATE-FORBIDDEN",
     )
+    integration_client.cookies.set("access_token", user_token(integration_user))
 
     response = await integration_client.patch(
         f"/api/v1/assets/{asset['id']}",
-        headers={"Authorization": f"Bearer {user_token(integration_user)}"},
         json={"notes": "Unauthorized"},
     )
 
@@ -582,6 +600,8 @@ async def test_admin_can_delete_allowed_asset_status(
     db_session,
     status: AssetStatus,
 ) -> None:
+    integration_client.cookies.set("access_token", admin_access_token)
+
     serial_number = f"SN-DEL-{status.name.replace('_', '')}"
 
     asset = await create_asset(
@@ -598,7 +618,6 @@ async def test_admin_can_delete_allowed_asset_status(
 
     response = await integration_client.delete(
         f"/api/v1/assets/{asset['id']}",
-        headers={"Authorization": f"Bearer {admin_access_token}"},
     )
 
     assert response.status_code == 204
@@ -620,6 +639,8 @@ async def test_admin_cannot_delete_restricted_asset_status(
     db_session,
     status: AssetStatus,
 ) -> None:
+    integration_client.cookies.set("access_token", admin_access_token)
+
     serial_number = f"SN-DEL-B-{status.name.replace('_', '')}"
 
     asset = await create_asset(
@@ -639,7 +660,6 @@ async def test_admin_cannot_delete_restricted_asset_status(
 
     response = await integration_client.delete(
         f"/api/v1/assets/{asset['id']}",
-        headers={"Authorization": f"Bearer {admin_access_token}"},
     )
 
     assert response.status_code == 409
@@ -652,9 +672,10 @@ async def test_delete_requires_admin_and_existing_asset(
     admin_access_token: str,
     integration_user: User,
 ) -> None:
+    integration_client.cookies.set("access_token", admin_access_token)
+
     response = await integration_client.delete(
         f"/api/v1/assets/{uuid4()}",
-        headers={"Authorization": f"Bearer {admin_access_token}"},
     )
 
     assert response.status_code == 404
@@ -665,10 +686,10 @@ async def test_delete_requires_admin_and_existing_asset(
         admin_access_token,
         serial_number="SN-DELETE-AUTH",
     )
+    integration_client.cookies.set("access_token", user_token(integration_user))
 
     response = await integration_client.delete(
         f"/api/v1/assets/{asset['id']}",
-        headers={"Authorization": f"Bearer {user_token(integration_user)}"},
     )
 
     assert response.status_code == 403
@@ -680,6 +701,8 @@ async def test_admin_can_assign_in_stock_asset(
     admin_access_token: str,
     integration_user: User,
 ) -> None:
+    integration_client.cookies.set("access_token", admin_access_token)
+
     asset = await create_asset(
         integration_client,
         admin_access_token,
@@ -688,7 +711,6 @@ async def test_admin_can_assign_in_stock_asset(
 
     response = await integration_client.post(
         f"/api/v1/assets/{asset['id']}/assign",
-        headers={"Authorization": f"Bearer {admin_access_token}"},
         json={"user_id": str(integration_user.id)},
     )
 
@@ -697,7 +719,7 @@ async def test_admin_can_assign_in_stock_asset(
     data = response.json()["data"]
 
     assert data["status"] == "assigned"
-    assert data["assigned_to"] == str(integration_user.id)
+    assert data["assigned_user"]["id"] == str(integration_user.id)
 
 
 @pytest.mark.asyncio
@@ -707,6 +729,8 @@ async def test_assign_rejects_invalid_asset_status(
     integration_user: User,
     db_session,
 ) -> None:
+    integration_client.cookies.set("access_token", admin_access_token)
+
     asset = await create_asset(
         integration_client,
         admin_access_token,
@@ -721,7 +745,6 @@ async def test_assign_rejects_invalid_asset_status(
 
     response = await integration_client.post(
         f"/api/v1/assets/{asset['id']}/assign",
-        headers={"Authorization": f"Bearer {admin_access_token}"},
         json={"user_id": str(integration_user.id)},
     )
 
@@ -734,6 +757,8 @@ async def test_assign_rejects_invalid_user(
     integration_client: AsyncClient,
     admin_access_token: str,
 ) -> None:
+    integration_client.cookies.set("access_token", admin_access_token)
+
     asset = await create_asset(
         integration_client,
         admin_access_token,
@@ -742,7 +767,6 @@ async def test_assign_rejects_invalid_user(
 
     response = await integration_client.post(
         f"/api/v1/assets/{asset['id']}/assign",
-        headers={"Authorization": f"Bearer {admin_access_token}"},
         json={
             "user_id": "00000000-0000-0000-0000-000000000001",
         },
@@ -758,9 +782,10 @@ async def test_assign_requires_admin_and_existing_asset(
     admin_access_token: str,
     integration_user: User,
 ) -> None:
+    integration_client.cookies.set("access_token", admin_access_token)
+
     response = await integration_client.post(
         f"/api/v1/assets/{uuid4()}/assign",
-        headers={"Authorization": f"Bearer {admin_access_token}"},
         json={"user_id": str(integration_user.id)},
     )
 
@@ -772,10 +797,10 @@ async def test_assign_requires_admin_and_existing_asset(
         admin_access_token,
         serial_number="SN-ASSIGN-AUTH",
     )
+    integration_client.cookies.set("access_token", user_token(integration_user))
 
     response = await integration_client.post(
         f"/api/v1/assets/{asset['id']}/assign",
-        headers={"Authorization": f"Bearer {user_token(integration_user)}"},
         json={"user_id": str(integration_user.id)},
     )
 
@@ -788,6 +813,8 @@ async def test_admin_can_unassign_assigned_asset(
     admin_access_token: str,
     integration_user: User,
 ) -> None:
+    integration_client.cookies.set("access_token", admin_access_token)
+
     asset = await create_asset(
         integration_client,
         admin_access_token,
@@ -796,7 +823,6 @@ async def test_admin_can_unassign_assigned_asset(
 
     assign_response = await integration_client.post(
         f"/api/v1/assets/{asset['id']}/assign",
-        headers={"Authorization": f"Bearer {admin_access_token}"},
         json={"user_id": str(integration_user.id)},
     )
 
@@ -804,7 +830,6 @@ async def test_admin_can_unassign_assigned_asset(
 
     response = await integration_client.post(
         f"/api/v1/assets/{asset['id']}/unassign",
-        headers={"Authorization": f"Bearer {admin_access_token}"},
     )
 
     assert response.status_code == 200
@@ -812,7 +837,7 @@ async def test_admin_can_unassign_assigned_asset(
     data = response.json()["data"]
 
     assert data["status"] == "in_stock"
-    assert data["assigned_to"] is None
+    assert data["assigned_user"] is None
 
 
 @pytest.mark.asyncio
@@ -820,6 +845,8 @@ async def test_unassign_rejects_non_assigned_asset(
     integration_client: AsyncClient,
     admin_access_token: str,
 ) -> None:
+    integration_client.cookies.set("access_token", admin_access_token)
+
     asset = await create_asset(
         integration_client,
         admin_access_token,
@@ -828,7 +855,6 @@ async def test_unassign_rejects_non_assigned_asset(
 
     response = await integration_client.post(
         f"/api/v1/assets/{asset['id']}/unassign",
-        headers={"Authorization": f"Bearer {admin_access_token}"},
     )
 
     assert response.status_code == 409
@@ -841,9 +867,10 @@ async def test_unassign_requires_admin_and_existing_asset(
     admin_access_token: str,
     integration_user: User,
 ) -> None:
+    integration_client.cookies.set("access_token", admin_access_token)
+
     response = await integration_client.post(
         f"/api/v1/assets/{uuid4()}/unassign",
-        headers={"Authorization": f"Bearer {admin_access_token}"},
     )
 
     assert response.status_code == 404
@@ -857,13 +884,12 @@ async def test_unassign_requires_admin_and_existing_asset(
 
     await integration_client.post(
         f"/api/v1/assets/{asset['id']}/assign",
-        headers={"Authorization": f"Bearer {admin_access_token}"},
         json={"user_id": str(integration_user.id)},
     )
+    integration_client.cookies.set("access_token", user_token(integration_user))
 
     response = await integration_client.post(
         f"/api/v1/assets/{asset['id']}/unassign",
-        headers={"Authorization": f"Bearer {user_token(integration_user)}"},
     )
 
     assert response.status_code == 403
@@ -886,6 +912,8 @@ async def test_admin_can_change_allowed_asset_status(
     initial_status: AssetStatus,
     target_status: AssetStatus,
 ) -> None:
+    integration_client.cookies.set("access_token", admin_access_token)
+
     serial_number = (
         f"SN-ST-"
         f"{initial_status.name.replace('_', '')[:5]}-"
@@ -906,7 +934,6 @@ async def test_admin_can_change_allowed_asset_status(
 
     response = await integration_client.post(
         f"/api/v1/assets/{asset['id']}/status",
-        headers={"Authorization": f"Bearer {admin_access_token}"},
         json={"status": target_status.value},
     )
 
@@ -931,6 +958,8 @@ async def test_admin_cannot_change_disallowed_asset_status(
     initial_status: AssetStatus,
     target_status: AssetStatus,
 ) -> None:
+    integration_client.cookies.set("access_token", admin_access_token)
+
     serial_number = f"SN-ST-B-{initial_status.name.replace('_', '')[:5]}"
 
     asset = await create_asset(
@@ -952,7 +981,6 @@ async def test_admin_cannot_change_disallowed_asset_status(
 
     response = await integration_client.post(
         f"/api/v1/assets/{asset['id']}/status",
-        headers={"Authorization": f"Bearer {admin_access_token}"},
         json={"status": target_status.value},
     )
 
@@ -966,9 +994,10 @@ async def test_status_change_requires_admin_and_existing_asset(
     admin_access_token: str,
     integration_user: User,
 ) -> None:
+    integration_client.cookies.set("access_token", admin_access_token)
+
     response = await integration_client.post(
         f"/api/v1/assets/{uuid4()}/status",
-        headers={"Authorization": f"Bearer {admin_access_token}"},
         json={"status": "repair"},
     )
 
@@ -980,10 +1009,10 @@ async def test_status_change_requires_admin_and_existing_asset(
         admin_access_token,
         serial_number="SN-STATUS-AUTH",
     )
+    integration_client.cookies.set("access_token", user_token(integration_user))
 
     response = await integration_client.post(
         f"/api/v1/assets/{asset['id']}/status",
-        headers={"Authorization": f"Bearer {user_token(integration_user)}"},
         json={"status": "repair"},
     )
 
@@ -997,6 +1026,8 @@ async def test_user_can_list_my_assets(
     integration_user: User,
     db_session,
 ) -> None:
+    integration_client.cookies.set("access_token", admin_access_token)
+
     asset = await create_asset(
         integration_client,
         admin_access_token,
@@ -1009,10 +1040,10 @@ async def test_user_can_list_my_assets(
         AssetStatus.ASSIGNED,
         integration_user.id,
     )
+    integration_client.cookies.set("access_token", user_token(integration_user))
 
     response = await integration_client.get(
         "/api/v1/users/me/assets",
-        headers={"Authorization": f"Bearer {user_token(integration_user)}"},
     )
 
     assert response.status_code == 200
@@ -1031,6 +1062,8 @@ async def test_my_assets_returns_only_current_users_assets(
     integration_admin: User,
     db_session,
 ) -> None:
+    integration_client.cookies.set("access_token", admin_access_token)
+
     user_asset = await create_asset(
         integration_client,
         admin_access_token,
@@ -1064,10 +1097,10 @@ async def test_my_assets_returns_only_current_users_assets(
         AssetStatus.ASSIGNED,
         integration_admin.id,
     )
+    integration_client.cookies.set("access_token", user_token(integration_user))
 
     response = await integration_client.get(
         "/api/v1/users/me/assets",
-        headers={"Authorization": f"Bearer {user_token(integration_user)}"},
     )
 
     assert response.status_code == 200
@@ -1086,6 +1119,8 @@ async def test_my_assets_supports_pagination_and_requires_authentication(
     integration_user: User,
     db_session,
 ) -> None:
+    integration_client.cookies.set("access_token", admin_access_token)
+
     asset_ids = []
 
     for index in range(5):
@@ -1108,9 +1143,10 @@ async def test_my_assets_supports_pagination_and_requires_authentication(
 
     await db_session.commit()
 
+    integration_client.cookies.set("access_token", user_token(integration_user))
+
     response = await integration_client.get(
         "/api/v1/users/me/assets?page=2&size=2",
-        headers={"Authorization": f"Bearer {user_token(integration_user)}"},
     )
 
     assert response.status_code == 200
@@ -1122,6 +1158,7 @@ async def test_my_assets_supports_pagination_and_requires_authentication(
     assert pagination["total_items"] == 5
     assert pagination["total_pages"] == 3
     assert len(response.json()["data"]) == 2
+    integration_client.cookies.delete("access_token")
 
     unauthenticated = await integration_client.get("/api/v1/users/me/assets")
 
@@ -1133,6 +1170,8 @@ async def test_admin_can_get_asset_summary(
     integration_client: AsyncClient,
     admin_access_token: str,
 ) -> None:
+    integration_client.cookies.set("access_token", admin_access_token)
+
     await create_asset(
         integration_client,
         admin_access_token,
@@ -1141,7 +1180,6 @@ async def test_admin_can_get_asset_summary(
 
     response = await integration_client.get(
         "/api/v1/assets/stats",
-        headers={"Authorization": f"Bearer {admin_access_token}"},
     )
 
     assert response.status_code == 200
@@ -1160,9 +1198,10 @@ async def test_non_admin_cannot_get_asset_summary(
     integration_client: AsyncClient,
     integration_user: User,
 ) -> None:
+    integration_client.cookies.set("access_token", user_token(integration_user))
+
     response = await integration_client.get(
         "/api/v1/assets/stats",
-        headers={"Authorization": f"Bearer {user_token(integration_user)}"},
     )
 
     assert response.status_code == 403
@@ -1174,6 +1213,8 @@ async def test_create_asset_rejects_duplicate_asset_tag(
     admin_access_token: str,
     db_session,
 ) -> None:
+    integration_client.cookies.set("access_token", admin_access_token)
+
     first = await create_asset(
         integration_client,
         admin_access_token,
@@ -1196,7 +1237,6 @@ async def test_create_asset_rejects_duplicate_asset_tag(
 
     response = await integration_client.post(
         "/api/v1/assets",
-        headers={"Authorization": f"Bearer {admin_access_token}"},
         json={
             "type": "laptop",
             "serial_number": "SN-TAG-DUP-002",
@@ -1214,6 +1254,8 @@ async def test_update_asset_rejects_duplicate_asset_tag(
     admin_access_token: str,
     db_session,
 ) -> None:
+    integration_client.cookies.set("access_token", admin_access_token)
+
     first = await create_asset(
         integration_client,
         admin_access_token,
@@ -1237,7 +1279,6 @@ async def test_update_asset_rejects_duplicate_asset_tag(
 
     response = await integration_client.patch(
         f"/api/v1/assets/{second['id']}",
-        headers={"Authorization": f"Bearer {admin_access_token}"},
         json={"type": "laptop"},
     )
 

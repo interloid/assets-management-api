@@ -1,8 +1,8 @@
-from datetime import date
+from datetime import date, datetime
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from sqlalchemy import CheckConstraint, Date, Enum, ForeignKey, Text
+from sqlalchemy import CheckConstraint, Date, DateTime, Enum, ForeignKey, Text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -75,6 +75,10 @@ class Asset(
     notes: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
+    )
+
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
     )
 
     assigned_user: Mapped["User | None"] = relationship(

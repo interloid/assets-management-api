@@ -17,7 +17,6 @@ from app.api.v1.schemas.auth import (
     UserListResponse,
     UserResponse,
 )
-from app.core.config import settings
 from app.modules.asset.services import AssetService
 from app.modules.auth.services import AuthService
 from app.modules.user.services import UserService
@@ -32,7 +31,11 @@ router = APIRouter(
     tags=["Users"],
 )
 
-COOKIE_PATH = "/api/v1/auth"
+ACCESS_TOKEN_COOKIE = "access_token"
+REFRESH_TOKEN_COOKIE = "refresh_token"
+
+ACCESS_TOKEN_COOKIE_PATH = "/"
+REFRESH_TOKEN_COOKIE_PATH = "/api/v1/auth"
 
 
 @router.get(
@@ -47,7 +50,6 @@ async def get_me(
     current_user: CurrentUser,
 ) -> SuccessResponse[UserResponse]:
     return SuccessResponse(
-        status_code=status.HTTP_200_OK,
         data=UserResponse.model_validate(current_user).model_dump(
             mode="json",
         ),
@@ -85,16 +87,17 @@ async def change_password(
     )
 
     result = SuccessResponse(
-        status_code=status.HTTP_200_OK,
         data={"message": "Password changed successfully"},
     )
 
     response.delete_cookie(
-        key="refresh_token",
-        httponly=True,
-        secure=settings.ENVIRONMENT == "production",
-        samesite="lax",
-        path=COOKIE_PATH,
+        key=ACCESS_TOKEN_COOKIE,
+        path=ACCESS_TOKEN_COOKIE_PATH,
+    )
+
+    response.delete_cookie(
+        key=REFRESH_TOKEN_COOKIE,
+        path=REFRESH_TOKEN_COOKIE_PATH,
     )
 
     return result
@@ -141,7 +144,6 @@ async def get_my_assets(
     ).model_dump(mode="json")
 
     return PaginatedSuccessResponse(
-        status_code=status.HTTP_200_OK,
         data=data,
         pagination=pagination,
     )
@@ -186,7 +188,6 @@ async def list_users(
     ).model_dump(mode="json")
 
     return PaginatedSuccessResponse(
-        status_code=status.HTTP_200_OK,
         data=data,
         pagination=pagination,
     )

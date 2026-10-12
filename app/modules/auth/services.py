@@ -247,7 +247,6 @@ class AuthService:
 
     async def logout_all(
         self,
-        refresh_token: str | None,
         current_user: User,
         access_token_version: int,
     ) -> None:
@@ -258,17 +257,6 @@ class AuthService:
         # Future token version: inconsistent with server state, so reject it.
         if access_token_version > current_user.token_version:
             raise InvalidAccessTokenError()
-
-        if refresh_token:
-            token_hash = hash_refresh_token(refresh_token)
-
-            stored_token = await self.refresh_token_repository.get_by_hash(
-                token_hash,
-            )
-
-            if stored_token is not None:
-                if stored_token.user_id != current_user.id:
-                    raise InvalidRefreshTokenError()
 
         await self.refresh_token_repository.revoke_user(
             current_user.id,

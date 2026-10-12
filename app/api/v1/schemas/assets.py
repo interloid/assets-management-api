@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.modules.asset.validators.serial_number import validate_serial_number
 from app.shared.models.enums import AssetStatus, AssetType
@@ -21,6 +21,13 @@ class AssetCreate(BaseModel):
     )(validate_serial_number)
 
 
+class AssignedUserResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    full_name: str
+    email: str
+
+
 class AssetResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -29,7 +36,10 @@ class AssetResponse(BaseModel):
     type: AssetType
     serial_number: str
     status: AssetStatus
-    assigned_to: UUID | None
+    assigned_user: AssignedUserResponse | None = Field(
+        default=None,
+        validation_alias="assigned_user",
+    )
     purchase_date: date
     warranty_expiry: date | None
     notes: str | None

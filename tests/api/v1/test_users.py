@@ -11,11 +11,9 @@ async def test_admin_list_users(
     admin_access_token,
     integration_user,
 ) -> None:
+    integration_client.cookies.set("access_token", admin_access_token)
     response = await integration_client.get(
         "/api/v1/users",
-        headers={
-            "Authorization": f"Bearer {admin_access_token}",
-        },
     )
 
     assert response.status_code == 200
@@ -50,11 +48,10 @@ async def test_admin_list_users_pagination(
     admin_access_token,
     integration_user,
 ) -> None:
+    integration_client.cookies.set("access_token", admin_access_token)
+
     response = await integration_client.get(
         "/api/v1/users?page=1&size=1",
-        headers={
-            "Authorization": f"Bearer {admin_access_token}",
-        },
     )
 
     assert response.status_code == 200
@@ -75,11 +72,10 @@ async def test_admin_list_users_search_by_email(
     admin_access_token,
     integration_user,
 ) -> None:
+    integration_client.cookies.set("access_token", admin_access_token)
+
     response = await integration_client.get(
         f"/api/v1/users?search={integration_user.email}",
-        headers={
-            "Authorization": f"Bearer {admin_access_token}",
-        },
     )
 
     assert response.status_code == 200
@@ -101,11 +97,10 @@ async def test_admin_list_users_search_by_full_name(
     admin_access_token,
     integration_user,
 ) -> None:
+    integration_client.cookies.set("access_token", admin_access_token)
+
     response = await integration_client.get(
         "/api/v1/users?search=Refresh Token",
-        headers={
-            "Authorization": f"Bearer {admin_access_token}",
-        },
     )
 
     assert response.status_code == 200
@@ -127,11 +122,10 @@ async def test_admin_list_users_search_is_case_insensitive(
     admin_access_token,
     integration_user,
 ) -> None:
+    integration_client.cookies.set("access_token", admin_access_token)
+
     response = await integration_client.get(
         "/api/v1/users?search=REFRESH TOKEN",
-        headers={
-            "Authorization": f"Bearer {admin_access_token}",
-        },
     )
 
     assert response.status_code == 200
@@ -155,12 +149,10 @@ async def test_non_admin_cannot_list_users(
         token_version=integration_user.token_version,
         family_id=str(uuid4()),
     )
+    integration_client.cookies.set("access_token", access_token)
 
     response = await integration_client.get(
         "/api/v1/users",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-        },
     )
 
     assert response.status_code == 403
@@ -171,11 +163,10 @@ async def test_admin_list_users_rejects_size_above_100(
     integration_client,
     admin_access_token,
 ) -> None:
+    integration_client.cookies.set("access_token", admin_access_token)
+
     response = await integration_client.get(
         "/api/v1/users?size=101",
-        headers={
-            "Authorization": f"Bearer {admin_access_token}",
-        },
     )
 
     assert response.status_code == 422

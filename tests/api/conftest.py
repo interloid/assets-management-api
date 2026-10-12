@@ -169,8 +169,8 @@ async def authenticated_client(
 
     assert response.status_code == 200
 
-    access_token = response.json()["data"]["access_token"]
+    access_token = response.cookies["access_token"]
 
-    integration_client.headers["Authorization"] = f"Bearer {access_token}"
+    integration_client.cookies.set("access_token", access_token)
 
     yield integration_client
