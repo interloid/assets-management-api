@@ -31,7 +31,7 @@ ACCESS_TOKEN_COOKIE = "access_token"
 REFRESH_TOKEN_COOKIE = "refresh_token"
 
 ACCESS_TOKEN_COOKIE_PATH = "/"
-REFRESH_TOKEN_COOKIE_PATH = "/api/v1/auth"
+REFRESH_TOKEN_COOKIE_PATH = "/"
 
 
 @router.post(
@@ -101,6 +101,8 @@ async def login(
         path=REFRESH_TOKEN_COOKIE_PATH,
     )
 
+    return SuccessResponse(data={"message": "Login successful"})
+
 
 @router.post(
     "/refresh",
@@ -139,6 +141,8 @@ async def refresh(
         max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
         path=REFRESH_TOKEN_COOKIE_PATH,
     )
+
+    return SuccessResponse(data={"message": "Token refreshed successfully"})
 
 
 @router.post(
