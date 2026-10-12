@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Response, status
 
 from app.api.deps import DBSession, RedisClient
+from app.api.v1.cookies import clear_auth_cookies, set_auth_cookies
 from app.api.v1.dependencies import (
     LogoutAccessTokenPayload,
     LogoutAllContext,
@@ -18,7 +19,6 @@ from app.api.v1.schemas.auth import (
     RegisterRequest,
     UserResponse,
 )
-from app.core.config import settings
 from app.modules.auth.services import AuthService
 from app.shared.schemas.common import SuccessResponse
 
@@ -26,12 +26,6 @@ router = APIRouter(
     prefix="/auth",
     tags=["Authentication"],
 )
-
-ACCESS_TOKEN_COOKIE = "access_token"
-REFRESH_TOKEN_COOKIE = "refresh_token"
-
-ACCESS_TOKEN_COOKIE_PATH = "/"
-REFRESH_TOKEN_COOKIE_PATH = "/"
 
 
 @router.post(
@@ -81,24 +75,10 @@ async def login(
         password=payload.password,
     )
 
-    response.set_cookie(
-        key=ACCESS_TOKEN_COOKIE,
-        value=access_token,
-        httponly=True,
-        secure=settings.ENVIRONMENT == "production",
-        samesite="lax",
-        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        path=ACCESS_TOKEN_COOKIE_PATH,
-    )
-
-    response.set_cookie(
-        key=REFRESH_TOKEN_COOKIE,
-        value=refresh_token,
-        httponly=True,
-        secure=settings.ENVIRONMENT == "production",
-        samesite="lax",
-        max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
-        path=REFRESH_TOKEN_COOKIE_PATH,
+    set_auth_cookies(
+        response,
+        access_token=access_token,
+        refresh_token=refresh_token,
     )
 
     return SuccessResponse(data={"message": "Login successful"})
@@ -122,24 +102,10 @@ async def refresh(
 
     access_token, new_refresh_token = await service.refresh(refresh_token)
 
-    response.set_cookie(
-        key=ACCESS_TOKEN_COOKIE,
-        value=access_token,
-        httponly=True,
-        secure=settings.ENVIRONMENT == "production",
-        samesite="lax",
-        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        path=ACCESS_TOKEN_COOKIE_PATH,
-    )
-
-    response.set_cookie(
-        key=REFRESH_TOKEN_COOKIE,
-        value=new_refresh_token,
-        httponly=True,
-        secure=settings.ENVIRONMENT == "production",
-        samesite="lax",
-        max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
-        path=REFRESH_TOKEN_COOKIE_PATH,
+    set_auth_cookies(
+        response,
+        access_token=access_token,
+        refresh_token=new_refresh_token,
     )
 
     return SuccessResponse(data={"message": "Token refreshed successfully"})
@@ -165,15 +131,7 @@ async def logout(
 
     await service.logout(refresh_token, access_token, redis_client)
 
-    response.delete_cookie(
-        key=ACCESS_TOKEN_COOKIE,
-        path=ACCESS_TOKEN_COOKIE_PATH,
-    )
-
-    response.delete_cookie(
-        key=REFRESH_TOKEN_COOKIE,
-        path=REFRESH_TOKEN_COOKIE_PATH,
-    )
+    clear_auth_cookies(response)
 
 
 @router.post(
@@ -197,12 +155,4 @@ async def logout_all(
         logout_all_context["token_version"],
     )
 
-    response.delete_cookie(
-        key=ACCESS_TOKEN_COOKIE,
-        path=ACCESS_TOKEN_COOKIE_PATH,
-    )
-
-    response.delete_cookie(
-        key=REFRESH_TOKEN_COOKIE,
-        path=REFRESH_TOKEN_COOKIE_PATH,
-    )
+    clear_auth_cookies(response)

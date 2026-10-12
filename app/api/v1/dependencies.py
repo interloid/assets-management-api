@@ -4,7 +4,7 @@ from uuid import UUID
 from fastapi import Cookie, Depends, HTTPException, Response, status
 
 from app.api.deps import DBSession, RedisClient
-from app.core.config import settings
+from app.api.v1.cookies import set_auth_cookies
 from app.core.exceptions import InvalidAccessTokenError
 from app.core.security import (
     decode_access_token,
@@ -30,11 +30,67 @@ RefreshToken = Annotated[
 
 AccessToken = Annotated[str | None, Cookie(alias="access_token")]
 
-ACCESS_TOKEN_COOKIE = "access_token"
-REFRESH_TOKEN_COOKIE = "refresh_token"
 
-ACCESS_TOKEN_COOKIE_PATH = "/"
-REFRESH_TOKEN_COOKIE_PATH = "/"
+async def _get_user_from_access_token(
+    session: DBSession,
+    redis_client: RedisClient,
+    access_token: AccessToken,
+):
+    try:
+        payload = decode_access_token(access_token)
+    except InvalidAccessTokenError:
+        return None
+
+    try:
+        user_id = UUID(payload["sub"])
+        token_version = int(payload["token_version"])
+        family_id = UUID(payload["family_id"])
+    except (KeyError, ValueError, TypeError) as exc:
+        raise InvalidAccessTokenError() from exc
+
+    if await is_access_token_family_blacklisted(redis_client, family_id):
+        raise InvalidAccessTokenError()
+
+    repository = UserRepository(session)
+    user = await repository.get_by_id(user_id)
+
+    if user is None or token_version != user.token_version:
+        raise InvalidAccessTokenError()
+
+    if not user.is_active:
+        raise UserInactiveError()
+
+    return user
+
+
+async def _get_user_from_refresh_token(
+    session: DBSession,
+    response: Response,
+    refresh_token: RefreshToken,
+):
+    auth_service = AuthService(session)
+
+    try:
+        new_access_token, new_refresh_token = await auth_service.refresh(refresh_token)
+    except Exception as exc:
+        raise InvalidAccessTokenError() from exc
+
+    set_auth_cookies(
+        response,
+        access_token=new_access_token,
+        refresh_token=new_refresh_token,
+    )
+
+    new_payload = decode_access_token(new_access_token)
+    user_id = UUID(new_payload["sub"])
+
+    repository = UserRepository(session)
+    user = await repository.get_by_id(user_id)
+
+    if user is None or not user.is_active:
+        raise UserInactiveError()
+
+    return user
 
 
 async def get_current_user(
@@ -44,41 +100,15 @@ async def get_current_user(
     access_token: AccessToken = None,
     refresh_token: RefreshToken = None,
 ):
-    payload = None
-    token_valid = False
-
     if access_token is not None:
-        try:
-            payload = decode_access_token(access_token)
-            token_valid = True
+        user = await _get_user_from_access_token(
+            session,
+            redis_client,
+            access_token,
+        )
 
-        except InvalidAccessTokenError:
-            pass
-
-    if token_valid and payload is not None:
-        try:
-            user_id = UUID(payload["sub"])
-            token_version = int(payload["token_version"])
-            family_id = UUID(payload["family_id"])
-        except (KeyError, ValueError, TypeError) as exc:
-            raise InvalidAccessTokenError() from exc
-
-        if await is_access_token_family_blacklisted(redis_client, family_id):
-            raise InvalidAccessTokenError()
-
-        repository = UserRepository(session)
-        user = await repository.get_by_id(user_id)
-
-        if user is None:
-            raise InvalidAccessTokenError()
-
-        if token_version != user.token_version:
-            raise InvalidAccessTokenError()
-
-        if not user.is_active:
-            raise UserInactiveError()
-
-        return user
+        if user is not None:
+            return user
 
     if refresh_token is None:
         raise HTTPException(
@@ -87,42 +117,11 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    auth_service = AuthService(session)
-
-    try:
-        new_access_token, new_refresh_token = await auth_service.refresh(refresh_token)
-    except Exception as exc:
-        raise InvalidAccessTokenError() from exc
-
-    response.set_cookie(
-        key=ACCESS_TOKEN_COOKIE,
-        value=new_access_token,
-        httponly=True,
-        secure=settings.ENVIRONMENT == "production",
-        samesite="lax",
-        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        path=ACCESS_TOKEN_COOKIE_PATH,
+    return await _get_user_from_refresh_token(
+        session,
+        response,
+        refresh_token,
     )
-
-    response.set_cookie(
-        key=REFRESH_TOKEN_COOKIE,
-        value=new_refresh_token,
-        httponly=True,
-        secure=settings.ENVIRONMENT == "production",
-        samesite="lax",
-        max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
-        path=REFRESH_TOKEN_COOKIE_PATH,
-    )
-
-    new_payload = decode_access_token(new_access_token)
-    user_id = UUID(new_payload["sub"])
-    repository = UserRepository(session)
-    user = await repository.get_by_id(user_id)
-
-    if user is None or not user.is_active:
-        raise InvalidAccessTokenError()
-
-    return user
 
 
 def get_logout_access_token(

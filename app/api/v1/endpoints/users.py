@@ -3,6 +3,7 @@ from math import ceil
 from fastapi import APIRouter, Query, Response, status
 
 from app.api.deps import DBSession
+from app.api.v1.cookies import clear_auth_cookies
 from app.api.v1.dependencies import AdminUser, CurrentUser
 from app.api.v1.responses import (
     BAD_REQUEST_RESPONSE,
@@ -30,12 +31,6 @@ router = APIRouter(
     prefix="/users",
     tags=["Users"],
 )
-
-ACCESS_TOKEN_COOKIE = "access_token"
-REFRESH_TOKEN_COOKIE = "refresh_token"
-
-ACCESS_TOKEN_COOKIE_PATH = "/"
-REFRESH_TOKEN_COOKIE_PATH = "/api/v1/auth"
 
 
 @router.get(
@@ -90,15 +85,7 @@ async def change_password(
         data={"message": "Password changed successfully"},
     )
 
-    response.delete_cookie(
-        key=ACCESS_TOKEN_COOKIE,
-        path=ACCESS_TOKEN_COOKIE_PATH,
-    )
-
-    response.delete_cookie(
-        key=REFRESH_TOKEN_COOKIE,
-        path=REFRESH_TOKEN_COOKIE_PATH,
-    )
+    clear_auth_cookies(response)
 
     return result
 
