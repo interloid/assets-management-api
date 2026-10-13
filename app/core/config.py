@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     ASSET_TAG_COMPANY_PREFIX: str = Field(min_length=1, max_length=20)
 
     SEED_USER_PASSWORD: str
+    SEED_ADMIN_PASSWORD: str
 
     CORS_ORIGINS: str
 
