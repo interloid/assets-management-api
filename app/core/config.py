@@ -22,6 +22,9 @@ class Settings(BaseSettings):
 
     CORS_ORIGINS: str
 
+    CELERY_BROKER_URL: str | None = None
+    CELERY_RESULT_BACKEND: str | None = None
+
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", extra="ignore"
     )
