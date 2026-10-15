@@ -103,6 +103,7 @@ async def login(
         path=request.url.path,
     )
 
+
 @router.post(
     "/refresh",
     status_code=status.HTTP_200_OK,
@@ -117,7 +118,7 @@ async def refresh(
     response: Response,
     session: DBSession,
     refresh_token: RefreshToken = None,
-)-> SuccessResponse:
+) -> SuccessResponse:
     service = AuthService(session)
 
     access_token, new_refresh_token = await service.refresh(refresh_token)

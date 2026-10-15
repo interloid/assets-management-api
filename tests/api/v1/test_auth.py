@@ -248,7 +248,7 @@ async def test_refresh_token_reuse_revokes_family(
 
     body = reuse_response.json()
 
-    assert body["error"]["code"] == "REFRESH_TOKEN_REUSE"
+    assert body["error_code"] == "REFRESH_TOKEN_REUSE"
 
     result = await db_session.execute(
         select(RefreshToken).where(
@@ -379,7 +379,7 @@ async def test_logout_rejects_refresh_token_from_different_user(
 
     body = logout_response.json()
 
-    assert body["error"]["code"] == "INVALID_ACCESS_TOKEN"
+    assert body["error_code"] == "INVALID_ACCESS_TOKEN"
 
     # integration_client.headers.pop("Authorization", None)
     integration_client.cookies.set(
@@ -552,7 +552,7 @@ async def test_change_password_revokes_all_sessions(
 
     change_password_body = change_password_response.json()
 
-    assert change_password_body["data"]["message"] == "Password changed successfully"
+    assert change_password_body["message"] == "Password changed successfully"
 
     result = await db_session.execute(
         select(RefreshToken).where(
@@ -635,7 +635,7 @@ async def test_register_duplicate_email(
 
     body = response.json()
 
-    assert body["error"]["code"] == "EMAIL_ALREADY_REGISTERED"
+    assert body["error_code"] == "EMAIL_ALREADY_REGISTERED"
 
 
 @pytest.mark.asyncio
@@ -660,7 +660,7 @@ async def test_login_invalid_credentials(
 
     body = response.json()
 
-    assert body["error"]["code"] == "INVALID_CREDENTIALS"
+    assert body["error_code"] == "INVALID_CREDENTIALS"
 
 
 @pytest.mark.asyncio
@@ -680,7 +680,7 @@ async def test_refresh_invalid_token(
 
     body = response.json()
 
-    assert body["error"]["code"] == "INVALID_REFRESH_TOKEN"
+    assert body["error_code"] == "INVALID_REFRESH_TOKEN"
 
 
 @pytest.mark.asyncio
@@ -713,4 +713,4 @@ async def test_me_missing_jwt(
 
     body = response.json()
 
-    assert body["error"]["code"] == "AUTHENTICATION_REQUIRED"
+    assert body["error_code"] == "AUTHENTICATION_REQUIRED"

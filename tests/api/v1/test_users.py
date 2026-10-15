@@ -21,12 +21,12 @@ async def test_admin_list_users(
     body = response.json()
 
     assert "data" in body
-    assert "pagination" in body
+    assert "pagination_meta" in body
 
-    assert body["pagination"]["page"] == 1
-    assert body["pagination"]["size"] == 20
-    assert body["pagination"]["total_items"] == 2
-    assert body["pagination"]["total_pages"] == 1
+    assert body["pagination_meta"]["page"] == 1
+    assert body["pagination_meta"]["records_per_page"] == 20
+    assert body["pagination_meta"]["total_items"] == 2
+    assert body["pagination_meta"]["total_pages"] == 1
 
     assert len(body["data"]) == 2
 
@@ -58,10 +58,10 @@ async def test_admin_list_users_pagination(
 
     body = response.json()
 
-    assert body["pagination"]["page"] == 1
-    assert body["pagination"]["size"] == 1
-    assert body["pagination"]["total_items"] == 2
-    assert body["pagination"]["total_pages"] == 2
+    assert body["pagination_meta"]["page"] == 1
+    assert body["pagination_meta"]["records_per_page"] == 1
+    assert body["pagination_meta"]["total_items"] == 2
+    assert body["pagination_meta"]["total_pages"] == 2
 
     assert len(body["data"]) == 1
 
@@ -82,8 +82,8 @@ async def test_admin_list_users_search_by_email(
 
     body = response.json()
 
-    assert body["pagination"]["total_items"] == 1
-    assert body["pagination"]["total_pages"] == 1
+    assert body["pagination_meta"]["total_items"] == 1
+    assert body["pagination_meta"]["total_pages"] == 1
 
     user = body["data"][0]
 
@@ -107,8 +107,8 @@ async def test_admin_list_users_search_by_full_name(
 
     body = response.json()
 
-    assert body["pagination"]["total_items"] == 1
-    assert body["pagination"]["total_pages"] == 1
+    assert body["pagination_meta"]["total_items"] == 1
+    assert body["pagination_meta"]["total_pages"] == 1
 
     user = body["data"][0]
 
@@ -132,8 +132,8 @@ async def test_admin_list_users_search_is_case_insensitive(
 
     body = response.json()
 
-    assert body["pagination"]["total_items"] == 1
-    assert body["pagination"]["total_pages"] == 1
+    assert body["pagination_meta"]["total_items"] == 1
+    assert body["pagination_meta"]["total_pages"] == 1
 
     assert body["data"][0]["id"] == str(integration_user.id)
 
@@ -184,4 +184,4 @@ async def test_unauthenticated_cannot_list_users(
 
     body = response.json()
 
-    assert body["error"]["code"] == "AUTHENTICATION_REQUIRED"
+    assert body["error_code"] == "AUTHENTICATION_REQUIRED"

@@ -14,23 +14,23 @@ from app.shared.models.enums import AssetStatus, AssetType, UserRole
 
 COMPANY_PREFIX = settings.ASSET_TAG_COMPANY_PREFIX
 
-ADMIN_EMAIL = "admin@interloid.com"
+ADMIN_EMAIL = "admin@asset.com"
 ADMIN_PASSWORD = settings.SEED_ADMIN_PASSWORD
 ADMIN_NAME = "Admin User"
 
 USERS = [
     {
-        "email": "user1@interloid.com",
+        "email": "user1@asset.com",
         "password": settings.SEED_USER_PASSWORD,
         "full_name": "User One",
     },
     {
-        "email": "user2@interloid.com",
+        "email": "user2@asset.com",
         "password": settings.SEED_USER_PASSWORD,
         "full_name": "User Two",
     },
     {
-        "email": "user3@interloid.com",
+        "email": "user3@asset.com",
         "password": settings.SEED_USER_PASSWORD,
         "full_name": "User Three",
     },

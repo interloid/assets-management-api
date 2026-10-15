@@ -108,9 +108,6 @@ async def test_create_asset_rejects_invalid_payload(
         json=payload,
     )
 
-    print(response.status_code)
-    print(response.json())
-
     assert response.status_code == 422
 
 
@@ -138,7 +135,7 @@ async def test_create_asset_rejects_duplicate_serial_number(
     )
 
     assert second.status_code == 409
-    assert second.json()["error"]["code"] == "SERIAL_NUMBER_ALREADY_EXISTS"
+    assert second.json()["error_code"] == "SERIAL_NUMBER_ALREADY_EXISTS"
 
 
 @pytest.mark.asyncio
@@ -181,10 +178,10 @@ async def test_admin_can_list_assets(
 
     body = response.json()
 
-    assert body["pagination"]["page"] == 1
-    assert body["pagination"]["size"] == 20
-    assert body["pagination"]["total_items"] == 3
-    assert body["pagination"]["total_pages"] == 1
+    assert body["pagination_meta"]["page"] == 1
+    assert body["pagination_meta"]["records_per_page"] == 20
+    assert body["pagination_meta"]["total_items"] == 3
+    assert body["pagination_meta"]["total_pages"] == 1
     assert len(body["data"]) == 3
 
 
@@ -208,10 +205,10 @@ async def test_list_assets_supports_pagination(
 
     assert response.status_code == 200
 
-    pagination = response.json()["pagination"]
+    pagination = response.json()["pagination_meta"]
 
     assert pagination["page"] == 2
-    assert pagination["size"] == 2
+    assert pagination["records_per_page"] == 2
     assert pagination["total_items"] == 5
     assert pagination["total_pages"] == 3
     assert len(response.json()["data"]) == 2
@@ -233,8 +230,8 @@ async def test_list_assets_returns_empty_results(
     body = response.json()
 
     assert body["data"] == []
-    assert body["pagination"]["total_items"] == 0
-    assert body["pagination"]["total_pages"] == 0
+    assert body["pagination_meta"]["total_items"] == 0
+    assert body["pagination_meta"]["total_pages"] == 0
 
 
 @pytest.mark.asyncio
@@ -451,7 +448,7 @@ async def test_user_cannot_get_asset_they_do_not_own(
     )
 
     assert response.status_code == 404
-    assert response.json()["error"]["code"] == "ASSET_NOT_FOUND"
+    assert response.json()["error_code"] == "ASSET_NOT_FOUND"
 
 
 @pytest.mark.asyncio
@@ -477,7 +474,7 @@ async def test_get_asset_rejects_invalid_or_missing_id(
         assert response.status_code == 422
     else:
         assert response.status_code == 404
-        assert response.json()["error"]["code"] == "ASSET_NOT_FOUND"
+        assert response.json()["error_code"] == "ASSET_NOT_FOUND"
 
 
 @pytest.mark.asyncio
@@ -580,7 +577,7 @@ async def test_update_asset_rejects_invalid_changes(
     assert response.status_code == expected_status
 
     if expected_code:
-        assert response.json()["error"]["code"] == expected_code
+        assert response.json()["error_code"] == expected_code
 
 
 @pytest.mark.asyncio
@@ -683,7 +680,7 @@ async def test_admin_cannot_delete_restricted_asset_status(
     )
 
     assert response.status_code == 409
-    assert response.json()["error"]["code"] == "ASSET_DELETE_CONFLICT"
+    assert response.json()["error_code"] == "ASSET_DELETE_CONFLICT"
 
 
 @pytest.mark.asyncio
@@ -699,7 +696,7 @@ async def test_delete_requires_admin_and_existing_asset(
     )
 
     assert response.status_code == 404
-    assert response.json()["error"]["code"] == "ASSET_NOT_FOUND"
+    assert response.json()["error_code"] == "ASSET_NOT_FOUND"
 
     asset = await create_asset(
         integration_client,
@@ -769,7 +766,7 @@ async def test_assign_rejects_invalid_asset_status(
     )
 
     assert response.status_code == 409
-    assert response.json()["error"]["code"] == "INVALID_ASSET_STATUS_TRANSITION"
+    assert response.json()["error_code"] == "INVALID_ASSET_STATUS_TRANSITION"
 
 
 @pytest.mark.asyncio
@@ -793,7 +790,7 @@ async def test_assign_rejects_invalid_user(
     )
 
     assert response.status_code == 404
-    assert response.json()["error"]["code"] == "ASSET_ASSIGNMENT_USER_NOT_FOUND"
+    assert response.json()["error_code"] == "ASSET_ASSIGNMENT_USER_NOT_FOUND"
 
 
 @pytest.mark.asyncio
@@ -810,7 +807,7 @@ async def test_assign_requires_admin_and_existing_asset(
     )
 
     assert response.status_code == 404
-    assert response.json()["error"]["code"] == "ASSET_NOT_FOUND"
+    assert response.json()["error_code"] == "ASSET_NOT_FOUND"
 
     asset = await create_asset(
         integration_client,
@@ -878,7 +875,7 @@ async def test_unassign_rejects_non_assigned_asset(
     )
 
     assert response.status_code == 409
-    assert response.json()["error"]["code"] == "INVALID_ASSET_STATUS_TRANSITION"
+    assert response.json()["error_code"] == "INVALID_ASSET_STATUS_TRANSITION"
 
 
 @pytest.mark.asyncio
@@ -894,7 +891,7 @@ async def test_unassign_requires_admin_and_existing_asset(
     )
 
     assert response.status_code == 404
-    assert response.json()["error"]["code"] == "ASSET_NOT_FOUND"
+    assert response.json()["error_code"] == "ASSET_NOT_FOUND"
 
     asset = await create_asset(
         integration_client,
@@ -1005,7 +1002,7 @@ async def test_admin_cannot_change_disallowed_asset_status(
     )
 
     assert response.status_code == 409
-    assert response.json()["error"]["code"] == "INVALID_ASSET_STATUS_TRANSITION"
+    assert response.json()["error_code"] == "INVALID_ASSET_STATUS_TRANSITION"
 
 
 @pytest.mark.asyncio
@@ -1022,7 +1019,7 @@ async def test_status_change_requires_admin_and_existing_asset(
     )
 
     assert response.status_code == 404
-    assert response.json()["error"]["code"] == "ASSET_NOT_FOUND"
+    assert response.json()["error_code"] == "ASSET_NOT_FOUND"
 
     asset = await create_asset(
         integration_client,
@@ -1070,7 +1067,7 @@ async def test_user_can_list_my_assets(
 
     body = response.json()
 
-    assert body["pagination"]["total_items"] == 1
+    assert body["pagination_meta"]["total_items"] == 1
     assert len(body["data"]) == 1
 
 
@@ -1171,10 +1168,10 @@ async def test_my_assets_supports_pagination_and_requires_authentication(
 
     assert response.status_code == 200
 
-    pagination = response.json()["pagination"]
+    pagination = response.json()["pagination_meta"]
 
     assert pagination["page"] == 2
-    assert pagination["size"] == 2
+    assert pagination["records_per_page"] == 2
     assert pagination["total_items"] == 5
     assert pagination["total_pages"] == 3
     assert len(response.json()["data"]) == 2
@@ -1265,7 +1262,7 @@ async def test_create_asset_rejects_duplicate_asset_tag(
     )
 
     assert response.status_code == 409
-    assert response.json()["error"]["code"] == "ASSET_TAG_ALREADY_EXISTS"
+    assert response.json()["error_code"] == "ASSET_TAG_ALREADY_EXISTS"
 
 
 @pytest.mark.asyncio

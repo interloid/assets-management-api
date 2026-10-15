@@ -34,6 +34,7 @@ router = APIRouter(
     prefix="/assets",
 )
 
+
 @router.post(
     "",
     tags=["Assets"],
@@ -120,9 +121,7 @@ async def list_assets(
         order=order,
     )
 
-    data = [
-        AssetResponse.model_validate(asset) for asset in assets
-    ]
+    data = [AssetResponse.model_validate(asset) for asset in assets]
 
     total_pages = ceil(total / size) if total else 0
 
@@ -144,6 +143,7 @@ async def list_assets(
         timestamp=datetime.now(UTC),
         path=request.url.path,
     )
+
 
 @router.get(
     "/stats",
@@ -279,6 +279,7 @@ async def delete_asset(
 
     await service.delete(id)
 
+
 @router.post(
     "/{id}/assign",
     tags=["Asset Assignment"],
@@ -320,7 +321,6 @@ async def assign_asset(
     )
 
 
-
 @router.post(
     "/{id}/unassign",
     tags=["Asset Assignment"],
@@ -356,7 +356,6 @@ async def unassign_asset(
         timestamp=datetime.now(UTC),
         path=request.url.path,
     )
-
 
 
 @router.post(

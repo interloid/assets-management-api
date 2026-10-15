@@ -132,9 +132,7 @@ async def get_my_assets(
         assigned_to=current_user.id,
     )
 
-    data = [
-        AssetResponse.model_validate(asset) for asset in assets
-    ]
+    data = [AssetResponse.model_validate(asset) for asset in assets]
 
     total_pages = ceil(total / size) if total else 0
 
@@ -184,9 +182,7 @@ async def list_users(
         search=search,
     )
 
-    data = [
-        UserListResponse.model_validate(user) for user in users
-    ]
+    data = [UserListResponse.model_validate(user) for user in users]
 
     total_pages = ceil(total / size) if total else 0
 

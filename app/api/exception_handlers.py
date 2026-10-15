@@ -10,7 +10,7 @@ from app.shared.schemas.common import ErrorResponse
 
 
 def app_error_handler(request: Request, exc: AppError):
-    response =  ErrorResponse(
+    response = ErrorResponse(
         success=False,
         status_code=exc.status_code,
         error_code=exc.code,
@@ -71,6 +71,7 @@ def validation_exception_handler(
         status_code=422,
         content=response.model_dump(mode="json"),
     )
+
 
 def unexpected_exception_handler(request: Request, _exc: Exception):
 
