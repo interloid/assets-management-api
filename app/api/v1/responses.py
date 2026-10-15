@@ -2,7 +2,6 @@ from fastapi import status
 
 from app.shared.schemas.common import (
     ErrorResponse,
-    ValidationErrorResponse,
 )
 
 BAD_REQUEST_RESPONSE = {
@@ -42,7 +41,7 @@ CONFLICT_RESPONSE = {
 
 VALIDATION_RESPONSE = {
     status.HTTP_422_UNPROCESSABLE_CONTENT: {
-        "model": ValidationErrorResponse,
+        "model": ErrorResponse,
         "description": "The request contains invalid or malformed data",
     },
 }

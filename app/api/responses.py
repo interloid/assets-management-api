@@ -1,47 +1,54 @@
-from typing import Any
+# from typing import Any
 
-from fastapi.responses import JSONResponse
-
-
-def success_response(
-    *,
-    status_code: int,
-    data: Any = None,
-    pagination: dict[str, Any] | None = None,
-) -> JSONResponse:
-    content: dict[str, Any] = {
-        "data": data,
-    }
-
-    if pagination is not None:
-        content["pagination"] = pagination
-
-    return JSONResponse(
-        status_code=status_code,
-        content=content,
-    )
+# from fastapi.responses import JSONResponse
 
 
-def error_response(
-    *,
-    status_code: int,
-    message: str,
-    code: str,
-    details: Any = None,
-    headers: dict[str, str] | None = None,
-) -> JSONResponse:
-    error: dict[str, Any] = {
-        "code": code,
-        "message": message,
-    }
+# def success_response(
+#     request: Request,
+#     *,
+#     status_code: int,
+#     message: str,
+#     data: Any = None,
+#     pagination_meta: dict[str, Any] | None = None,
+# ) -> JSONResponse:
+#     content: dict[str, Any] = {
+#         "success": True,
+#         "status_code": status_code,
+#         "message": message,
+#         "data": data,
+#         "pagination_meta": pagination_meta,
+#         "request_id": None,
+#         "timestamp":
+#     }
 
-    if details is not None:
-        error["details"] = details
+#     return JSONResponse(
+#         status_code=status_code,
+#         content=jsonable_encoder(content),
+#     )
 
-    return JSONResponse(
-        status_code=status_code,
-        content={
-            "error": error,
-        },
-        headers=headers,
-    )
+
+# def error_response(
+#     *,
+#     status_code: int,
+#     message: str,
+#     code: str,
+#     details: Any = None,
+#     headers: dict[str, str] | None = None,
+# ) -> JSONResponse:
+#     error: dict[str, Any] = {
+#         "code": code,
+#         "message": message,
+#     }
+
+#     if details is not None:
+#         error["details"] = details
+
+#     return JSONResponse(
+#         status_code=status_code,
+#         content={
+#             "error": error,
+#         },
+#         headers=headers,
+#     )
+
+

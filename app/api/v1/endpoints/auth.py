@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Response, status
+from datetime import UTC, datetime
+
+from fastapi import APIRouter, Request, Response, status
 
 from app.api.deps import DBSession, RedisClient
 from app.api.v1.cookies import clear_auth_cookies, set_auth_cookies
@@ -38,6 +40,7 @@ router = APIRouter(
     },
 )
 async def register(
+    request: Request,
     data: RegisterRequest,
     session: DBSession,
 ) -> SuccessResponse[UserResponse]:
@@ -50,7 +53,14 @@ async def register(
     )
 
     return SuccessResponse(
-        data=UserResponse.model_validate(user).model_dump(mode="json"),
+        success=True,
+        status_code=status.HTTP_201_CREATED,
+        message="User registered successfully",
+        data=UserResponse.model_validate(user),
+        pagination_meta=None,
+        request_id=None,
+        timestamp=datetime.now(UTC),
+        path=request.url.path,
     )
 
 
@@ -64,10 +74,11 @@ async def register(
     },
 )
 async def login(
+    request: Request,
     response: Response,
     payload: LoginRequest,
     session: DBSession,
-):
+) -> SuccessResponse:
     service = AuthService(session)
 
     access_token, refresh_token = await service.login(
@@ -81,8 +92,16 @@ async def login(
         refresh_token=refresh_token,
     )
 
-    return SuccessResponse(data={"message": "Login successful"})
-
+    return SuccessResponse(
+        success=True,
+        status_code=status.HTTP_200_OK,
+        message="Login successful",
+        data=None,
+        pagination_meta=None,
+        request_id=None,
+        timestamp=datetime.now(UTC),
+        path=request.url.path,
+    )
 
 @router.post(
     "/refresh",
@@ -94,10 +113,11 @@ async def login(
     },
 )
 async def refresh(
+    request: Request,
     response: Response,
     session: DBSession,
     refresh_token: RefreshToken = None,
-):
+)-> SuccessResponse:
     service = AuthService(session)
 
     access_token, new_refresh_token = await service.refresh(refresh_token)
@@ -108,7 +128,16 @@ async def refresh(
         refresh_token=new_refresh_token,
     )
 
-    return SuccessResponse(data={"message": "Token refreshed successfully"})
+    return SuccessResponse(
+        success=True,
+        status_code=status.HTTP_200_OK,
+        message="Access and refresh tokens renewed successfully",
+        data=None,
+        pagination_meta=None,
+        request_id=None,
+        timestamp=datetime.now(UTC),
+        path=request.url.path,
+    )
 
 
 @router.post(

@@ -1,6 +1,7 @@
+from datetime import UTC, datetime
 from math import ceil
 
-from fastapi import APIRouter, Query, Response, status
+from fastapi import APIRouter, Query, Request, Response, status
 
 from app.api.deps import DBSession
 from app.api.v1.cookies import clear_auth_cookies
@@ -42,12 +43,19 @@ router = APIRouter(
     },
 )
 async def get_me(
+    request: Request,
     current_user: CurrentUser,
 ) -> SuccessResponse[UserResponse]:
+
     return SuccessResponse(
-        data=UserResponse.model_validate(current_user).model_dump(
-            mode="json",
-        ),
+        success=True,
+        status_code=status.HTTP_200_OK,
+        message="Current user retrieved successfully",
+        data=UserResponse.model_validate(current_user),
+        pagination_meta=None,
+        request_id=None,
+        timestamp=datetime.now(UTC),
+        path=request.url.path,
     )
 
 
@@ -68,11 +76,12 @@ async def get_me(
     },
 )
 async def change_password(
+    request: Request,
     response: Response,
     data: ChangePasswordRequest,
     current_user: CurrentUser,
     session: DBSession,
-) -> SuccessResponse[dict[str, str]]:
+) -> SuccessResponse:
     service = AuthService(session)
 
     await service.change_password(
@@ -81,13 +90,18 @@ async def change_password(
         new_password=data.new_password,
     )
 
-    result = SuccessResponse(
-        data={"message": "Password changed successfully"},
-    )
-
     clear_auth_cookies(response)
 
-    return result
+    return SuccessResponse(
+        success=True,
+        status_code=status.HTTP_200_OK,
+        message="Password changed successfully",
+        data=None,
+        pagination_meta=None,
+        request_id=None,
+        timestamp=datetime.now(UTC),
+        path=request.url.path,
+    )
 
 
 @router.get(
@@ -100,6 +114,7 @@ async def change_password(
     },
 )
 async def get_my_assets(
+    request: Request,
     session: DBSession,
     current_user: CurrentUser,
     page: int = Query(default=1, ge=1, le=1000),
@@ -108,7 +123,7 @@ async def get_my_assets(
         ge=1,
         le=100,
     ),
-) -> PaginatedSuccessResponse[list[AssetResponse]]:
+) -> SuccessResponse[list[AssetResponse]]:
     service = AssetService(session)
 
     assets, total = await service.list(
@@ -118,21 +133,28 @@ async def get_my_assets(
     )
 
     data = [
-        AssetResponse.model_validate(asset).model_dump(mode="json") for asset in assets
+        AssetResponse.model_validate(asset) for asset in assets
     ]
 
     total_pages = ceil(total / size) if total else 0
 
     pagination = PaginationMeta(
+        items_on_page=len(assets),
         page=page,
-        size=size,
-        total_pages=total_pages,
+        records_per_page=size,
         total_items=total,
-    ).model_dump(mode="json")
+        total_pages=total_pages,
+    )
 
-    return PaginatedSuccessResponse(
+    return SuccessResponse(
+        success=True,
+        status_code=status.HTTP_200_OK,
+        message="Assigned assets retrieved successfully",
         data=data,
-        pagination=pagination,
+        pagination_meta=pagination,
+        request_id=None,
+        timestamp=datetime.now(UTC),
+        path=request.url.path,
     )
 
 
@@ -147,8 +169,9 @@ async def get_my_assets(
     },
 )
 async def list_users(
+    request: Request,
     session: DBSession,
-    admin_user: AdminUser,
+    _admin_user: AdminUser,
     page: int = Query(default=1, ge=1, le=1000),
     size: int = Query(default=20, ge=1, le=100),
     search: str | None = Query(default=None),
@@ -162,19 +185,26 @@ async def list_users(
     )
 
     data = [
-        UserListResponse.model_validate(user).model_dump(mode="json") for user in users
+        UserListResponse.model_validate(user) for user in users
     ]
 
     total_pages = ceil(total / size) if total else 0
 
     pagination = PaginationMeta(
+        items_on_page=len(users),
         page=page,
-        size=size,
-        total_pages=total_pages,
+        records_per_page=size,
         total_items=total,
-    ).model_dump(mode="json")
+        total_pages=total_pages,
+    )
 
-    return PaginatedSuccessResponse(
+    return SuccessResponse(
+        success=True,
+        status_code=status.HTTP_200_OK,
+        message="Users retrieved successfully",
         data=data,
-        pagination=pagination,
+        pagination_meta=pagination,
+        request_id=None,
+        timestamp=datetime.now(UTC),
+        path=request.url.path,
     )

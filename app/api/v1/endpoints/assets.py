@@ -1,9 +1,9 @@
-from datetime import date
+from datetime import UTC, date, datetime
 from math import ceil
 from typing import Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, Query, Request, status
 
 from app.api.deps import DBSession
 from app.api.v1.dependencies import AdminUser, CurrentUser
@@ -26,7 +26,6 @@ from app.api.v1.schemas.assets import (
 from app.modules.asset.services import AssetService
 from app.shared.models.enums import AssetStatus, AssetType
 from app.shared.schemas.common import (
-    PaginatedSuccessResponse,
     PaginationMeta,
     SuccessResponse,
 )
@@ -34,7 +33,6 @@ from app.shared.schemas.common import (
 router = APIRouter(
     prefix="/assets",
 )
-
 
 @router.post(
     "",
@@ -49,6 +47,7 @@ router = APIRouter(
     },
 )
 async def create_asset(
+    request: Request,
     data: AssetCreate,
     session: DBSession,
     _admin_user: AdminUser,
@@ -64,9 +63,16 @@ async def create_asset(
     )
 
     return SuccessResponse(
+        success=True,
+        status_code=status.HTTP_201_CREATED,
+        message="Asset created successfully",
         data=AssetResponse.model_validate(
             asset,
-        ).model_dump(mode="json"),
+        ),
+        pagination_meta=None,
+        request_id=None,
+        timestamp=datetime.now(UTC),
+        path=request.url.path,
     )
 
 
@@ -82,6 +88,7 @@ async def create_asset(
     },
 )
 async def list_assets(
+    request: Request,
     session: DBSession,
     _admin_user: AdminUser,
     page: int = Query(default=1, ge=1, le=1000),
@@ -98,7 +105,7 @@ async def list_assets(
         default="created_at",
     ),
     order: Literal["asc", "desc"] = Query(default="desc"),
-) -> PaginatedSuccessResponse[list[AssetResponse]]:
+) -> SuccessResponse[list[AssetResponse]]:
     service = AssetService(session)
 
     assets, total = await service.list(
@@ -114,23 +121,29 @@ async def list_assets(
     )
 
     data = [
-        AssetResponse.model_validate(asset).model_dump(mode="json") for asset in assets
+        AssetResponse.model_validate(asset) for asset in assets
     ]
 
     total_pages = ceil(total / size) if total else 0
 
     pagination = PaginationMeta(
+        items_on_page=len(assets),
         page=page,
-        size=size,
-        total_pages=total_pages,
+        records_per_page=size,
         total_items=total,
-    ).model_dump(mode="json")
-
-    return PaginatedSuccessResponse(
-        data=data,
-        pagination=pagination,
+        total_pages=total_pages,
     )
 
+    return SuccessResponse(
+        success=True,
+        status_code=status.HTTP_200_OK,
+        message="Assets retrieved successfully",
+        data=data,
+        pagination_meta=pagination,
+        request_id=None,
+        timestamp=datetime.now(UTC),
+        path=request.url.path,
+    )
 
 @router.get(
     "/stats",
@@ -143,6 +156,7 @@ async def list_assets(
     },
 )
 async def get_asset_stats(
+    request: Request,
     session: DBSession,
     _admin_user: AdminUser,
 ) -> SuccessResponse[AssetStatsResponse]:
@@ -151,7 +165,14 @@ async def get_asset_stats(
     result = await service.stats()
 
     return SuccessResponse(
+        success=True,
+        status_code=status.HTTP_200_OK,
+        message="Asset statistics retrieved successfully",
         data=result,
+        pagination_meta=None,
+        request_id=None,
+        timestamp=datetime.now(UTC),
+        path=request.url.path,
     )
 
 
@@ -167,6 +188,7 @@ async def get_asset_stats(
     },
 )
 async def get_by_id(
+    request: Request,
     id: UUID,
     session: DBSession,
     current_user: CurrentUser,
@@ -179,9 +201,16 @@ async def get_by_id(
     )
 
     return SuccessResponse(
+        success=True,
+        status_code=status.HTTP_200_OK,
+        message="Asset details retrieved successfully",
         data=AssetResponse.model_validate(
             asset,
-        ).model_dump(mode="json"),
+        ),
+        pagination_meta=None,
+        request_id=None,
+        timestamp=datetime.now(UTC),
+        path=request.url.path,
     )
 
 
@@ -199,6 +228,7 @@ async def get_by_id(
     },
 )
 async def update_asset(
+    request: Request,
     id: UUID,
     data: AssetUpdate,
     session: DBSession,
@@ -214,9 +244,16 @@ async def update_asset(
     )
 
     return SuccessResponse(
+        success=True,
+        status_code=status.HTTP_200_OK,
+        message="Asset updated successfully",
         data=AssetResponse.model_validate(
             asset,
-        ).model_dump(mode="json"),
+        ),
+        pagination_meta=None,
+        request_id=None,
+        timestamp=datetime.now(UTC),
+        path=request.url.path,
     )
 
 
@@ -242,7 +279,6 @@ async def delete_asset(
 
     await service.delete(id)
 
-
 @router.post(
     "/{id}/assign",
     tags=["Asset Assignment"],
@@ -257,6 +293,7 @@ async def delete_asset(
     },
 )
 async def assign_asset(
+    request: Request,
     id: UUID,
     data: AssetAssign,
     session: DBSession,
@@ -270,10 +307,18 @@ async def assign_asset(
     )
 
     return SuccessResponse(
+        success=True,
+        status_code=status.HTTP_200_OK,
+        message="Asset assigned to user successfully",
         data=AssetResponse.model_validate(
             asset,
-        ).model_dump(mode="json"),
+        ),
+        pagination_meta=None,
+        request_id=None,
+        timestamp=datetime.now(UTC),
+        path=request.url.path,
     )
+
 
 
 @router.post(
@@ -290,6 +335,7 @@ async def assign_asset(
     },
 )
 async def unassign_asset(
+    request: Request,
     id: UUID,
     session: DBSession,
     _admin_user: AdminUser,
@@ -299,10 +345,18 @@ async def unassign_asset(
     asset = await service.unassign(id)
 
     return SuccessResponse(
+        success=True,
+        status_code=status.HTTP_200_OK,
+        message="Asset unassigned from user successfully",
         data=AssetResponse.model_validate(
             asset,
-        ).model_dump(mode="json"),
+        ),
+        pagination_meta=None,
+        request_id=None,
+        timestamp=datetime.now(UTC),
+        path=request.url.path,
     )
+
 
 
 @router.post(
@@ -319,6 +373,7 @@ async def unassign_asset(
     },
 )
 async def change_status(
+    request: Request,
     id: UUID,
     data: AssetStatusUpdate,
     session: DBSession,
@@ -332,7 +387,14 @@ async def change_status(
     )
 
     return SuccessResponse(
+        success=True,
+        status_code=status.HTTP_200_OK,
+        message="Asset status updated successfully",
         data=AssetResponse.model_validate(
             asset,
-        ).model_dump(mode="json"),
+        ),
+        pagination_meta=None,
+        request_id=None,
+        timestamp=datetime.now(UTC),
+        path=request.url.path,
     )

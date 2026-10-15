@@ -1,23 +1,35 @@
+from datetime import UTC, datetime
+
 from fastapi import Request
 from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from app.api.responses import error_response
 from app.core.exceptions import AppError
+from app.shared.schemas.common import ErrorResponse
 
 
-def app_error_handler(_request: Request, exc: AppError):
-    return error_response(
+def app_error_handler(request: Request, exc: AppError):
+    response =  ErrorResponse(
+        success=False,
         status_code=exc.status_code,
+        error_code=exc.code,
         message=exc.message,
-        code=exc.code,
-        details=exc.details,
+        errors=None,
+        request_id=None,
+        timestamp=datetime.now(UTC),
+        path=request.url.path,
+    )
+
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=response.model_dump(mode="json"),
         headers=exc.headers,
     )
 
 
 def validation_exception_handler(
-    _request: Request,
+    request: Request,
     exc: RequestValidationError,
 ):
     details = []
@@ -41,35 +53,65 @@ def validation_exception_handler(
         details.append(
             {
                 "field": field,
-                "issue": issue,
+                "message": issue,
             }
         )
 
-    return error_response(
+    response = ErrorResponse(
+        success=False,
         status_code=422,
         message="Request validation failed",
-        code="VALIDATION_ERROR",
-        details=details,
+        error_code="VALIDATION_ERROR",
+        errors=details,
+        request_id=None,
+        timestamp=datetime.now(UTC),
+        path=request.url.path,
+    )
+    return JSONResponse(
+        status_code=422,
+        content=response.model_dump(mode="json"),
+    )
+
+def unexpected_exception_handler(request: Request, _exc: Exception):
+
+    response = ErrorResponse(
+        success=False,
+        status_code=500,
+        message="Internal server error",
+        error_code="INTERNAL_ERROR",
+        errors=None,
+        request_id=None,
+        timestamp=datetime.now(UTC),
+        path=request.url.path,
+    )
+
+    return JSONResponse(
+        status_code=500,
+        content=response.model_dump(mode="json"),
     )
 
 
-def unexpected_exception_handler(_request: Request, _exc: Exception):
-    return error_response(
-        status_code=500, message="Internal server error", code="INTERNAL_ERROR"
-    )
-
-
-def http_exception_handler(_request: Request, exc: StarletteHTTPException):
+def http_exception_handler(request: Request, exc: StarletteHTTPException):
     if exc.status_code == 401:
-        return error_response(
-            status_code=401,
-            message="Authentication credentials are required",
-            code="AUTHENTICATION_REQUIRED",
-            headers=exc.headers,
-        )
-    return error_response(
+        message = "Authentication credentials are required"
+        code = "AUTHENTICATION_REQUIRED"
+    else:
+        message = str(exc.detail)
+        code = "HTTP_ERROR"
+
+    response = ErrorResponse(
+        success=False,
         status_code=exc.status_code,
-        message=str(exc.detail),
-        code="HTTP_ERROR",
+        error_code=code,
+        message=message,
+        errors=None,
+        request_id=None,
+        timestamp=datetime.now(UTC),
+        path=request.url.path,
+    )
+
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=response.model_dump(mode="json"),
         headers=exc.headers,
     )

@@ -1,4 +1,6 @@
-from typing import Any, Generic, TypeVar
+from datetime import datetime
+from typing import Generic, TypeVar
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
@@ -13,49 +15,39 @@ class APIModel(BaseModel):
 
 
 class PaginationMeta(APIModel):
+    items_on_page: int
     page: int
-    size: int
-    total_pages: int
+    records_per_page: int
     total_items: int
+    total_pages: int
 
 
 class SuccessResponse(APIModel, Generic[DataT]):
+    success: bool = True
+    status_code: int
+    message: str
     data: DataT
+    pagination_meta: PaginationMeta | None = None
+    request_id: UUID | None = None
+    timestamp: datetime
+    path: str
 
 
-class PaginatedSuccessResponse(SuccessResponse[DataT], Generic[DataT]):
-    pagination: PaginationMeta
+class PaginatedSuccessResponse(SuccessResponse[DataT]):
+    pagination_meta: PaginationMeta
 
 
 class ErrorDetail(APIModel):
     field: str
-    issue: str
-
-
-class APIError(APIModel):
-    code: str
     message: str
-
-
-class DetailedAPIError(APIModel):
-    code: str
-    message: str
-    details: dict[str, Any]
-
-
-class ValidationAPIError(APIModel):
-    code: str
-    message: str
-    details: list[ErrorDetail]
 
 
 class ErrorResponse(APIModel):
-    error: APIError
-
-
-class DetailedErrorResponse(APIModel):
-    error: DetailedAPIError
-
-
-class ValidationErrorResponse(APIModel):
-    error: ValidationAPIError
+    success: bool = False
+    status_code: int
+    error_code: str
+    message: str
+    errors: list[ErrorDetail] | None = None
+    request_id: UUID | None = None
+    timestamp: datetime
+    path: str
