@@ -13,6 +13,7 @@ from app.modules.asset.exceptions import (
 )
 from app.modules.asset.models import Asset
 from app.modules.asset.services import AssetService
+from app.modules.auth.exceptions import AuthorizationError
 from app.shared.models.enums import AssetStatus, AssetType, UserRole
 
 
@@ -95,7 +96,7 @@ async def test_list_assets(
         asset_type=None,
         asset_status=None,
         assigned_to=None,
-        warranty_expiring_before=None,
+        warranty_expiry=None,
         search=None,
         sort="created_at",
         order="desc",
@@ -266,7 +267,7 @@ async def test_get_by_id_raises_when_user_is_not_allowed(
         return_value=asset,
     )
 
-    with pytest.raises(AssetNotFoundError):
+    with pytest.raises(AuthorizationError):
         await service.get_by_id(
             asset_id=asset.id,
             current_user=created_user,

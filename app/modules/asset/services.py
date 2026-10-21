@@ -18,6 +18,7 @@ from app.modules.asset.models import Asset
 from app.modules.asset.repositories import AssetRepository
 from app.modules.asset.tag.generator import build_asset_tag, get_company_prefix
 from app.modules.asset.tag.repository import AssetTagCounterRepository
+from app.modules.auth.exceptions import AuthorizationError
 from app.modules.user.models import User
 from app.modules.user.repositories import UserRepository
 from app.shared.models.enums import AssetStatus, AssetType, UserRole
@@ -146,7 +147,7 @@ class AssetService:
         asset_type: AssetType | None = None,
         asset_status: AssetStatus | None = None,
         assigned_to: UUID | None = None,
-        warranty_expiring_before: date | None = None,
+        warranty_expiry: date | None = None,
         search: str | None = None,
         sort: Literal["created_at", "purchase_date", "asset_tag"] = "created_at",
         order: Literal["asc", "desc"] = "desc",
@@ -157,7 +158,7 @@ class AssetService:
             asset_type=asset_type,
             asset_status=asset_status,
             assigned_to=assigned_to,
-            warranty_expiring_before=warranty_expiring_before,
+            warranty_expiry=warranty_expiry,
             search=search,
             sort=sort,
             order=order,
@@ -182,7 +183,7 @@ class AssetService:
         if asset.assigned_to == current_user.id:
             return asset
 
-        raise AssetNotFoundError()
+        raise AuthorizationError()
 
     async def update(
         self,

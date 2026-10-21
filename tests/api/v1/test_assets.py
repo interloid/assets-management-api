@@ -447,8 +447,8 @@ async def test_user_cannot_get_asset_they_do_not_own(
         f"/api/v1/assets/{asset['id']}",
     )
 
-    assert response.status_code == 404
-    assert response.json()["error_code"] == "ASSET_NOT_FOUND"
+    assert response.status_code == 403
+    assert response.json()["error_code"] == "AUTHORIZATION_ERROR"
 
 
 @pytest.mark.asyncio

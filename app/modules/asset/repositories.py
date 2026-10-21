@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Literal
 from uuid import UUID
 
@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.modules.asset.models import Asset
-from app.shared.models.enums import AssetStatus, AssetType
+from app.shared.models.enums import AssetStatus, AssetType, WarrantyExpiry
 from app.shared.utils.query import escape_like
 
 SORT_COLUMNS = {
@@ -35,11 +35,12 @@ class AssetRepository:
         asset_type: AssetType | None = None,
         asset_status: AssetStatus | None = None,
         assigned_to: UUID | None = None,
-        warranty_expiring_before: date | None = None,
+        warranty_expiry: WarrantyExpiry | None = None,
         search: str | None = None,
         sort: Literal["created_at", "purchase_date", "asset_tag"] = "created_at",
         order: Literal["asc", "desc"] = "desc",
     ) -> tuple[list[Asset], int]:
+        today = date.today()
         filters = [Asset.deleted_at.is_(None)]
 
         if asset_type is not None:
@@ -48,8 +49,17 @@ class AssetRepository:
             filters.append(Asset.status == asset_status)
         if assigned_to is not None:
             filters.append(Asset.assigned_to == assigned_to)
-        if warranty_expiring_before is not None:
-            filters.append(Asset.warranty_expiry <= warranty_expiring_before)
+
+        if warranty_expiry == WarrantyExpiry.EXPIRES_IN_30_DAYS:
+            filters.append(Asset.warranty_expiry >= today)
+            filters.append(Asset.warranty_expiry <= today + timedelta(days=30))
+
+        elif warranty_expiry == WarrantyExpiry.EXPIRES_IN_90_DAYS:
+            filters.append(Asset.warranty_expiry >= today)
+            filters.append(Asset.warranty_expiry <= today + timedelta(days=90))
+
+        elif warranty_expiry == WarrantyExpiry.ALREADY_EXPIRED:
+            filters.append(Asset.warranty_expiry < today)
 
         if search:
             search = search.strip()

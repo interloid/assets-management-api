@@ -1,4 +1,4 @@
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 from math import ceil
 from typing import Literal
 from uuid import UUID
@@ -24,7 +24,7 @@ from app.api.v1.schemas.assets import (
     AssetUpdate,
 )
 from app.modules.asset.services import AssetService
-from app.shared.models.enums import AssetStatus, AssetType
+from app.shared.models.enums import AssetStatus, AssetType, WarrantyExpiry
 from app.shared.schemas.common import (
     PaginationMeta,
     SuccessResponse,
@@ -100,7 +100,7 @@ async def list_assets(
         alias="status",
     ),
     assigned_to: UUID | None = None,
-    warranty_expiring_before: date | None = None,
+    warranty_expiry: WarrantyExpiry | None = None,
     search: str | None = None,
     sort: Literal["created_at", "purchase_date", "asset_tag"] = Query(
         default="created_at",
@@ -115,7 +115,7 @@ async def list_assets(
         asset_type=asset_type,
         asset_status=asset_status,
         assigned_to=assigned_to,
-        warranty_expiring_before=warranty_expiring_before,
+        warranty_expiry=warranty_expiry,
         search=search,
         sort=sort,
         order=order,
