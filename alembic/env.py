@@ -5,16 +5,19 @@ from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-import app.models  # noqa: F401
 from alembic import context
 from app.core.config import settings
-from app.db.base import Base
+from app.modules.asset.models import Asset  # noqa: F401
+from app.modules.asset.tag.model import AssetTagCounter  # noqa: F401
+from app.modules.auth.models import RefreshToken  # noqa: F401
+from app.modules.user.models import User  # noqa: F401
+from app.shared.models.base import Base
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
 
-database_url = os.getenv("ALEMBIC_DATABASE_URL", settings.database_url)
+database_url = os.getenv("ALEMBIC_DATABASE_URL", str(settings.DATABASE_URL))
 
 config.set_main_option(
     "sqlalchemy.url",

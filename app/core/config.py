@@ -1,22 +1,29 @@
 from typing import Literal
 
-from pydantic import PositiveInt, PostgresDsn, RedisDsn
+from pydantic import Field, PositiveInt, PostgresDsn, RedisDsn
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    ENVIRONMENT: str = "development"
     DATABASE_URL: PostgresDsn
     REDIS_URL: RedisDsn
 
-    JWT_SECRET_KEY: str
+    JWT_SECRET_KEY: str = Field(min_length=32)
     JWT_ALGORITHM: Literal["HS256"]
 
     ACCESS_TOKEN_EXPIRE_MINUTES: PositiveInt
     REFRESH_TOKEN_EXPIRE_DAYS: PositiveInt
 
+    ASSET_TAG_COMPANY_PREFIX: str = Field(min_length=1, max_length=20)
+
+    SEED_USER_PASSWORD: str
+    SEED_ADMIN_PASSWORD: str
+
+    CORS_ORIGINS: str
+
     model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
+        env_file=".env", env_file_encoding="utf-8", extra="ignore"
     )
 
 
