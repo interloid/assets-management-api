@@ -102,7 +102,9 @@ async def list_assets(
     assigned_to: UUID | None = None,
     warranty_expiry: WarrantyExpiry | None = None,
     search: str | None = None,
-    sort: Literal["created_at", "purchase_date", "asset_tag"] = Query(
+    sort: Literal[
+        "created_at", "purchase_date", "warranty_expiry", "asset_tag"
+    ] = Query(
         default="created_at",
     ),
     order: Literal["asc", "desc"] = Query(default="desc"),

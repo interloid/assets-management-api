@@ -149,7 +149,9 @@ class AssetService:
         assigned_to: UUID | None = None,
         warranty_expiry: date | None = None,
         search: str | None = None,
-        sort: Literal["created_at", "purchase_date", "asset_tag"] = "created_at",
+        sort: Literal[
+            "created_at", "purchase_date", "warranty_expiry", "asset_tag"
+        ] = "created_at",
         order: Literal["asc", "desc"] = "desc",
     ) -> tuple[list[Asset], int]:
         assets, total = await self.asset_repository.list(

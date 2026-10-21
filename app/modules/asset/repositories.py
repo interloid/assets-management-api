@@ -14,6 +14,7 @@ SORT_COLUMNS = {
     "created_at": Asset.created_at,
     "purchase_date": Asset.purchase_date,
     "asset_tag": Asset.asset_tag,
+    "warranty_expiry": Asset.warranty_expiry,
 }
 
 
@@ -37,7 +38,9 @@ class AssetRepository:
         assigned_to: UUID | None = None,
         warranty_expiry: WarrantyExpiry | None = None,
         search: str | None = None,
-        sort: Literal["created_at", "purchase_date", "asset_tag"] = "created_at",
+        sort: Literal[
+            "created_at", "purchase_date", "warranty_expiry", "asset_tag"
+        ] = "created_at",
         order: Literal["asc", "desc"] = "desc",
     ) -> tuple[list[Asset], int]:
         today = date.today()
@@ -73,7 +76,16 @@ class AssetRepository:
             )
 
         sort_column = SORT_COLUMNS[sort]
-        order_by_clause = sort_column.asc() if order == "asc" else sort_column.desc()
+        if sort == "warranty_expiry":
+            order_by_clause = (
+                sort_column.asc().nullslast()
+                if order == "asc"
+                else sort_column.desc().nullslast()
+            )
+        else:
+            order_by_clause = (
+                sort_column.asc() if order == "asc" else sort_column.desc()
+            )
 
         order_clauses = (
             [order_by_clause, Asset.id.asc()]
