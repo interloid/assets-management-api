@@ -18,6 +18,78 @@ SORT_COLUMNS = {
 }
 
 
+def build_filters(
+    *,
+    asset_type: AssetType | None = None,
+    asset_status: AssetStatus | None = None,
+    assigned_to: UUID | None = None,
+    warranty_expiry: WarrantyExpiry | None = None,
+    search: str | None = None,
+) -> list:
+    today = date.today()
+    filters = [Asset.deleted_at.is_(None)]
+
+    if asset_type is not None:
+        filters.append(Asset.type == asset_type)
+
+    if asset_status is not None:
+        filters.append(Asset.status == asset_status)
+
+    if assigned_to is not None:
+        filters.append(Asset.assigned_to == assigned_to)
+
+    if warranty_expiry == WarrantyExpiry.EXPIRES_IN_30_DAYS:
+        filters.append(Asset.warranty_expiry >= today)
+        filters.append(Asset.warranty_expiry <= today + timedelta(days=30))
+
+    elif warranty_expiry == WarrantyExpiry.EXPIRES_IN_90_DAYS:
+        filters.append(Asset.warranty_expiry >= today)
+        filters.append(Asset.warranty_expiry <= today + timedelta(days=90))
+
+    elif warranty_expiry == WarrantyExpiry.ALREADY_EXPIRED:
+        filters.append(Asset.warranty_expiry < today)
+
+    if search:
+        search_pattern = f"%{escape_like(search.strip())}%"
+        filters.append(
+            or_(
+                Asset.asset_tag.ilike(search_pattern, escape="\\"),
+                Asset.serial_number.ilike(search_pattern, escape="\\"),
+                Asset.notes.ilike(search_pattern, escape="\\"),
+            )
+        )
+
+    return filters
+
+
+def build_ordering(
+    *,
+    sort: Literal[
+        "created_at", "purchase_date", "warranty_expiry", "asset_tag"
+    ] = "created_at",
+    order: Literal["asc", "desc"] = "desc",
+) -> list:
+    sort_column = SORT_COLUMNS[sort]
+
+    if sort == "warranty_expiry":
+        order_by_clause = (
+            sort_column.asc().nullslast()
+            if order == "asc"
+            else sort_column.desc().nullslast()
+        )
+    else:
+        order_by_clause = sort_column.asc() if order == "asc" else sort_column.desc()
+
+    if sort == "created_at":
+        return [order_by_clause, Asset.id.asc()]
+
+    return [
+        order_by_clause,
+        Asset.created_at.desc(),
+        Asset.id.asc(),
+    ]
+
+
 class AssetRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
@@ -27,6 +99,43 @@ class AssetRepository:
         await self.session.flush()
         await self.session.refresh(asset)
         return asset
+
+    async def list_for_export(
+        self,
+        *,
+        asset_type: AssetType | None = None,
+        asset_status: AssetStatus | None = None,
+        assigned_to: UUID | None = None,
+        warranty_expiry: WarrantyExpiry | None = None,
+        search: str | None = None,
+        sort: Literal[
+            "created_at", "purchase_date", "warranty_expiry", "asset_tag"
+        ] = "created_at",
+        order: Literal["asc", "desc"] = "desc",
+    ) -> list[Asset]:
+        filters = build_filters(
+            asset_type=asset_type,
+            asset_status=asset_status,
+            assigned_to=assigned_to,
+            warranty_expiry=warranty_expiry,
+            search=search,
+        )
+
+        order_clauses = build_ordering(
+            sort=sort,
+            order=order,
+        )
+
+        query = (
+            select(Asset)
+            .options(selectinload(Asset.assigned_user))
+            .where(*filters)
+            .order_by(*order_clauses)
+        )
+
+        result = await self.session.execute(query)
+
+        return list(result.scalars().all())
 
     async def list(
         self,
@@ -43,55 +152,16 @@ class AssetRepository:
         ] = "created_at",
         order: Literal["asc", "desc"] = "desc",
     ) -> tuple[list[Asset], int]:
-        today = date.today()
-        filters = [Asset.deleted_at.is_(None)]
 
-        if asset_type is not None:
-            filters.append(Asset.type == asset_type)
-        if asset_status is not None:
-            filters.append(Asset.status == asset_status)
-        if assigned_to is not None:
-            filters.append(Asset.assigned_to == assigned_to)
-
-        if warranty_expiry == WarrantyExpiry.EXPIRES_IN_30_DAYS:
-            filters.append(Asset.warranty_expiry >= today)
-            filters.append(Asset.warranty_expiry <= today + timedelta(days=30))
-
-        elif warranty_expiry == WarrantyExpiry.EXPIRES_IN_90_DAYS:
-            filters.append(Asset.warranty_expiry >= today)
-            filters.append(Asset.warranty_expiry <= today + timedelta(days=90))
-
-        elif warranty_expiry == WarrantyExpiry.ALREADY_EXPIRED:
-            filters.append(Asset.warranty_expiry < today)
-
-        if search:
-            search = search.strip()
-            search_pattern = f"%{escape_like(search)}%"
-            filters.append(
-                or_(
-                    Asset.asset_tag.ilike(search_pattern, escape="\\"),
-                    Asset.serial_number.ilike(search_pattern, escape="\\"),
-                    Asset.notes.ilike(search_pattern, escape="\\"),
-                ),
-            )
-
-        sort_column = SORT_COLUMNS[sort]
-        if sort == "warranty_expiry":
-            order_by_clause = (
-                sort_column.asc().nullslast()
-                if order == "asc"
-                else sort_column.desc().nullslast()
-            )
-        else:
-            order_by_clause = (
-                sort_column.asc() if order == "asc" else sort_column.desc()
-            )
-
-        order_clauses = (
-            [order_by_clause, Asset.id.asc()]
-            if sort == "created_at"
-            else [order_by_clause, Asset.created_at.desc(), Asset.id.asc()]
+        filters = build_filters(
+            asset_type=asset_type,
+            asset_status=asset_status,
+            assigned_to=assigned_to,
+            warranty_expiry=warranty_expiry,
+            search=search,
         )
+
+        order_clauses = build_ordering(sort=sort, order=order)
 
         offset = (page - 1) * size
         query = (

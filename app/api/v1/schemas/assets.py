@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -87,3 +88,15 @@ class AssetStatsResponse(BaseModel):
     assigned: int
     repair: int
     retired: int
+
+
+class AssetExportRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    asset_type: AssetType | None = Field(default=None, alias="type")
+    asset_status: AssetStatus | None = Field(default=None, alias="status")
+    assigned_to: UUID | None = None
+    warranty_expiring_before: date | None = None
+    search: str | None = None
+    sort: Literal["created_at", "purchase_date", "asset_tag"] = "created_at"
+    order: Literal["asc", "desc"] = "desc"
