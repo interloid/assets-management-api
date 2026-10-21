@@ -7,7 +7,10 @@ celery_app = Celery(
     "assets_management",
     broker=str(settings.CELERY_BROKER_URL or settings.REDIS_URL),
     backend=str(settings.CELERY_RESULT_BACKEND or settings.REDIS_URL),
-    include=["app.infrastructure.celery.warranty_tasks"],
+    include=[
+        "app.infrastructure.celery.tasks.warranty_tasks",
+        "app.infrastructure.celery.tasks.csv_export_tasks",
+    ],
 )
 
 celery_app.conf.update(

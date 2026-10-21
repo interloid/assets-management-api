@@ -22,7 +22,11 @@ COPY app/ ./app/
 COPY alembic/ ./alembic
 COPY alembic.ini ./
 
-RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser && chown -R appuser:appgroup /app
+RUN addgroup --system appgroup \
+    && adduser --system --ingroup appgroup appuser \
+    && mkdir -p /app/exports \
+    && chown -R appuser:appgroup /app \
+    && chmod 775 /app/exports
 
 USER appuser
 

@@ -26,6 +26,9 @@ services:
     restart: "no"
 
   api:
+    build:
+      context: .
+      dockerfile: Dockerfile
     image: madhavanselvaraj/assets-management-api:latest
     env_file:
       - .env
@@ -47,6 +50,7 @@ services:
       - ./app:/app/app
       - ./alembic:/app/alembic
       - ./alembic.ini:/app/alembic.ini
+      - exports_data:/app/exports
     depends_on:
       redis:
         condition: service_healthy
@@ -70,6 +74,8 @@ services:
       - --loglevel=info
     volumes:
       - ./app:/app/app
+      - exports_data:/app/exports
+
     depends_on:
       redis:
         condition: service_healthy
@@ -102,3 +108,4 @@ services:
 
 volumes:
   redis_data:
+  exports_data:
