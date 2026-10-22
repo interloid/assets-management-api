@@ -148,7 +148,7 @@ def build_digest(assets) -> str:
 
 @celery_app.task(
     bind=True,
-    name="app.infrastructure.celery.warranty_tasks.send_warranty_reminders",
+    name="app.infrastructure.celery.tasks.warranty_tasks.send_warranty_reminders",
     autoretry_for=(smtplib.SMTPException, OSError),
     retry_backoff=True,
     retry_kwargs={"max_retries": 3},

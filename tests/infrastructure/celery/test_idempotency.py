@@ -2,11 +2,8 @@ from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
-import pytest_asyncio
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.infrastructure.celery import idempotency
 from app.infrastructure.celery.idempotency import (
     STALE_JOB_TIMEOUT,
     claim_job,
@@ -18,27 +15,6 @@ from app.modules.asset.tag.model import AssetTagCounter  # noqa: F401
 from app.modules.auth.models import RefreshToken  # noqa: F401
 from app.modules.user.models import User  # noqa: F401
 from app.shared.models.background_job import BackgroundJob
-from tests.config import test_settings
-
-
-@pytest_asyncio.fixture
-async def job_session_factory(monkeypatch):
-    engine = create_async_engine(
-        str(test_settings.TEST_DATABASE_URL),
-        echo=False,
-    )
-    session_factory = async_sessionmaker(
-        bind=engine,
-        class_=AsyncSession,
-        expire_on_commit=False,
-    )
-
-    monkeypatch.setattr(idempotency, "AsyncSessionLocal", session_factory)
-
-    try:
-        yield session_factory
-    finally:
-        await engine.dispose()
 
 
 async def get_job(
