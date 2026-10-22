@@ -10,6 +10,7 @@ celery_app = Celery(
     include=[
         "app.infrastructure.celery.tasks.warranty_tasks",
         "app.infrastructure.celery.tasks.csv_export_tasks",
+        "app.infrastructure.celery.tasks.weekly_tasks",
     ],
 )
 
@@ -22,8 +23,12 @@ celery_app.conf.update(
     task_trace_started=True,
     beat_schedule={
         "daily-warranty-expiry-reminders": {
-            "task": "app.infrastructure.celery.warranty_tasks.send_warranty_reminders",
+            "task": "app.infrastructure.celery.tasks.warranty_tasks.send_warranty_reminders",
             "schedule": crontab(hour=12, minute=30),
-        }
+        },
+        "weekly-asset-management-summary": {
+            "task": "app.infrastructure.celery.tasks.weekly_tasks.send_weekly_summary",
+            "schedule": crontab(hour=5, minute=35, day_of_week="thursday"),
+        },
     },
 )

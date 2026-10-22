@@ -1,64 +1,36 @@
-from datetime import date
-from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
-import pytest
-
-from app.infrastructure.celery.app import celery_app
-from app.infrastructure.celery.warranty_tasks import (
+from app.infrastructure.celery.tasks.warranty_tasks import (
     build_digest,
     send_warranty_reminders,
 )
 
 
-@pytest.fixture
-def eager_celery(monkeypatch):
-    monkeypatch.setitem(
-        celery_app.conf,
-        "task_always_eager",
-        True,
-    )
-    monkeypatch.setitem(
-        celery_app.conf,
-        "task_eager_propagates",
-        True,
-    )
-
-
-def make_asset():
-    return SimpleNamespace(
-        asset_tag="IL-LAP-0001",
-        type=SimpleNamespace(value="laptop"),
-        status=SimpleNamespace(value="in_stock"),
-        warranty_expiry=date(2026, 10, 25),
-    )
-
-
-def test_send_warranty_reminders_success(eager_celery):
-    assets = [make_asset()]
+def test_send_warranty_reminders_success(eager_celery, make_asset):
+    assets = [make_asset]
     admins = ["admin@example.com"]
 
     with (
         patch(
-            "app.infrastructure.celery.warranty_tasks.get_warranty_reminder_data",
+            "app.infrastructure.celery.tasks.warranty_tasks.get_warranty_reminder_data",
             new_callable=AsyncMock,
             return_value=(assets, admins),
         ),
         patch(
-            "app.infrastructure.celery.warranty_tasks.send_email",
+            "app.infrastructure.celery.tasks.warranty_tasks.send_email",
         ) as mock_send_email,
         patch(
-            "app.infrastructure.celery.warranty_tasks.claim_job",
+            "app.infrastructure.celery.tasks.warranty_tasks.claim_job",
             new_callable=AsyncMock,
             return_value=True,
         ),
         patch(
-            "app.infrastructure.celery.warranty_tasks.mark_completed",
+            "app.infrastructure.celery.tasks.warranty_tasks.mark_completed",
             new_callable=AsyncMock,
             return_value=True,
         ),
         patch(
-            "app.infrastructure.celery.warranty_tasks.mark_failed",
+            "app.infrastructure.celery.tasks.warranty_tasks.mark_failed",
             new_callable=AsyncMock,
         ),
     ):
@@ -76,28 +48,28 @@ def test_send_warranty_reminders_success(eager_celery):
     assert "IL-LAP-0001" in (mock_send_email.call_args.kwargs["text_body"])
 
 
-def test_send_warranty_reminders_without_admins(eager_celery):
+def test_send_warranty_reminders_without_admins(eager_celery, make_asset):
     with (
         patch(
-            "app.infrastructure.celery.warranty_tasks.get_warranty_reminder_data",
+            "app.infrastructure.celery.tasks.warranty_tasks.get_warranty_reminder_data",
             new_callable=AsyncMock,
-            return_value=([make_asset()], []),
+            return_value=([make_asset], []),
         ),
         patch(
-            "app.infrastructure.celery.warranty_tasks.send_email",
+            "app.infrastructure.celery.tasks.warranty_tasks.send_email",
         ) as mock_send_email,
         patch(
-            "app.infrastructure.celery.warranty_tasks.claim_job",
+            "app.infrastructure.celery.tasks.warranty_tasks.claim_job",
             new_callable=AsyncMock,
             return_value=True,
         ),
         patch(
-            "app.infrastructure.celery.warranty_tasks.mark_completed",
+            "app.infrastructure.celery.tasks.warranty_tasks.mark_completed",
             new_callable=AsyncMock,
             return_value=True,
         ),
         patch(
-            "app.infrastructure.celery.warranty_tasks.mark_failed",
+            "app.infrastructure.celery.tasks.warranty_tasks.mark_failed",
             new_callable=AsyncMock,
         ),
     ):
@@ -115,25 +87,25 @@ def test_send_warranty_reminders_without_expiring_assets(
 ):
     with (
         patch(
-            "app.infrastructure.celery.warranty_tasks.get_warranty_reminder_data",
+            "app.infrastructure.celery.tasks.warranty_tasks.get_warranty_reminder_data",
             new_callable=AsyncMock,
             return_value=([], ["admin@example.com"]),
         ),
         patch(
-            "app.infrastructure.celery.warranty_tasks.send_email",
+            "app.infrastructure.celery.tasks.warranty_tasks.send_email",
         ) as mock_send_email,
         patch(
-            "app.infrastructure.celery.warranty_tasks.claim_job",
+            "app.infrastructure.celery.tasks.warranty_tasks.claim_job",
             new_callable=AsyncMock,
             return_value=True,
         ),
         patch(
-            "app.infrastructure.celery.warranty_tasks.mark_completed",
+            "app.infrastructure.celery.tasks.warranty_tasks.mark_completed",
             new_callable=AsyncMock,
             return_value=True,
         ),
         patch(
-            "app.infrastructure.celery.warranty_tasks.mark_failed",
+            "app.infrastructure.celery.tasks.warranty_tasks.mark_failed",
             new_callable=AsyncMock,
         ),
     ):
@@ -152,13 +124,13 @@ def test_send_warranty_reminders_without_expiring_assets(
     )
 
 
-def test_build_digest_contains_asset_details():
-    result = build_digest([make_asset()])
+def test_build_digest_contains_asset_details(make_asset):
+    result = build_digest([make_asset])
 
     assert "IL-LAP-0001" in result
     assert "laptop" in result
     assert "in_stock" in result
-    assert "2026-10-25" in result
+    assert str(make_asset.warranty_expiry) in result
 
 
 def test_build_digest_without_assets():

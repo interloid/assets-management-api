@@ -1,6 +1,4 @@
 import csv
-from contextlib import asynccontextmanager
-from datetime import date, datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -20,16 +18,15 @@ from app.modules.asset.csv_export.csv_export_writter import (
     write_csv_file,
 )
 from app.shared.models.enums import AssetStatus, AssetType
-
-
-@asynccontextmanager
-async def fake_session(session):
-    yield session
-
-
-@asynccontextmanager
-async def fake_context():
-    yield
+from tests.infrastructure.conftest import (
+    CREATED_AT,
+    PURCHASE_DATE,
+    REPORT_DATE,
+    UPDATED_AT,
+    WARRANTY_EXPIRY,
+    fake_context,
+    fake_session,
+)
 
 
 def test_csv_value_returns_empty_string_for_none():
@@ -47,13 +44,11 @@ def test_csv_value_converts_uuid_to_string():
 
 
 def test_csv_value_converts_date_to_iso_format():
-    assert csv_value(date(2026, 10, 25)) == "2026-10-25"
+    assert csv_value(REPORT_DATE) == REPORT_DATE.isoformat()
 
 
 def test_csv_value_converts_datetime_to_iso_format():
-    value = datetime(2026, 10, 21, 12, 30, tzinfo=timezone.utc)
-
-    assert csv_value(value) == value.isoformat()
+    assert csv_value(CREATED_AT) == CREATED_AT.isoformat()
 
 
 def test_parse_filters_converts_enum_and_uuid_values():
@@ -106,11 +101,11 @@ def test_write_csv_file_writes_header_and_rows(tmp_path: Path):
             "status": "in_stock",
             "assigned_user_name": None,
             "assigned_user_email": None,
-            "purchase_date": date(2026, 1, 1),
-            "warranty_expiry": date(2027, 1, 1),
+            "purchase_date": PURCHASE_DATE,
+            "warranty_expiry": WARRANTY_EXPIRY,
             "notes": None,
-            "created_at": datetime(2026, 1, 1, tzinfo=timezone.utc),
-            "updated_at": datetime(2026, 1, 2, tzinfo=timezone.utc),
+            "created_at": CREATED_AT,
+            "updated_at": UPDATED_AT,
         }
     ]
 
@@ -130,7 +125,7 @@ def test_write_csv_file_writes_header_and_rows(tmp_path: Path):
     assert exported_rows[0]["type"] == "laptop"
     assert exported_rows[0]["status"] == "in_stock"
     assert exported_rows[0]["assigned_user_name"] == ""
-    assert exported_rows[0]["purchase_date"] == "2026-01-01"
+    assert exported_rows[0]["purchase_date"] == PURCHASE_DATE.isoformat()
 
 
 def test_write_csv_file_writes_header_for_empty_export(tmp_path: Path):
@@ -156,11 +151,11 @@ def test_asset_to_csv_handles_unassigned_asset():
         serial_number = "SN-001"
         status = AssetStatus.IN_STOCK
         assigned_user = None
-        purchase_date = date(2026, 1, 1)
-        warranty_expiry = date(2027, 1, 1)
+        purchase_date = PURCHASE_DATE
+        warranty_expiry = WARRANTY_EXPIRY
         notes = None
-        created_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
-        updated_at = datetime(2026, 1, 2, tzinfo=timezone.utc)
+        created_at = CREATED_AT
+        updated_at = UPDATED_AT
 
     row = asset_to_csv(FakeAsset())
 
