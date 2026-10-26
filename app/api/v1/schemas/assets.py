@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
 
 from app.modules.asset.validators.serial_number import validate_serial_number
 from app.shared.models.enums import AssetStatus, AssetType
@@ -42,6 +42,22 @@ class AssetResponse(BaseModel):
     )
     purchase_date: date
     warranty_expiry: date | None
+
+    @computed_field
+    @property
+    def warranty_expires_in_days(self) -> str:
+        if not self.warranty_expiry:
+            return "No Warranty"
+
+        delta = (self.warranty_expiry - date.today()).days
+
+        if delta <= -1:
+            return "Expired"
+        elif delta == 0:
+            return "Expires Today"
+        else:
+            return str(delta)
+
     notes: str | None
     created_at: datetime
     updated_at: datetime
