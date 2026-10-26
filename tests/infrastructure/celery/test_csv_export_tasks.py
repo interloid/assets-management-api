@@ -18,7 +18,7 @@ from app.modules.asset.csv_export.csv_export_writter import (
     write_csv_file,
 )
 from app.shared.models.enums import AssetStatus, AssetType
-from tests.infrastructure.conftest import (
+from tests.infrastructure.celery.conftest import (
     CREATED_AT,
     PURCHASE_DATE,
     REPORT_DATE,

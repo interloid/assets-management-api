@@ -8,6 +8,7 @@ from app.core.security import hash_password
 from app.infrastructure.database import AsyncSessionLocal, engine
 from app.modules.asset.models import Asset
 from app.modules.asset.tag.model import AssetTagCounter
+from app.modules.asset_files.models import AssetFiles  # noqa: F401
 from app.modules.auth.models import RefreshToken  # noqa: F401
 from app.modules.user.models import User
 from app.shared.models.enums import AssetStatus, AssetType, UserRole

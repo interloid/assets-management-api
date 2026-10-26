@@ -1,4 +1,19 @@
 services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   redis:
     image: redis:7-alpine
     restart: unless-stopped
@@ -10,17 +25,31 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+    networks:
+      default:
+        aliases:
+          - redis
 
   migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
     image: madhavanselvaraj/assets-management-api:latest
     env_file:
       - .env
     environment:
+      DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/1
+    volumes:
+      - ./app:/app/app
+      - ./alembic:/app/alembic
+      - ./alembic.ini:/app/alembic.ini
     command: ["alembic", "upgrade", "head"]
     depends_on:
+      db:
+        condition: service_healthy
       redis:
         condition: service_healthy
     restart: "no"
@@ -33,6 +62,7 @@ services:
     env_file:
       - .env
     environment:
+      DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/1
@@ -51,6 +81,9 @@ services:
       - ./alembic:/app/alembic
       - ./alembic.ini:/app/alembic.ini
       - exports_data:/app/exports
+    networks:
+      - default
+      - floci-network
     depends_on:
       redis:
         condition: service_healthy
@@ -59,10 +92,14 @@ services:
     restart: unless-stopped
 
   worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
     image: madhavanselvaraj/assets-management-api:latest
     env_file:
       - .env
     environment:
+      DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/1
@@ -75,7 +112,9 @@ services:
     volumes:
       - ./app:/app/app
       - exports_data:/app/exports
-
+    networks:
+      - default
+      - floci-network
     depends_on:
       redis:
         condition: service_healthy
@@ -84,10 +123,14 @@ services:
     restart: unless-stopped
 
   beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
     image: madhavanselvaraj/assets-management-api:latest
     env_file:
       - .env
     environment:
+      DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/1
@@ -99,6 +142,9 @@ services:
       - --loglevel=info
     volumes:
       - ./app:/app/app
+    networks:
+      - default
+      - floci-network
     depends_on:
       redis:
         condition: service_healthy
@@ -107,5 +153,13 @@ services:
     restart: unless-stopped
 
 volumes:
+  postgres_data:
   redis_data:
   exports_data:
+
+networks:
+  default:
+    driver: bridge
+  floci-network:
+    external: true
+    name: floci_default

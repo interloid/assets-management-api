@@ -11,6 +11,7 @@ celery_app = Celery(
         "app.infrastructure.celery.tasks.warranty_tasks",
         "app.infrastructure.celery.tasks.csv_export_tasks",
         "app.infrastructure.celery.tasks.weekly_tasks",
+        "app.infrastructure.celery.tasks.asset_file_cleanup_tasks",
     ],
 )
 
@@ -29,6 +30,12 @@ celery_app.conf.update(
         "weekly-asset-management-summary": {
             "task": "app.infrastructure.celery.tasks.weekly_tasks.send_weekly_summary",
             "schedule": crontab(hour=5, minute=35, day_of_week="thursday"),
+        },
+        "daily-expired-asset-file-cleanup": {
+            "task": (
+                "app.infrastructure.celery.tasks.asset_file_cleanup_tasks.cleanup_expired_asset_files"
+            ),
+            "schedule": crontab(hour=1, minute=0),
         },
     },
 )
