@@ -11,6 +11,7 @@ from app.shared.models.enums import AssetStatus, AssetType
 from app.shared.models.mixins import CreatedAtMixin, UpdatedAtMixin
 
 if TYPE_CHECKING:
+    from app.modules.asset_files.models import AssetFiles
     from app.modules.user.models import User
 
 
@@ -83,6 +84,12 @@ class Asset(
 
     assigned_user: Mapped["User | None"] = relationship(
         back_populates="assets",
+    )
+
+    asset_files: Mapped[list["AssetFiles"]] = relationship(
+        "AssetFiles",
+        back_populates="asset",
+        cascade="all, delete-orphan",
     )
 
     __table_args__ = (
