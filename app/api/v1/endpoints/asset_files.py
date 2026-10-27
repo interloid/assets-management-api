@@ -5,6 +5,14 @@ from fastapi import APIRouter, Request, status
 
 from app.api.deps import DBSession
 from app.api.v1.dependencies import AdminUser, CurrentUser
+from app.api.v1.responses import (
+    CONFLICT_RESPONSE,
+    FORBIDDEN_RESPONSE,
+    INTERNAL_SERVER_ERROR_RESPONSE,
+    NOT_FOUND_RESPONSE,
+    UNAUTHORIZED_RESPONSE,
+    VALIDATION_RESPONSE,
+)
 from app.api.v1.schemas.assets import (
     AssetFileConfirmResponse,
     AssetFileResponse,
@@ -23,6 +31,14 @@ router = APIRouter(
 @router.post(
     "/{id}/files/presign",
     status_code=status.HTTP_201_CREATED,
+    responses={
+        **CONFLICT_RESPONSE,
+        **FORBIDDEN_RESPONSE,
+        **INTERNAL_SERVER_ERROR_RESPONSE,
+        **NOT_FOUND_RESPONSE,
+        **UNAUTHORIZED_RESPONSE,
+        **VALIDATION_RESPONSE,
+    },
 )
 async def generate_upload_url(
     request: Request,
@@ -54,6 +70,14 @@ async def generate_upload_url(
 @router.post(
     "/{id}/files/{file_id}/confirm",
     status_code=status.HTTP_200_OK,
+    responses={
+        **CONFLICT_RESPONSE,
+        **FORBIDDEN_RESPONSE,
+        **INTERNAL_SERVER_ERROR_RESPONSE,
+        **NOT_FOUND_RESPONSE,
+        **UNAUTHORIZED_RESPONSE,
+        **VALIDATION_RESPONSE,
+    },
 )
 async def confirm_upload(
     request: Request, id: UUID, file_id: UUID, session: DBSession, admin_user: AdminUser
@@ -77,6 +101,13 @@ async def confirm_upload(
 @router.get(
     "/{id}/files",
     status_code=status.HTTP_200_OK,
+    responses={
+        **FORBIDDEN_RESPONSE,
+        **INTERNAL_SERVER_ERROR_RESPONSE,
+        **NOT_FOUND_RESPONSE,
+        **UNAUTHORIZED_RESPONSE,
+        **VALIDATION_RESPONSE,
+    },
 )
 async def get_files(
     request: Request,
@@ -107,6 +138,13 @@ async def get_files(
 @router.delete(
     "/{id}/files/{file_id}",
     status_code=status.HTTP_204_NO_CONTENT,
+    responses={
+        **FORBIDDEN_RESPONSE,
+        **INTERNAL_SERVER_ERROR_RESPONSE,
+        **NOT_FOUND_RESPONSE,
+        **UNAUTHORIZED_RESPONSE,
+        **VALIDATION_RESPONSE,
+    },
 )
 async def delete_file(
     id: UUID,

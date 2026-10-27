@@ -1,14 +1,16 @@
-from datetime import date
+from datetime import UTC, date, datetime
 from typing import Literal
 from uuid import UUID
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.asset.asset_assignment import AssetAssignment
 from app.modules.asset.exceptions import (
     AssetAssignmentUserInactiveError,
     AssetAssignmentUserNotFoundError,
     AssetDeleteConflictError,
+    AssetHistoryNotFoundError,
     AssetNotFoundError,
     AssetTagAlreadyExistsError,
     InvalidAssetStatusTransitionError,
@@ -151,6 +153,7 @@ class AssetService:
         self,
         asset: Asset,
         user_id: UUID,
+        assigned_by: UUID,
     ) -> None:
         self._validate_status_transition(
             current_status=asset.status,
@@ -166,11 +169,25 @@ class AssetService:
         if not user.is_active:
             raise AssetAssignmentUserInactiveError()
 
-        await self.asset_repository.assign(asset=asset, user_id=user_id)
+        asset_history = AssetAssignment(
+            asset_id=asset.id,
+            user_id=user_id,
+            assigned_by=assigned_by,
+            unassigned_by=None,
+            assigned_at=datetime.now(UTC),
+            returned_at=None,
+        )
+
+        await self.asset_repository.assign(
+            asset=asset,
+            user_id=user_id,
+        )
+        await self.asset_repository.add_history(asset_history)
 
     async def _unassign_asset(
         self,
         asset: Asset,
+        unassigned_by: UUID,
     ) -> None:
         self._validate_status_transition(
             current_status=asset.status,
@@ -178,12 +195,23 @@ class AssetService:
             allowed_map=ALLOWED_STATUS_TRANSITIONS,
         )
 
+        asset_history = await self.asset_repository.get_active_assignment_by_id(
+            asset.id
+        )
+
+        if asset_history is None:
+            raise AssetHistoryNotFoundError()
+
+        asset_history.unassigned_by = unassigned_by
+        asset_history.returned_at = datetime.now(UTC)
+
         await self.asset_repository.unassign(asset=asset)
 
     async def _change_asset_status(
         self,
         asset: Asset,
         new_status: AssetStatus,
+        changed_by: UUID,
     ) -> None:
         self._validate_status_transition(
             current_status=asset.status,
@@ -191,10 +219,31 @@ class AssetService:
             allowed_map=MANUAL_STATUS_TRANSITIONS,
         )
 
-        await self.asset_repository.change_status(asset=asset, new_status=new_status)
+        if (
+            asset.status == AssetStatus.ASSIGNED
+            and new_status == AssetStatus.REPAIR
+        ):
+            asset_history = await self.asset_repository.get_active_assignment_by_id(
+                asset.id
+            )
+
+            if asset_history is None:
+                raise AssetHistoryNotFoundError()
+
+            asset_history.returned_at = datetime.now(UTC)
+            asset_history.unassigned_by = changed_by
+
+        await self.asset_repository.change_status(
+            asset=asset,
+            new_status=new_status,
+        )
 
     async def _apply_status_transition(
-        self, asset: Asset, new_status: AssetStatus, user_id: UUID | None = None
+        self,
+        asset: Asset,
+        new_status: AssetStatus,
+        user_id: UUID | None,
+        changed_by: UUID,
     ) -> None:
         if asset.status == new_status:
             if (
@@ -213,17 +262,32 @@ class AssetService:
             if user_id is None:
                 raise AssetAssignmentUserNotFoundError()
 
-            await self._assign_asset(asset=asset, user_id=user_id)
+            await self._assign_asset(
+                asset=asset,
+                user_id=user_id,
+                assigned_by=changed_by,
+            )
             return
 
         if new_status == AssetStatus.IN_STOCK:
             if asset.status == AssetStatus.ASSIGNED:
-                await self._unassign_asset(asset=asset)
+                await self._unassign_asset(
+                    asset=asset,
+                    unassigned_by=changed_by,
+                )
             else:
-                await self._change_asset_status(asset=asset, new_status=new_status)
+                await self._change_asset_status(
+                    asset=asset,
+                    new_status=new_status,
+                    changed_by=changed_by,
+                )
             return
 
-        await self._change_asset_status(asset=asset, new_status=new_status)
+        await self._change_asset_status(
+            asset=asset,
+            new_status=new_status,
+            changed_by=changed_by,
+        )
 
     async def create(
         self,
@@ -333,23 +397,26 @@ class AssetService:
         self,
         asset_id: UUID,
         update_data: dict,
+        changed_by: UUID,
     ) -> Asset:
         asset = await self._get_asset_or_raise(asset_id)
 
         update_data = update_data.copy()
-
         new_status = update_data.pop("status", None)
-
         user_id = update_data.pop("user_id", None)
 
         try:
-            await self._update_asset_details(asset=asset, update_data=update_data)
+            await self._update_asset_details(
+                asset=asset,
+                update_data=update_data,
+            )
 
             if new_status is not None:
                 await self._apply_status_transition(
                     asset=asset,
                     new_status=new_status,
                     user_id=user_id,
+                    changed_by=changed_by,
                 )
 
             await self.session.commit()
@@ -392,24 +459,43 @@ class AssetService:
 
         await self.session.commit()
 
-    async def assign(self, asset_id: UUID, user_id: UUID) -> Asset:
+    async def assign(
+        self,
+        asset_id: UUID,
+        user_id: UUID,
+        assigned_by: UUID,
+    ) -> Asset:
         asset = await self._get_asset_or_raise(asset_id)
 
         try:
-            await self._assign_asset(asset, user_id)
+            await self._assign_asset(
+                asset=asset,
+                user_id=user_id,
+                assigned_by=assigned_by,
+            )
             await self.session.commit()
+
         except Exception:
             await self.session.rollback()
             raise
 
         return asset
 
-    async def unassign(self, asset_id: UUID) -> Asset:
+
+    async def unassign(
+        self,
+        asset_id: UUID,
+        unassigned_by: UUID,
+    ) -> Asset:
         asset = await self._get_asset_or_raise(asset_id)
 
         try:
-            await self._unassign_asset(asset)
+            await self._unassign_asset(
+                asset=asset,
+                unassigned_by=unassigned_by,
+            )
             await self.session.commit()
+
         except Exception:
             await self.session.rollback()
             raise
@@ -420,12 +506,18 @@ class AssetService:
         self,
         asset_id: UUID,
         new_status: AssetStatus,
+        changed_by: UUID,
     ) -> Asset:
         asset = await self._get_asset_or_raise(asset_id)
 
         try:
-            await self._change_asset_status(asset, new_status)
+            await self._change_asset_status(
+                asset=asset,
+                new_status=new_status,
+                changed_by=changed_by,
+            )
             await self.session.commit()
+
         except Exception:
             await self.session.rollback()
             raise
@@ -447,3 +539,40 @@ class AssetService:
             "repair": repair,
             "retired": retired,
         }
+
+    async def get_history_by_asset(
+        self,
+        asset_id: UUID,
+    ):
+        asset = await self.asset_repository.get_by_id(asset_id)
+
+        if asset is None:
+            raise AssetNotFoundError()
+
+        asset_history = await self.asset_repository.get_history_by_asset_id(asset_id)
+
+        if asset_history is None:
+            raise AssetHistoryNotFoundError()
+
+        return asset_id, asset_history
+
+    async def get_history_by_user(
+        self,
+        user_id: UUID,
+        current_user: User,
+    ):
+        user = await self.user_repository.get_by_id(user_id=user_id)
+
+        if user is None:
+            raise AssetAssignmentUserNotFoundError()
+        user_history = await self.asset_repository.get_history_by_user_id(
+            user_id=user_id
+        )
+
+        if current_user.role == UserRole.ADMIN:
+            return user_history
+
+        if current_user.id == user_id:
+            return user_history
+
+        raise AuthorizationError()

@@ -9,6 +9,7 @@ from app.shared.models.enums import UserRole
 from app.shared.models.mixins import CreatedAtMixin, UpdatedAtMixin
 
 if TYPE_CHECKING:
+    from app.modules.asset.asset_assignment import AssetAssignment
     from app.modules.asset.models import Asset
     from app.modules.auth.models import RefreshToken
 
@@ -52,6 +53,24 @@ class User(BaseModel, CreatedAtMixin, UpdatedAtMixin):
 
     refresh_tokens: Mapped[list["RefreshToken"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
+    )
+
+    asset_assignments: Mapped[list["AssetAssignment"]] = relationship(
+        "AssetAssignment",
+        foreign_keys="AssetAssignment.user_id",
+        back_populates="user",
+    )
+
+    created_asset_assignments: Mapped[list["AssetAssignment"]] = relationship(
+        "AssetAssignment",
+        foreign_keys="AssetAssignment.assigned_by",
+        back_populates="assigner",
+    )
+
+    unassigned_asset: Mapped[list["AssetAssignment"]] = relationship(
+        "AssetAssignment",
+        foreign_keys="AssetAssignment.unassigned_by",
+        back_populates="un_assigner",
     )
 
     assets: Mapped[list["Asset"]] = relationship(back_populates="assigned_user")
