@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
 from app.core.config import settings
+from app.modules.asset.asset_assignment import AssetAssignment  # noqa: F401
 from app.modules.asset.csv_export.csv_export_model import AssetExport  # noqa: F401
 from app.modules.asset.models import Asset  # noqa: F401
 from app.modules.asset.tag.model import AssetTagCounter  # noqa: F401

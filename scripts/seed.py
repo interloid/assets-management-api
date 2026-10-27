@@ -1,11 +1,12 @@
 import asyncio
-from datetime import date
+from datetime import UTC, date, datetime
 
 from sqlalchemy import select
 
 from app.core.config import settings
 from app.core.security import hash_password
 from app.infrastructure.database import AsyncSessionLocal, engine
+from app.modules.asset.asset_assignment import AssetAssignment
 from app.modules.asset.models import Asset
 from app.modules.asset.tag.model import AssetTagCounter
 from app.modules.asset_files.models import AssetFiles  # noqa: F401
@@ -272,10 +273,10 @@ async def get_or_create_counter(
 async def seed_assets(
     session,
     users: list[User],
+    admin: User,
 ) -> None:
     user1, user2, user3 = users
     assigned_users = [user1, user2, user3]
-
     assignment_index = 0
 
     for asset_data in ASSET_SEED_DATA:
@@ -293,18 +294,15 @@ async def seed_assets(
             session,
             asset_type=asset_data["type"],
         )
-
         counter.last_number += 1
 
         prefix = ASSET_TYPE_PREFIX[asset_data["type"]]
-
         asset_tag = f"{COMPANY_PREFIX}-{prefix}-{counter.last_number:04d}"
 
-        assigned_to = None
+        assigned_user = None
 
         if asset_data["status"] == AssetStatus.ASSIGNED:
             assigned_user = assigned_users[assignment_index % len(assigned_users)]
-            assigned_to = assigned_user.id
             assignment_index += 1
 
         asset = Asset(
@@ -312,13 +310,23 @@ async def seed_assets(
             type=asset_data["type"],
             serial_number=serial_number,
             status=asset_data["status"],
-            assigned_to=assigned_to,
+            assigned_to=(assigned_user.id if assigned_user else None),
             purchase_date=asset_data["purchase_date"],
             warranty_expiry=asset_data["warranty_expiry"],
             notes=asset_data["notes"],
         )
 
         session.add(asset)
+        await session.flush()  # Generate asset.id
+
+        if assigned_user is not None:
+            assignment = AssetAssignment(
+                asset_id=asset.id,
+                user_id=assigned_user.id,
+                assigned_by=admin.id,
+                assigned_at=datetime.now(UTC),
+            )
+            session.add(assignment)
 
     await session.flush()
 
@@ -346,7 +354,7 @@ async def seed() -> None:
                 )
                 users.append(user)
 
-            await seed_assets(session, users)
+            await seed_assets(session, users, admin)
 
             await session.commit()
 

@@ -1,5 +1,6 @@
 from datetime import UTC, datetime
 from math import ceil
+from uuid import UUID
 
 from fastapi import APIRouter, Query, Request, Response, status
 
@@ -10,10 +11,11 @@ from app.api.v1.responses import (
     BAD_REQUEST_RESPONSE,
     FORBIDDEN_RESPONSE,
     INTERNAL_SERVER_ERROR_RESPONSE,
+    NOT_FOUND_RESPONSE,
     UNAUTHORIZED_RESPONSE,
     VALIDATION_RESPONSE,
 )
-from app.api.v1.schemas.assets import AssetResponse
+from app.api.v1.schemas.assets import AssetResponse, UserAssetHistoryListResponse
 from app.api.v1.schemas.auth import (
     ChangePasswordRequest,
     UserListResponse,
@@ -150,6 +152,45 @@ async def get_my_assets(
         message="Assigned assets retrieved successfully",
         data=data,
         pagination_meta=pagination,
+        request_id=None,
+        timestamp=datetime.now(UTC),
+        path=request.url.path,
+    )
+
+
+@router.get(
+    "/{id}/assignments",
+    status_code=status.HTTP_200_OK,
+    responses={
+        **FORBIDDEN_RESPONSE,
+        **INTERNAL_SERVER_ERROR_RESPONSE,
+        **NOT_FOUND_RESPONSE,
+        **UNAUTHORIZED_RESPONSE,
+        **VALIDATION_RESPONSE,
+    },
+)
+async def get_user_history(
+    request: Request,
+    id: UUID,
+    session: DBSession,
+    current_user: CurrentUser,
+) -> SuccessResponse[UserAssetHistoryListResponse]:
+    service = AssetService(session)
+
+    asset_history = await service.get_history_by_user(
+        user_id=id,
+        current_user=current_user,
+    )
+
+    return SuccessResponse(
+        success=True,
+        status_code=status.HTTP_200_OK,
+        message="User Asset History retrieved successfully",
+        data=UserAssetHistoryListResponse(
+            user_id=id,
+            assets=asset_history,
+        ),
+        pagination_meta=None,
         request_id=None,
         timestamp=datetime.now(UTC),
         path=request.url.path,

@@ -6,6 +6,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.modules.asset.asset_assignment import AssetAssignment
 from app.modules.asset.models import Asset
 from app.shared.models.enums import AssetStatus, AssetType, WarrantyExpiry
 from app.shared.utils.query import escape_like
@@ -99,6 +100,15 @@ class AssetRepository:
         await self.session.flush()
         await self.session.refresh(asset)
         return asset
+
+    async def add_history(
+        self,
+        asset_history: AssetAssignment,
+    ) -> AssetAssignment:
+        self.session.add(asset_history)
+        await self.session.flush()
+        await self.session.refresh(asset_history)
+        return asset_history
 
     async def list_for_export(
         self,
@@ -288,3 +298,44 @@ class AssetRepository:
         result = await self.session.execute(stmt)
 
         return dict(result.all())
+
+    async def get_history_by_asset_id(self, asset_id: UUID):
+        stmt = (
+            select(AssetAssignment)
+            .where(AssetAssignment.asset_id == asset_id)
+            .options(
+                selectinload(AssetAssignment.user),
+                selectinload(AssetAssignment.assigner),
+                selectinload(AssetAssignment.un_assigner),
+            )
+            .order_by(AssetAssignment.assigned_at.asc())
+        )
+
+        result = await self.session.execute(stmt)
+        return result.scalars().all()
+
+    async def get_active_assignment_by_id(
+        self,
+        asset_id: UUID,
+    ) -> AssetAssignment | None:
+        stmt = select(AssetAssignment).where(
+            AssetAssignment.asset_id == asset_id,
+            AssetAssignment.returned_at.is_(None),
+        )
+
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def get_history_by_user_id(
+        self,
+        user_id: UUID,
+    ):
+        stmt = (
+            select(AssetAssignment)
+            .where(AssetAssignment.user_id == user_id)
+            .options(selectinload(AssetAssignment.asset))
+            .order_by(AssetAssignment.assigned_at.desc())
+        )
+
+        result = await self.session.execute(stmt)
+        return result.scalars().all()

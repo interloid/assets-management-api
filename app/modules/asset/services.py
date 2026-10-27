@@ -1,14 +1,16 @@
-from datetime import date
+from datetime import UTC, date, datetime
 from typing import Literal
 from uuid import UUID
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.asset.asset_assignment import AssetAssignment
 from app.modules.asset.exceptions import (
     AssetAssignmentUserInactiveError,
     AssetAssignmentUserNotFoundError,
     AssetDeleteConflictError,
+    AssetHistoryNotFoundError,
     AssetNotFoundError,
     AssetTagAlreadyExistsError,
     InvalidAssetStatusTransitionError,
@@ -284,7 +286,7 @@ class AssetService:
 
         await self.session.commit()
 
-    async def assign(self, asset_id: UUID, user_id: UUID) -> Asset:
+    async def assign(self, asset_id: UUID, user_id: UUID, assigned_by: UUID) -> Asset:
         asset = await self.asset_repository.get_by_id(asset_id)
 
         if asset is None:
@@ -304,12 +306,21 @@ class AssetService:
         if not user.is_active:
             raise AssetAssignmentUserInactiveError()
 
+        asset_history = AssetAssignment(
+            asset_id=asset_id,
+            user_id=user_id,
+            assigned_by=assigned_by,
+            unassigned_by=None,
+            assigned_at=datetime.now(UTC),
+            returned_at=None,
+        )
         await self.asset_repository.assign(asset, user_id)
+        await self.asset_repository.add_history(asset_history)
         await self.session.commit()
 
         return asset
 
-    async def unassign(self, asset_id: UUID) -> Asset:
+    async def unassign(self, asset_id: UUID, unassigned_by: UUID) -> Asset:
         asset = await self.asset_repository.get_by_id(asset_id)
 
         if asset is None:
@@ -321,15 +332,23 @@ class AssetService:
             allowed_map=ALLOWED_STATUS_TRANSITIONS,
         )
 
+        asset_history = await self.asset_repository.get_active_assignment_by_id(
+            asset_id
+        )
+
+        if asset_history is None:
+            raise AssetHistoryNotFoundError()
+
+        asset_history.unassigned_by = unassigned_by
+        asset_history.returned_at = datetime.now(UTC)
+
         await self.asset_repository.unassign(asset)
         await self.session.commit()
 
         return asset
 
     async def change_status(
-        self,
-        asset_id: UUID,
-        new_status: AssetStatus,
+        self, asset_id: UUID, new_status: AssetStatus, changed_by: UUID
     ) -> Asset:
         asset = await self.asset_repository.get_by_id(asset_id)
 
@@ -341,6 +360,17 @@ class AssetService:
             new_status=new_status,
             allowed_map=MANUAL_STATUS_TRANSITIONS,
         )
+
+        if asset.status == AssetStatus.ASSIGNED and new_status == AssetStatus.REPAIR:
+            asset_history = await self.asset_repository.get_active_assignment_by_id(
+                asset_id
+            )
+
+            if asset_history is None:
+                raise AssetHistoryNotFoundError()
+
+            asset_history.returned_at = datetime.now(UTC)
+            asset_history.unassigned_by = changed_by
 
         await self.asset_repository.change_status(
             asset=asset,
@@ -366,3 +396,40 @@ class AssetService:
             "repair": repair,
             "retired": retired,
         }
+
+    async def get_history_by_asset(
+        self,
+        asset_id: UUID,
+    ):
+        asset = await self.asset_repository.get_by_id(asset_id)
+
+        if asset is None:
+            raise AssetNotFoundError()
+
+        asset_history = await self.asset_repository.get_history_by_asset_id(asset_id)
+
+        if asset_history is None:
+            raise AssetHistoryNotFoundError()
+
+        return asset_id, asset_history
+
+    async def get_history_by_user(
+        self,
+        user_id: UUID,
+        current_user: User,
+    ):
+        user = await self.user_repository.get_by_id(user_id=user_id)
+
+        if user is None:
+            raise AssetAssignmentUserNotFoundError()
+        user_history = await self.asset_repository.get_history_by_user_id(
+            user_id=user_id
+        )
+
+        if current_user.role == UserRole.ADMIN:
+            return user_history
+
+        if current_user.id == user_id:
+            return user_history
+
+        raise AuthorizationError()

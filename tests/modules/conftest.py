@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from uuid6 import uuid7
@@ -10,8 +10,16 @@ from app.modules.auth.services import AuthService
 
 
 @pytest.fixture
-def mock_session() -> AsyncMock:
-    return AsyncMock()
+def mock_session():
+    session = MagicMock()
+    session.execute = AsyncMock()
+    session.commit = AsyncMock()
+    session.rollback = AsyncMock()
+    session.flush = AsyncMock()
+    session.refresh = AsyncMock()
+    session.add = MagicMock()
+    session.delete = MagicMock()
+    return session
 
 
 @pytest.fixture

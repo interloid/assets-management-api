@@ -5,6 +5,13 @@ from fastapi import APIRouter, Header, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
 from app.api.deps import DBSession
+from app.api.v1.responses import (
+    BAD_REQUEST_RESPONSE,
+    INTERNAL_SERVER_ERROR_RESPONSE,
+    NOT_FOUND_RESPONSE,
+    UNAUTHORIZED_RESPONSE,
+    VALIDATION_RESPONSE,
+)
 from app.core.config import settings
 from app.modules.asset_files.service import AssetFileService
 from app.shared.schemas.common import SuccessResponse
@@ -24,6 +31,13 @@ class S3UploadCompletedRequest(BaseModel):
 @router.post(
     "/s3-upload-completed",
     status_code=status.HTTP_200_OK,
+    responses={
+        **UNAUTHORIZED_RESPONSE,
+        **BAD_REQUEST_RESPONSE,
+        **NOT_FOUND_RESPONSE,
+        **INTERNAL_SERVER_ERROR_RESPONSE,
+        **VALIDATION_RESPONSE,
+    },
 )
 async def s3_upload_completed(
     request: Request,

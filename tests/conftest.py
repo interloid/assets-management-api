@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 import pytest
 from uuid6 import uuid7
 
+import app.shared.models.registry  # noqa: F401
 from app.api.v1.schemas.auth import LoginRequest, RegisterRequest
 from app.modules.user.models import User
 from app.shared.models.enums import UserRole

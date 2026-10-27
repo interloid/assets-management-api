@@ -1,4 +1,5 @@
 from datetime import date, datetime, timezone
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -554,6 +555,7 @@ async def test_assign_asset(
     result = await service.assign(
         asset_id=asset.id,
         user_id=created_user.id,
+        assigned_by=uuid7(),
     )
 
     service.user_repository.get_by_id.assert_awaited_once_with(
@@ -601,6 +603,7 @@ async def test_assign_asset_user_not_found(
         await service.assign(
             asset_id=asset.id,
             user_id=user_id,
+            assigned_by=uuid7(),
         )
 
     service.asset_repository.assign.assert_not_awaited()
@@ -635,8 +638,7 @@ async def test_assign_asset_user_inactive(
 
     with pytest.raises(AssetAssignmentUserInactiveError):
         await service.assign(
-            asset_id=asset.id,
-            user_id=inactive_user.id,
+            asset_id=asset.id, user_id=inactive_user.id, assigned_by=uuid7()
         )
 
     service.asset_repository.assign.assert_not_awaited()
@@ -669,6 +671,7 @@ async def test_assign_asset_rejects_invalid_transition(
         await service.assign(
             asset_id=asset.id,
             user_id=created_user.id,
+            assigned_by=uuid7(),
         )
 
     service.user_repository.get_by_id.assert_not_awaited()
@@ -692,6 +695,7 @@ async def test_assign_asset_not_found(mock_session) -> None:
         await service.assign(
             asset_id=asset_id,
             user_id=user_id,
+            assigned_by=uuid7(),
         )
 
     service.user_repository.get_by_id.assert_not_awaited()
@@ -714,13 +718,26 @@ async def test_unassign_asset(
         purchase_date=date(2026, 1, 1),
     )
 
+    asset_history = SimpleNamespace(
+        asset_id=asset.id,
+        unassigned_by=None,
+        returned_at=None,
+    )
+
+    service.asset_repository.get_active_assignment_by_id = AsyncMock(
+        return_value=asset_history,
+    )
+
     service.asset_repository.get_by_id = AsyncMock(
         return_value=asset,
     )
 
     service.asset_repository.unassign = AsyncMock()
 
-    result = await service.unassign(asset.id)
+    result = await service.unassign(
+        asset_id=asset.id,
+        unassigned_by=uuid7(),
+    )
 
     service.asset_repository.unassign.assert_awaited_once_with(
         asset,
@@ -742,7 +759,10 @@ async def test_unassign_asset_not_found(mock_session) -> None:
     service.asset_repository.unassign = AsyncMock()
 
     with pytest.raises(AssetNotFoundError):
-        await service.unassign(asset_id)
+        await service.unassign(
+            asset_id=asset_id,
+            unassigned_by=uuid7(),
+        )
 
     service.asset_repository.unassign.assert_not_awaited()
     mock_session.commit.assert_not_awaited()
@@ -770,7 +790,10 @@ async def test_unassign_asset_rejects_invalid_transition(
     service.asset_repository.unassign = AsyncMock()
 
     with pytest.raises(InvalidAssetStatusTransitionError):
-        await service.unassign(asset.id)
+        await service.unassign(
+            asset_id=asset.id,
+            unassigned_by=uuid7(),
+        )
 
     service.asset_repository.unassign.assert_not_awaited()
     mock_session.commit.assert_not_awaited()
@@ -800,6 +823,7 @@ async def test_change_status(
     result = await service.change_status(
         asset_id=asset.id,
         new_status=AssetStatus.REPAIR,
+        changed_by=uuid7(),
     )
 
     service.asset_repository.change_status.assert_awaited_once_with(
@@ -826,6 +850,7 @@ async def test_change_status_asset_not_found(mock_session) -> None:
         await service.change_status(
             asset_id=asset_id,
             new_status=AssetStatus.REPAIR,
+            changed_by=uuid7(),
         )
 
     service.asset_repository.change_status.assert_not_awaited()
@@ -857,6 +882,7 @@ async def test_change_status_rejects_assignment_transition(
         await service.change_status(
             asset_id=asset.id,
             new_status=AssetStatus.ASSIGNED,
+            changed_by=uuid7(),
         )
 
     service.asset_repository.change_status.assert_not_awaited()

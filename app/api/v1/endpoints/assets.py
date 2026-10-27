@@ -17,6 +17,7 @@ from app.api.v1.responses import (
 )
 from app.api.v1.schemas.assets import (
     AssetAssign,
+    AssetAssignmentHistoryListResponse,
     AssetCreate,
     AssetResponse,
     AssetStatsResponse,
@@ -300,13 +301,14 @@ async def assign_asset(
     id: UUID,
     data: AssetAssign,
     session: DBSession,
-    _admin_user: AdminUser,
+    admin_user: AdminUser,
 ) -> SuccessResponse[AssetResponse]:
     service = AssetService(session)
 
     asset = await service.assign(
         asset_id=id,
         user_id=data.user_id,
+        assigned_by=admin_user.id,
     )
 
     return SuccessResponse(
@@ -340,11 +342,11 @@ async def unassign_asset(
     request: Request,
     id: UUID,
     session: DBSession,
-    _admin_user: AdminUser,
+    admin_user: AdminUser,
 ) -> SuccessResponse[AssetResponse]:
     service = AssetService(session)
 
-    asset = await service.unassign(id)
+    asset = await service.unassign(asset_id=id, unassigned_by=admin_user.id)
 
     return SuccessResponse(
         success=True,
@@ -378,13 +380,14 @@ async def change_status(
     id: UUID,
     data: AssetStatusUpdate,
     session: DBSession,
-    _admin_user: AdminUser,
+    admin_user: AdminUser,
 ) -> SuccessResponse[AssetResponse]:
     service = AssetService(session)
 
     asset = await service.change_status(
         id,
         data.status,
+        changed_by=admin_user.id,
     )
 
     return SuccessResponse(
@@ -393,6 +396,43 @@ async def change_status(
         message="Asset status updated successfully",
         data=AssetResponse.model_validate(
             asset,
+        ),
+        pagination_meta=None,
+        request_id=None,
+        timestamp=datetime.now(UTC),
+        path=request.url.path,
+    )
+
+
+@router.get(
+    "/{id}/history",
+    tags=["Assets History"],
+    status_code=status.HTTP_200_OK,
+    responses={
+        **FORBIDDEN_RESPONSE,
+        **INTERNAL_SERVER_ERROR_RESPONSE,
+        **NOT_FOUND_RESPONSE,
+        **UNAUTHORIZED_RESPONSE,
+        **VALIDATION_RESPONSE,
+    },
+)
+async def get_asset_history(
+    request: Request,
+    id: UUID,
+    session: DBSession,
+    current_user: AdminUser,
+) -> SuccessResponse[AssetAssignmentHistoryListResponse]:
+    service = AssetService(session)
+
+    asset_id, asset_history = await service.get_history_by_asset(id)
+
+    return SuccessResponse(
+        success=True,
+        status_code=status.HTTP_200_OK,
+        message="Asset history retrieved successfully",
+        data=AssetAssignmentHistoryListResponse(
+            asset_id=asset_id,
+            history=asset_history,
         ),
         pagination_meta=None,
         request_id=None,

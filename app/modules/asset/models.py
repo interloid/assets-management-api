@@ -11,6 +11,7 @@ from app.shared.models.enums import AssetStatus, AssetType
 from app.shared.models.mixins import CreatedAtMixin, UpdatedAtMixin
 
 if TYPE_CHECKING:
+    from app.modules.asset.asset_assignment import AssetAssignment
     from app.modules.asset_files.models import AssetFiles
     from app.modules.user.models import User
 
@@ -90,6 +91,11 @@ class Asset(
         "AssetFiles",
         back_populates="asset",
         cascade="all, delete-orphan",
+    )
+
+    assignments: Mapped[list["AssetAssignment"]] = relationship(
+        "AssetAssignment",
+        back_populates="asset",
     )
 
     __table_args__ = (

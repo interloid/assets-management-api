@@ -185,3 +185,45 @@ class AssetFileResponse(BaseModel):
     uploaded_at: datetime | None = None
     download_url: str
     expires_in: int
+
+
+class AssetAssignmentHistoryResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    assignee: AssignedUserResponse = Field(validation_alias="user")
+    assigned_by: AssignedUserResponse | None = Field(
+        default=None,
+        validation_alias="assigner",
+    )
+    assigned_at: datetime
+    unassigned_by: AssignedUserResponse | None = Field(
+        default=None,
+        validation_alias="un_assigner",
+    )
+    returned_at: datetime | None = None
+
+
+class UserAssetHistoryResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    asset_id: UUID
+    assigned_by: AssignedUserResponse | None = Field(
+        default=None,
+        validation_alias="assigner",
+    )
+    assigned_at: datetime
+    unassigned_by: AssignedUserResponse | None = Field(
+        default=None,
+        validation_alias="un_assigner",
+    )
+    returned_at: datetime | None = None
+
+
+class AssetAssignmentHistoryListResponse(BaseModel):
+    asset_id: UUID
+    history: list[AssetAssignmentHistoryResponse]
+
+
+class UserAssetHistoryListResponse(BaseModel):
+    user_id: UUID
+    assets: list[UserAssetHistoryResponse]
