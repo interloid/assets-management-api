@@ -466,5 +466,5 @@ async def test_delete_file_rolls_back_on_commit_failure(
             file_id=pending_file.id,
         )
 
-    storage.delete_object.assert_called_once_with(pending_file.s3_object_key)
+    storage.delete_object.assert_not_called()
     session.rollback.assert_awaited_once()

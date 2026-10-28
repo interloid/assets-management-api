@@ -13,7 +13,7 @@ from pydantic import (
 
 from app.modules.asset.exceptions import InvalidWarrantyExpiryError
 from app.modules.asset.validators.serial_number import validate_serial_number
-from app.shared.models.enums import AssetStatus, AssetType, FileType
+from app.shared.models.enums import AssetStatus, AssetType, FileType, WarrantyExpiry
 
 
 class AssetCreate(BaseModel):
@@ -141,9 +141,11 @@ class AssetExportRequest(BaseModel):
     asset_type: AssetType | None = Field(default=None, alias="type")
     asset_status: AssetStatus | None = Field(default=None, alias="status")
     assigned_to: UUID | None = None
-    warranty_expiring_before: date | None = None
+    warranty_expiry: WarrantyExpiry | None = None
     search: str | None = None
-    sort: Literal["created_at", "purchase_date", "asset_tag"] = "created_at"
+    sort: Literal["created_at", "purchase_date", "asset_tag", "warranty_expiry"] = (
+        "created_at"
+    )
     order: Literal["asc", "desc"] = "desc"
 
 

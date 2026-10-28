@@ -1,4 +1,4 @@
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Literal
 from uuid import UUID
 
@@ -27,7 +27,7 @@ def build_filters(
     warranty_expiry: WarrantyExpiry | None = None,
     search: str | None = None,
 ) -> list:
-    today = date.today()
+    today = datetime.now(timezone.utc).date()
     filters = [Asset.deleted_at.is_(None)]
 
     if asset_type is not None:
@@ -241,7 +241,7 @@ class AssetRepository:
     ) -> None:
         if asset.deleted_at is not None:
             return
-        asset.deleted_at = datetime.now()
+        asset.deleted_at = datetime.now(timezone.utc)
         await self.session.flush()
 
     async def assign(

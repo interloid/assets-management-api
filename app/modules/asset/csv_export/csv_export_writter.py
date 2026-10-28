@@ -23,6 +23,18 @@ CSV_COLUMNS = [
 ]
 
 
+def sanitize_csv_cell(value: object) -> object:
+    if not isinstance(value, str) or not value:
+        return value
+
+    probe = value.lstrip(" \t\r\n")
+
+    if probe.startswith(("=", "+", "-", "@", "\t", "\r", "\n")):
+        return "'" + value
+
+    return value
+
+
 def csv_value(value):
     if value is None:
         return ""
@@ -90,6 +102,11 @@ def write_csv_file(file_path: Path, rows: list[dict]) -> int:
         writer.writeheader()
 
         for row in rows:
-            writer.writerow({key: csv_value(value) for key, value in row.items()})
+            writer.writerow(
+                {
+                    column: sanitize_csv_cell(csv_value(row.get(column)))
+                    for column in CSV_COLUMNS
+                }
+            )
 
     return len(rows)

@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime, timedelta, timezone
 from uuid import UUID, uuid4
 
@@ -30,14 +31,11 @@ class AssetFileService:
         self.repository = AssetFileRepository(session)
         self.storage = storage or S3Storage()
 
-    def cleanup_s3(
-        self,
-        object_key: str,
-    ) -> None:
-        try:
-            self.storage.delete_object(object_key)
-        except Exception:
-            raise
+    async def cleanup_s3(self, object_key: str) -> None:
+        await asyncio.to_thread(
+            self.storage.delete_object,
+            object_key,
+        )
 
     async def reject_upload(
         self,
@@ -48,7 +46,7 @@ class AssetFileService:
         file.updated_at = datetime.now(timezone.utc)
         await self.session.commit()
 
-        self.cleanup_s3(file.s3_object_key)
+        await self.cleanup_s3(file.s3_object_key)
 
         raise AssetFileValidationError(message)
 
@@ -93,7 +91,10 @@ class AssetFileService:
                     continue
 
                 # Delete the S3 object only after confirming the record is eligible.
-                self.storage.delete_object(object_key)
+                await asyncio.to_thread(
+                    self.storage.delete_object,
+                    object_key,
+                )
 
                 now = datetime.now(timezone.utc)
                 file.status = FileUploadStatus.DELETED
@@ -133,7 +134,7 @@ class AssetFileService:
                 file_size,
             )
         except ValueError as exc:
-            raise AssetFileValidationError() from exc
+            raise AssetFileValidationError(str(exc)) from exc
 
         object_key = f"assets/{asset_id}/{uuid4()}-{filename}"
 
@@ -185,7 +186,10 @@ class AssetFileService:
         if file.status != FileUploadStatus.PENDING:
             raise AssetFileValidationError()
 
-        metadata = self.storage.get_object_metadata(file.s3_object_key)
+        metadata = await asyncio.to_thread(
+            self.storage.get_object_metadata,
+            file.s3_object_key,
+        )
 
         if metadata is None:
             await self.reject_upload(file=file, message="File does not exist in S3")
@@ -277,11 +281,6 @@ class AssetFileService:
         if file.status == FileUploadStatus.DELETED:
             return
 
-        try:
-            self.storage.delete_object(file.s3_object_key)
-        except Exception:
-            raise
-
         file.status = FileUploadStatus.DELETED
         file.deleted_at = datetime.now(timezone.utc)
         file.updated_at = datetime.now(timezone.utc)
@@ -291,3 +290,8 @@ class AssetFileService:
         except Exception:
             await self.session.rollback()
             raise
+
+        await asyncio.to_thread(
+            self.storage.delete_object,
+            file.s3_object_key,
+        )
