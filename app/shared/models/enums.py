@@ -21,7 +21,7 @@ class AssetStatus(StrEnum):
 
 
 class WarrantyExpiry(StrEnum):
-    EXPIRES_IN_30_DAYS = ("expires_in_30_days",)
+    EXPIRES_IN_30_DAYS = "expires_in_30_days"
     EXPIRES_IN_90_DAYS = "expires_in_90_days"
     ALREADY_EXPIRED = "already_expired"
 

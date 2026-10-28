@@ -120,7 +120,7 @@ def test_send_warranty_reminders_without_expiring_assets(
     mock_send_email.assert_called_once()
     assert (
         mock_send_email.call_args.kwargs["subject"]
-        == "Daily Warranty Report - No Upcomming Expirations"
+        == "Daily Warranty Report - No Upcoming Expirations"
     )
 
 

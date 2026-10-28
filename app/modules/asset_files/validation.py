@@ -13,7 +13,7 @@ def validate_file(
     file_size: int,
 ) -> None:
     if not filename or filename != filename.strip():
-        raise ValueError("Filename must not be empty pr padded with spaces")
+        raise ValueError("Filename must not be empty or padded with spaces")
 
     if len(filename) > 255:
         raise ValueError("Filename must not exceed 255 characters")

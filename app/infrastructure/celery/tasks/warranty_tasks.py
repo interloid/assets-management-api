@@ -55,7 +55,7 @@ async def run_warranty_reminder(
         if assets:
             subject = f"Warranty Expiry Reminder - {len(assets)} asset(s)"
         else:
-            subject = "Daily Warranty Report - No Upcomming Expirations"
+            subject = "Daily Warranty Report - No Upcoming Expirations"
 
         digest = build_digest(assets)
         emails_sent = 0
@@ -137,7 +137,7 @@ def build_digest(assets) -> str:
 
     lines.extend(
         [
-            "Please review these assets and take any neccessary actions",
+            "Please review these assets and take any necessary actions",
             "",
             "Assets Management API",
         ]
@@ -161,7 +161,7 @@ def send_warranty_reminders(self) -> dict:
 
     try:
         return asyncio.run(
-            run_warranty_reminder(
+            run_warranty_reminder_with_cleanup(
                 task_id=task_id,
                 idempotency_key=idempotency_key,
             )

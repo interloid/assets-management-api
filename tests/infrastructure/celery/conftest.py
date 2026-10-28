@@ -1,5 +1,5 @@
 from contextlib import asynccontextmanager
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
@@ -18,7 +18,7 @@ WARRANTY_EXPIRY = REPORT_DATE + timedelta(days=90)
 CREATED_AT = datetime.combine(
     REPORT_DATE,
     datetime.min.time(),
-    tzinfo=timezone.utc,
+    tzinfo=UTC,
 )
 UPDATED_AT = CREATED_AT + timedelta(hours=1)
 

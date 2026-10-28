@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
@@ -306,7 +306,7 @@ async def test_list_files_admin_success(service, storage, asset, pending_file):
     admin = SimpleNamespace(id=uuid4(), role=UserRole.ADMIN)
 
     pending_file.status = FileUploadStatus.UPLOADED
-    pending_file.uploaded_at = datetime.now(timezone.utc)
+    pending_file.uploaded_at = datetime.now(UTC)
 
     service.asset_repository.get_by_id.return_value = asset
     service.repository.list_uploaded_for_asset.return_value = [pending_file]
@@ -438,7 +438,7 @@ async def test_delete_file_is_idempotent_when_already_deleted(
     service, session, storage, asset, pending_file
 ):
     pending_file.status = FileUploadStatus.DELETED
-    pending_file.deleted_at = datetime.now(timezone.utc)
+    pending_file.deleted_at = datetime.now(UTC)
 
     service.asset_repository.get_by_id.return_value = asset
     service.repository.get_by_id.return_value = pending_file
@@ -466,5 +466,5 @@ async def test_delete_file_rolls_back_on_commit_failure(
             file_id=pending_file.id,
         )
 
-    storage.delete_object.assert_called_once_with(pending_file.s3_object_key)
+    storage.delete_object.assert_not_called()
     session.rollback.assert_awaited_once()

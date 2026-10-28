@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
@@ -28,7 +28,7 @@ def mock_uploaded_file(asset_id):
         content_type=FileType.PDF,
         file_size=1024,
         status=FileUploadStatus.UPLOADED,
-        uploaded_at=datetime.now(timezone.utc),
+        uploaded_at=datetime.now(UTC),
     )
 
 

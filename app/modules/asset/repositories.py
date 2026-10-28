@@ -1,4 +1,4 @@
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Literal
 from uuid import UUID
 
@@ -27,7 +27,7 @@ def build_filters(
     warranty_expiry: WarrantyExpiry | None = None,
     search: str | None = None,
 ) -> list:
-    today = date.today()
+    today = datetime.now(UTC).date()
     filters = [Asset.deleted_at.is_(None)]
 
     if asset_type is not None:
