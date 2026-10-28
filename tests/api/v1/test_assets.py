@@ -119,7 +119,7 @@ async def test_create_asset_rejects_duplicate_serial_number(
     integration_client.cookies.set("access_token", admin_access_token)
     payload = {
         "type": "laptop",
-        "serial_number": "SN-CREATE-DUPLICATE",
+        "serial_number": "SN-DUPLICATE-01",
         "purchase_date": "2026-09-08",
     }
 
@@ -148,7 +148,7 @@ async def test_non_admin_cannot_create_asset(
         "/api/v1/assets",
         json={
             "type": "laptop",
-            "serial_number": "SN-CREATE-UNAUTHORIZED",
+            "serial_number": "SN-UNAUTHORIZED-01",
             "purchase_date": "2026-09-08",
         },
     )
@@ -238,12 +238,12 @@ async def test_list_assets_returns_empty_results(
 @pytest.mark.parametrize(
     "query, expected_serial",
     [
-        ("type=laptop", "SN-FILTER-LAPTOP"),
-        ("status=in_stock", "SN-FILTER-STATUS"),
-        ("search=dell", "SN-FILTER-SEARCH"),
+        ("type=laptop", "SN-LAPTOP-01"),
+        ("status=in_stock", "SN-STATUS-01"),
+        ("search=dell", "SN-SEARCH-01"),
         (
             "warranty_expiring_before=2026-12-31",
-            "SN-FILTER-WARRANTY",
+            "SN-WARRANTY-01",
         ),
     ],
 )
@@ -259,26 +259,26 @@ async def test_list_assets_filters(
         integration_client,
         admin_access_token,
         asset_type="laptop",
-        serial_number="SN-FILTER-LAPTOP",
+        serial_number="SN-LAPTOP-01",
     )
 
     await create_asset(
         integration_client,
         admin_access_token,
-        serial_number="SN-FILTER-STATUS",
+        serial_number="SN-STATUS-01",
     )
 
     await create_asset(
         integration_client,
         admin_access_token,
-        serial_number="SN-FILTER-SEARCH",
+        serial_number="SN-SEARCH-01",
         notes="Dell development laptop",
     )
 
     await create_asset(
         integration_client,
         admin_access_token,
-        serial_number="SN-FILTER-WARRANTY",
+        serial_number="SN-WARRANTY-01",
         warranty_expiry="2026-10-01",
     )
 
@@ -304,7 +304,7 @@ async def test_list_assets_combines_filters_with_and(
     await create_asset(
         integration_client,
         admin_access_token,
-        serial_number="SN-AND-MATCH",
+        serial_number="SN-AND-MATCH-01",
         notes="Development laptop",
     )
 
@@ -312,7 +312,7 @@ async def test_list_assets_combines_filters_with_and(
         integration_client,
         admin_access_token,
         asset_type="monitor",
-        serial_number="SN-AND-NO-TYPE",
+        serial_number="SN-TYPE-01",
         notes="Development monitor",
     )
 
@@ -325,7 +325,7 @@ async def test_list_assets_combines_filters_with_and(
     data = response.json()["data"]
 
     assert len(data) == 1
-    assert data[0]["serial_number"] == "SN-AND-MATCH"
+    assert data[0]["serial_number"] == "SN-AND-MATCH-01"
 
 
 @pytest.mark.asyncio
@@ -371,7 +371,7 @@ async def test_admin_can_get_asset(
     asset = await create_asset(
         integration_client,
         admin_access_token,
-        serial_number="SN-GET-ADMIN",
+        serial_number="SN-GET-ADMIN-01",
     )
 
     response = await integration_client.get(
@@ -393,7 +393,7 @@ async def test_assigned_user_can_get_own_asset(
     asset = await create_asset(
         integration_client,
         admin_access_token,
-        serial_number="SN-GET-OWN",
+        serial_number="SN-GET-OWN-01",
     )
 
     await set_asset_status(
@@ -426,7 +426,7 @@ async def test_user_cannot_get_asset_they_do_not_own(
     assigned: bool,
 ) -> None:
 
-    serial_number = "SN-GET-NO-OWNER" if not assigned else "SN-GET-OTHER"
+    serial_number = "SN-GET-NO-OWNER-01" if not assigned else "SN-GET-OTHER-01"
 
     asset = await create_asset(
         integration_client,
@@ -531,7 +531,7 @@ async def test_update_asset_type_changes_asset_tag(
     "payload, expected_status, expected_code",
     [
         (
-            {"serial_number": "SN-UPDATE-DUPLICATE"},
+            {"serial_number": "SN-DUPLICATE-01"},
             409,
             "SERIAL_NUMBER_ALREADY_EXISTS",
         ),
@@ -554,14 +554,14 @@ async def test_update_asset_rejects_invalid_changes(
     first = await create_asset(
         integration_client,
         admin_access_token,
-        serial_number="SN-UPDATE-DUPLICATE",
+        serial_number="SN-DUPLICATE-01",
     )
 
     second = await create_asset(
         integration_client,
         admin_access_token,
         asset_type="monitor",
-        serial_number="SN-UPDATE-SECOND",
+        serial_number="SN-SECOND-01",
     )
 
     target_id = second["id"]
@@ -591,7 +591,7 @@ async def test_non_admin_cannot_update_asset(
     asset = await create_asset(
         integration_client,
         admin_access_token,
-        serial_number="SN-UPDATE-FORBIDDEN",
+        serial_number="SN-FORBIDDEN-01",
     )
     integration_client.cookies.set("access_token", user_token(integration_user))
 
@@ -619,7 +619,7 @@ async def test_admin_can_delete_allowed_asset_status(
 ) -> None:
     integration_client.cookies.set("access_token", admin_access_token)
 
-    serial_number = f"SN-DEL-{status.name.replace('_', '')}"
+    serial_number = f"SN-{status.name.replace('_', '')}-01"
 
     asset = await create_asset(
         integration_client,
@@ -658,7 +658,7 @@ async def test_admin_cannot_delete_restricted_asset_status(
 ) -> None:
     integration_client.cookies.set("access_token", admin_access_token)
 
-    serial_number = f"SN-DEL-B-{status.name.replace('_', '')}"
+    serial_number = f"SN-DEL-{status.name.replace('_', '')}-01"
 
     asset = await create_asset(
         integration_client,
@@ -701,7 +701,7 @@ async def test_delete_requires_admin_and_existing_asset(
     asset = await create_asset(
         integration_client,
         admin_access_token,
-        serial_number="SN-DELETE-AUTH",
+        serial_number="SN-DELETE-01",
     )
     integration_client.cookies.set("access_token", user_token(integration_user))
 
@@ -723,7 +723,7 @@ async def test_admin_can_assign_in_stock_asset(
     asset = await create_asset(
         integration_client,
         admin_access_token,
-        serial_number="SN-ASSIGN-OK",
+        serial_number="SN-ASSIGN-01",
     )
 
     response = await integration_client.post(
@@ -751,7 +751,7 @@ async def test_assign_rejects_invalid_asset_status(
     asset = await create_asset(
         integration_client,
         admin_access_token,
-        serial_number="SN-ASSIGN-STATUS",
+        serial_number="SN-STATUS-01",
     )
 
     await set_asset_status(
@@ -779,7 +779,7 @@ async def test_assign_rejects_invalid_user(
     asset = await create_asset(
         integration_client,
         admin_access_token,
-        serial_number="SN-ASSIGN-USER",
+        serial_number="SN-USER-01",
     )
 
     response = await integration_client.post(
@@ -812,7 +812,7 @@ async def test_assign_requires_admin_and_existing_asset(
     asset = await create_asset(
         integration_client,
         admin_access_token,
-        serial_number="SN-ASSIGN-AUTH",
+        serial_number="SN-AUTH-01",
     )
     integration_client.cookies.set("access_token", user_token(integration_user))
 
@@ -835,7 +835,7 @@ async def test_admin_can_unassign_assigned_asset(
     asset = await create_asset(
         integration_client,
         admin_access_token,
-        serial_number="SN-UNASSIGN-OK",
+        serial_number="SN-UNASSIGN-01",
     )
 
     assign_response = await integration_client.post(
@@ -867,7 +867,7 @@ async def test_unassign_rejects_non_assigned_asset(
     asset = await create_asset(
         integration_client,
         admin_access_token,
-        serial_number="SN-UNASSIGN-BLOCK",
+        serial_number="SN-UNASSIGN-01",
     )
 
     response = await integration_client.post(
@@ -896,7 +896,7 @@ async def test_unassign_requires_admin_and_existing_asset(
     asset = await create_asset(
         integration_client,
         admin_access_token,
-        serial_number="SN-UNASSIGN-AUTH",
+        serial_number="SN-UNASSIGN-01",
     )
 
     await integration_client.post(
@@ -932,7 +932,7 @@ async def test_admin_can_change_allowed_asset_status(
     integration_client.cookies.set("access_token", admin_access_token)
 
     serial_number = (
-        f"SN-ST-"
+        f"SN-01-"
         f"{initial_status.name.replace('_', '')[:5]}-"
         f"{target_status.name.replace('_', '')[:5]}"
     )
@@ -977,7 +977,7 @@ async def test_admin_cannot_change_disallowed_asset_status(
 ) -> None:
     integration_client.cookies.set("access_token", admin_access_token)
 
-    serial_number = f"SN-ST-B-{initial_status.name.replace('_', '')[:5]}"
+    serial_number = f"SN-ST-1-{initial_status.name.replace('_', '')[:5]}"
 
     asset = await create_asset(
         integration_client,
@@ -1024,7 +1024,7 @@ async def test_status_change_requires_admin_and_existing_asset(
     asset = await create_asset(
         integration_client,
         admin_access_token,
-        serial_number="SN-STATUS-AUTH",
+        serial_number="SN-STATUS-01",
     )
     integration_client.cookies.set("access_token", user_token(integration_user))
 
@@ -1084,21 +1084,21 @@ async def test_my_assets_returns_only_current_users_assets(
     user_asset = await create_asset(
         integration_client,
         admin_access_token,
-        serial_number="SN-MY-USER",
+        serial_number="SN-MY-USER-01",
     )
 
     other_asset = await create_asset(
         integration_client,
         admin_access_token,
         asset_type="monitor",
-        serial_number="SN-MY-OTHER",
+        serial_number="SN-MY-OTHER-01",
     )
 
     unassigned_asset = await create_asset(
         integration_client,
         admin_access_token,
         asset_type="phone",
-        serial_number="SN-MY-NONE",
+        serial_number="SN-MY-NONE-01",
     )
 
     await set_asset_status(

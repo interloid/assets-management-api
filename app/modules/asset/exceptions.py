@@ -54,3 +54,19 @@ class AssetAssignmentUserInactiveError(AppError):
     status_code = 409
     code = "ASSET_ASSIGNMENT_USER_INACTIVE"
     message = "The user assigned to this asset is inactive"
+
+
+class InvalidWarrantyExpiryError(AppError):
+    status_code = 422
+    code = "INVALID_WARRANTY_DATE"
+
+    def __init__(self) -> None:
+        super().__init__(
+            message="Request validation failed",
+            errors=[
+                {
+                    "field": "warranty_expiry",
+                    "message": "Warranty expiry date cannot be before purchase date",
+                }
+            ],
+        )

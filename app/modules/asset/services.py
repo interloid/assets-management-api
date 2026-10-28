@@ -12,6 +12,7 @@ from app.modules.asset.exceptions import (
     AssetNotFoundError,
     AssetTagAlreadyExistsError,
     InvalidAssetStatusTransitionError,
+    InvalidWarrantyExpiryError,
     SerialNumberAlreadyExistsError,
 )
 from app.modules.asset.models import Asset
@@ -73,6 +74,15 @@ class AssetService:
         self.asset_tag_counter_repository = AssetTagCounterRepository(session)
         self.user_repository = UserRepository(session)
 
+    def validate_warranty_expiry(
+        self,
+        *,
+        purchase_date: date,
+        warranty_expiry: date | None,
+    ) -> None:
+        if warranty_expiry is not None and warranty_expiry < purchase_date:
+            raise InvalidWarrantyExpiryError()
+
     def _validate_status_transition(
         self,
         *,
@@ -97,6 +107,11 @@ class AssetService:
         warranty_expiry: date | None,
         notes: str | None,
     ) -> Asset:
+        self.validate_warranty_expiry(
+            purchase_date=purchase_date,
+            warranty_expiry=warranty_expiry,
+        )
+
         company_prefix = get_company_prefix()
 
         number = await self.asset_tag_counter_repository.get_next_number(
@@ -196,6 +211,20 @@ class AssetService:
 
         if asset is None:
             raise AssetNotFoundError()
+
+        purchase_date = update_data.get(
+            "purchase_date",
+            asset.purchase_date,
+        )
+        warranty_expiry = update_data.get(
+            "warranty_expiry",
+            asset.warranty_expiry,
+        )
+
+        self.validate_warranty_expiry(
+            purchase_date=purchase_date,
+            warranty_expiry=warranty_expiry,
+        )
 
         try:
             if "type" in update_data:

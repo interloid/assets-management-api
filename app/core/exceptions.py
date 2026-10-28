@@ -6,17 +6,17 @@ class AppError(Exception):
     code = "INTERNAL_ERROR"
     message = "An unexpected error occurred"
     headers: dict[str, str] | None = None
-    details: Any = None
+    errors: list[dict[str, Any]] | None = None
 
     def __init__(
         self,
         message: str | None = None,
         headers: dict[str, str] | None = None,
-        details: Any = None,
+        errors: list[dict[str, Any]] | None = None,
     ) -> None:
         self.message = message or self.message
         self.headers = headers or self.headers
-        self.details = details
+        self.errors = errors or self.errors
         super().__init__(self.message)
 
 

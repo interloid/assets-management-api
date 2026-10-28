@@ -15,7 +15,7 @@ def app_error_handler(request: Request, exc: AppError):
         status_code=exc.status_code,
         error_code=exc.code,
         message=exc.message,
-        errors=None,
+        errors=exc.errors,
         request_id=None,
         timestamp=datetime.now(UTC),
         path=request.url.path,

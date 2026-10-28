@@ -21,4 +21,20 @@ def validate_serial_number(value: str) -> str:
             "Serial number must contain only uppercase letters, digits, and hyphens"
         )
 
+    if not re.match(r"^[A-Z0-9]", value):
+        raise ValueError(
+            "Serial number must start with an uppercase letter or digit"
+        )
+
+    if "--" in value:
+        raise ValueError(
+            "Serial number cannot contain consecutive hyphens"
+        )
+
+    if not re.search(r"[A-Z]", value):
+        raise ValueError("Serial number must contain at least one uppercase letter")
+
+    if not re.search(r"\d", value):
+        raise ValueError("Serial number must contain at least one digit")
+
     return value

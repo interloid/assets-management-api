@@ -1,8 +1,16 @@
 from datetime import date, datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    computed_field,
+    field_validator,
+    model_validator,
+)
 
+from app.modules.asset.exceptions import InvalidWarrantyExpiryError
 from app.modules.asset.validators.serial_number import validate_serial_number
 from app.shared.models.enums import AssetStatus, AssetType
 
@@ -19,6 +27,16 @@ class AssetCreate(BaseModel):
     _validate_serial_number = field_validator(
         "serial_number",
     )(validate_serial_number)
+
+    @model_validator(mode="after")
+    def validate_warranty_expiry(self):
+        if (
+            self.warranty_expiry is not None
+            and self.warranty_expiry < self.purchase_date
+        ):
+            raise InvalidWarrantyExpiryError()
+
+        return self
 
 
 class AssignedUserResponse(BaseModel):
@@ -83,6 +101,17 @@ class AssetUpdate(BaseModel):
     @classmethod
     def validate_serial_number_field(cls, value: str) -> str:
         return validate_serial_number(value)
+
+    @model_validator(mode="after")
+    def validate_warranty_expiry(self):
+        if (
+            self.purchase_date is not None
+            and self.warranty_expiry is not None
+            and self.warranty_expiry < self.purchase_date
+        ):
+            raise InvalidWarrantyExpiryError()
+
+        return self
 
 
 class AssetAssign(BaseModel):

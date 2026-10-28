@@ -1,3 +1,4 @@
+import json
 from typing import Annotated, Any
 from uuid import UUID
 
@@ -65,15 +66,44 @@ async def _get_user_from_access_token(
 
 async def _get_user_from_refresh_token(
     session: DBSession,
+    redis_client: RedisClient,
     response: Response,
     refresh_token: RefreshToken,
 ):
-    auth_service = AuthService(session)
+    lock_key = f"lock:refresh:{hash(refresh_token)}"
+    cache_key = f"cache:rotated:{hash(refresh_token)}"
 
-    try:
-        new_access_token, new_refresh_token = await auth_service.refresh(refresh_token)
-    except Exception as exc:
-        raise InvalidAccessTokenError() from exc
+    cached_result = await redis_client.get(cache_key)
+    if cached_result:
+        data = json.loads(cached_result)
+        new_access_token = data["access_token"]
+        new_refresh_token = data["refresh_token"]
+    else:
+        async with redis_client.lock(lock_key, timeout=5, blocking_timeout=5):
+            cached_result = await redis_client.get(cache_key)
+            if cached_result:
+                data = json.loads(cached_result)
+                new_access_token = data["access_token"]
+                new_refresh_token = data["refresh_token"]
+            else:
+                auth_service = AuthService(session)
+                try:
+                    new_access_token, new_refresh_token = await auth_service.refresh(
+                        refresh_token
+                    )
+                except Exception as exc:
+                    raise InvalidAccessTokenError() from exc
+
+                await redis_client.setex(
+                    cache_key,
+                    10,
+                    json.dumps(
+                        {
+                            "access_token": new_access_token,
+                            "refresh_token": new_refresh_token,
+                        }
+                    ),
+                )
 
     set_auth_cookies(
         response,
@@ -119,6 +149,7 @@ async def get_current_user(
 
     return await _get_user_from_refresh_token(
         session,
+        redis_client,
         response,
         refresh_token,
     )
