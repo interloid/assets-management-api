@@ -5,7 +5,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Query, Request, status
 
-from app.api.deps import DBSession
+from app.api.deps import DBSession, RedisClient
 from app.api.v1.dependencies import AdminUser, CurrentUser
 from app.api.v1.responses import (
     CONFLICT_RESPONSE,
@@ -52,9 +52,10 @@ async def create_asset(
     request: Request,
     data: AssetCreate,
     session: DBSession,
+    redis_client: RedisClient,
     _admin_user: AdminUser,
 ) -> SuccessResponse[AssetResponse]:
-    service = AssetService(session)
+    service = AssetService(session, redis_client)
 
     asset = await service.create(
         asset_type=data.type,
@@ -92,6 +93,7 @@ async def create_asset(
 async def list_assets(
     request: Request,
     session: DBSession,
+    redis_client: RedisClient,
     _admin_user: AdminUser,
     page: int = Query(default=1, ge=1, le=1000),
     size: int = Query(default=20, ge=1, le=100),
@@ -110,7 +112,7 @@ async def list_assets(
     ),
     order: Literal["asc", "desc"] = Query(default="desc"),
 ) -> SuccessResponse[list[AssetResponse]]:
-    service = AssetService(session)
+    service = AssetService(session, redis_client)
 
     assets, total = await service.list(
         page=page,
@@ -161,9 +163,10 @@ async def list_assets(
 async def get_asset_stats(
     request: Request,
     session: DBSession,
+    redis_client: RedisClient,
     _admin_user: AdminUser,
 ) -> SuccessResponse[AssetStatsResponse]:
-    service = AssetService(session)
+    service = AssetService(session, redis_client)
 
     result = await service.stats()
 
@@ -194,9 +197,10 @@ async def get_by_id(
     request: Request,
     id: UUID,
     session: DBSession,
+    redis_client: RedisClient,
     current_user: CurrentUser,
 ) -> SuccessResponse[AssetResponse]:
-    service = AssetService(session)
+    service = AssetService(session, redis_client)
 
     asset = await service.get_by_id(
         asset_id=id,
@@ -235,9 +239,10 @@ async def update_asset(
     id: UUID,
     data: AssetUpdate,
     session: DBSession,
+    redis_client: RedisClient,
     _admin_user: AdminUser,
 ) -> SuccessResponse[AssetResponse]:
-    service = AssetService(session)
+    service = AssetService(session, redis_client)
 
     update_data = data.model_dump(exclude_unset=True)
 
@@ -277,8 +282,9 @@ async def delete_asset(
     id: UUID,
     _current_user: AdminUser,
     session: DBSession,
+    redis_client: RedisClient,
 ) -> None:
-    service = AssetService(session)
+    service = AssetService(session, redis_client)
 
     await service.delete(id)
 
@@ -301,9 +307,10 @@ async def assign_asset(
     id: UUID,
     data: AssetAssign,
     session: DBSession,
+    redis_client: RedisClient,
     admin_user: AdminUser,
 ) -> SuccessResponse[AssetResponse]:
-    service = AssetService(session)
+    service = AssetService(session, redis_client)
 
     asset = await service.assign(
         asset_id=id,
@@ -342,9 +349,10 @@ async def unassign_asset(
     request: Request,
     id: UUID,
     session: DBSession,
+    redis_client: RedisClient,
     admin_user: AdminUser,
 ) -> SuccessResponse[AssetResponse]:
-    service = AssetService(session)
+    service = AssetService(session, redis_client)
 
     asset = await service.unassign(asset_id=id, unassigned_by=admin_user.id)
 
@@ -380,9 +388,10 @@ async def change_status(
     id: UUID,
     data: AssetStatusUpdate,
     session: DBSession,
+    redis_client: RedisClient,
     admin_user: AdminUser,
 ) -> SuccessResponse[AssetResponse]:
-    service = AssetService(session)
+    service = AssetService(session, redis_client)
 
     asset = await service.change_status(
         id,
@@ -420,9 +429,10 @@ async def get_asset_history(
     request: Request,
     id: UUID,
     session: DBSession,
+    redis_client: RedisClient,
     current_user: AdminUser,
 ) -> SuccessResponse[AssetAssignmentHistoryListResponse]:
-    service = AssetService(session)
+    service = AssetService(session, redis_client)
 
     asset_id, asset_history = await service.get_history_by_asset(id)
 

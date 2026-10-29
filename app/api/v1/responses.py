@@ -59,3 +59,14 @@ LOGOUT_UNAUTHORIZED_RESPONSE = {
         "description": "The provided access token is invalid or expired, or the access and refresh tokens do not belong to the same session",
     },
 }
+
+
+TOO_MANY_REQUESTS_RESPONSE = {
+    status.HTTP_429_TOO_MANY_REQUESTS: {
+        "model": ErrorResponse,
+        "description": (
+            "The request was rejected because the rate limit was exceeded. "
+            "Retry after the period specified by the Retry-After header."
+        ),
+    },
+}

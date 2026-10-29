@@ -1,8 +1,11 @@
+import math
+import time
 from datetime import UTC, datetime
 
 from fastapi import Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from slowapi.errors import RateLimitExceeded
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.core.exceptions import AppError
@@ -115,4 +118,47 @@ def http_exception_handler(request: Request, exc: StarletteHTTPException):
         status_code=exc.status_code,
         content=response.model_dump(mode="json"),
         headers=exc.headers,
+    )
+
+
+def rate_limit_exception_handler(
+    request: Request,
+    _exc: RateLimitExceeded,
+) -> JSONResponse:
+    retry_after = 60
+
+    try:
+        current_limit = request.state.view_rate_limit
+
+        if current_limit is not None:
+            rate_limit_item, identifiers = current_limit
+
+            limiter = request.app.state.limiter
+            window_stats = limiter.limiter.get_window_stats(
+                rate_limit_item,
+                *identifiers,
+            )
+
+            retry_after = max(
+                1,
+                math.ceil(window_stats.reset_time - time.time()),
+            )
+    except (AttributeError, TypeError, ValueError):
+        pass
+
+    response = ErrorResponse(
+        success=False,
+        status_code=429,
+        message=(f"Rate limit exceeded. Please retry after {retry_after} seconds."),
+        error_code="RATE_LIMIT_EXCEEDED",
+        errors=None,
+        request_id=None,
+        timestamp=datetime.now(UTC),
+        path=request.url.path,
+    )
+
+    return JSONResponse(
+        status_code=429,
+        content=response.model_dump(mode="json"),
+        headers={"Retry-After": str(retry_after)},
     )

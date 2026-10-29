@@ -16,8 +16,9 @@ from app.shared.models.enums import UserRole
 
 @pytest.fixture
 def service():
+    redis_client = MagicMock()
     session = MagicMock()
-    instance = AssetService(session)
+    instance = AssetService(session, redis_client)
 
     instance.asset_repository = MagicMock()
     instance.user_repository = MagicMock()

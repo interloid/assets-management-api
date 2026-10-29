@@ -22,12 +22,19 @@ async def health_check(request: Request, session: DBSession, redis_client: Redis
 
     if not all(s.status == "ok" for s in services.values()):
         raise ServiceUnavailableError(
-            details={
-                "status": "degraded",
-                "services": {
-                    key: value.model_dump() for key, value in services.items()
-                },
-            }
+            message="One or more required services are unavailable",
+            errors=[
+                {
+                    "field": "services",
+                    "message": "Health check detected degraded dependencies",
+                    "details": {
+                        "status": "degraded",
+                        "services": {
+                            key: value.model_dump() for key, value in services.items()
+                        },
+                    },
+                }
+            ],
         )
 
     return SuccessResponse(

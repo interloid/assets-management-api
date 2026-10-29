@@ -1,3 +1,4 @@
+import json
 from datetime import UTC, date, datetime
 from typing import Literal
 from uuid import UUID
@@ -5,6 +6,7 @@ from uuid import UUID
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.deps import RedisClient
 from app.modules.asset.asset_assignment import AssetAssignment
 from app.modules.asset.exceptions import (
     AssetAssignmentUserInactiveError,
@@ -26,6 +28,8 @@ from app.modules.user.models import User
 from app.modules.user.repositories import UserRepository
 from app.shared.models.enums import AssetStatus, AssetType, UserRole
 
+ASSET_STATS_CACHE_KEY = "assets:stats"
+ASSET_STATS_CACHE_TTL = 60
 ALLOWED_STATUS_TRANSITIONS: dict[AssetStatus, set[AssetStatus]] = {
     AssetStatus.IN_STOCK: {
         AssetStatus.ASSIGNED,
@@ -70,11 +74,12 @@ def get_constraint_name(exc: IntegrityError) -> str | None:
 
 
 class AssetService:
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(self, session: AsyncSession, redis_client: RedisClient) -> None:
         self.session = session
         self.asset_repository = AssetRepository(session)
         self.asset_tag_counter_repository = AssetTagCounterRepository(session)
         self.user_repository = UserRepository(session)
+        self.redis_client = redis_client
 
     def validate_warranty_expiry(
         self,
@@ -154,6 +159,7 @@ class AssetService:
 
             raise
 
+        await self.redis_client.delete(ASSET_STATS_CACHE_KEY)
         return asset
 
     async def list(
@@ -265,6 +271,7 @@ class AssetService:
 
             raise
 
+        await self.redis_client.delete(ASSET_STATS_CACHE_KEY)
         return asset
 
     async def delete(self, asset_id: UUID) -> None:
@@ -285,6 +292,7 @@ class AssetService:
         await self.asset_repository.delete(asset)
 
         await self.session.commit()
+        await self.redis_client.delete(ASSET_STATS_CACHE_KEY)
 
     async def assign(self, asset_id: UUID, user_id: UUID, assigned_by: UUID) -> Asset:
         asset = await self.asset_repository.get_by_id(asset_id)
@@ -317,6 +325,7 @@ class AssetService:
         await self.asset_repository.assign(asset, user_id)
         await self.asset_repository.add_history(asset_history)
         await self.session.commit()
+        await self.redis_client.delete(ASSET_STATS_CACHE_KEY)
 
         return asset
 
@@ -344,6 +353,7 @@ class AssetService:
 
         await self.asset_repository.unassign(asset)
         await self.session.commit()
+        await self.redis_client.delete(ASSET_STATS_CACHE_KEY)
 
         return asset
 
@@ -378,10 +388,16 @@ class AssetService:
         )
 
         await self.session.commit()
+        await self.redis_client.delete(ASSET_STATS_CACHE_KEY)
 
         return asset
 
     async def stats(self) -> dict[str, int]:
+        cached = await self.redis_client.get(ASSET_STATS_CACHE_KEY)
+
+        if cached is not None:
+            return json.loads(cached)
+
         counts = await self.asset_repository.stats()
 
         in_stock = counts.get(AssetStatus.IN_STOCK, 0)
@@ -389,13 +405,21 @@ class AssetService:
         repair = counts.get(AssetStatus.REPAIR, 0)
         retired = counts.get(AssetStatus.RETIRED, 0)
 
-        return {
+        result = {
             "total": in_stock + assigned + repair + retired,
             "in_stock": in_stock,
             "assigned": assigned,
             "repair": repair,
             "retired": retired,
         }
+
+        await self.redis_client.set(
+            ASSET_STATS_CACHE_KEY,
+            json.dumps(result),
+            ex=ASSET_STATS_CACHE_TTL,
+        )
+
+        return result
 
     async def get_history_by_asset(
         self,
