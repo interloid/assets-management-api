@@ -2,11 +2,12 @@ name: Deploy to FastAPI Cloud
 
 on:
   push:
-    branches: [feature/auth]
+    branches: [refactor/api-v1]
   workflow_dispatch:
 
 jobs:
   deploy:
+    if: github.ref == 'refs/heads/refactor/api-v1'
     runs-on: ubuntu-latest
 
     steps:

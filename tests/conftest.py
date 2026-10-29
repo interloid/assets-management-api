@@ -3,9 +3,9 @@ from datetime import datetime, timezone
 import pytest
 from uuid6 import uuid7
 
-from app.models.enums import UserRole
-from app.models.user import User
-from app.schemas.auth import LoginRequest, RegisterRequest
+from app.api.v1.schemas.auth import LoginRequest, RegisterRequest
+from app.modules.user.models import User
+from app.shared.models.enums import UserRole
 
 
 @pytest.fixture
