@@ -2,7 +2,7 @@ import json
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import Cookie, Depends, HTTPException, Response, status
+from fastapi import Cookie, Depends, HTTPException, Request, Response, status
 
 from app.api.deps import DBSession, RedisClient
 from app.api.v1.cookies import set_auth_cookies
@@ -124,6 +124,7 @@ async def _get_user_from_refresh_token(
 
 
 async def get_current_user(
+    request: Request,
     session: DBSession,
     redis_client: RedisClient,
     response: Response,
@@ -138,6 +139,7 @@ async def get_current_user(
         )
 
         if user is not None:
+            request.state.user_id = str(user.id)
             return user
 
     if refresh_token is None:
@@ -147,12 +149,14 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    return await _get_user_from_refresh_token(
+    user = await _get_user_from_refresh_token(
         session,
         redis_client,
         response,
         refresh_token,
     )
+    request.state.user_id = str(user.id)
+    return user
 
 
 def get_logout_access_token(

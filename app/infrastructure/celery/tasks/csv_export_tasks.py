@@ -220,20 +220,42 @@ async def run_export_with_cleanup(
     retry_backoff=True,
     retry_kwargs={"max_retries": 3},
 )
-def generate_asset_csv(self, export_id: str) -> dict:
+def generate_asset_csv(
+    self,
+    export_id: str,
+    request_id: str | None = None,
+) -> dict:
     task_id = self.request.id
 
+    log_context = {
+        "request_id": request_id,
+        "task_id": task_id,
+        "export_id": export_id,
+    }
+
+    logger.info(
+        "CSV export task started",
+        extra=log_context,
+    )
+
     try:
-        return asyncio.run(
+        result = asyncio.run(
             run_export_with_cleanup(
                 export_id=UUID(export_id),
                 task_id=task_id,
             )
         )
+
+        logger.info(
+            "CSV export task completed",
+            extra=log_context,
+        )
+
+        return result
+
     except Exception:
         logger.exception(
-            "CSV export task failed. export_id=%s task_id=%s",
-            export_id,
-            task_id,
+            "CSV export task failed",
+            extra=log_context,
         )
         raise

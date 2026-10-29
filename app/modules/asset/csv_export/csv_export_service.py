@@ -44,6 +44,7 @@ class AssetExportService:
         self,
         requested_by: UUID,
         filters: dict,
+        request_id: str | None = None,
     ) -> AssetExport:
         export = AssetExport(
             requested_by=requested_by,
@@ -56,7 +57,10 @@ class AssetExportService:
         await self.session.refresh(export)
 
         try:
-            generate_asset_csv.delay(str(export.id))
+            generate_asset_csv.apply_async(
+                args=[str(export.id)],
+                kwargs={"request_id": request_id},
+            )
         except Exception as exc:
             await self.repository.update_status(export.id, "failed")
             await self.session.commit()

@@ -1,7 +1,9 @@
 from celery import Celery
 from celery.schedules import crontab
+from celery.signals import setup_logging
 
 from app.core.config import settings
+from app.core.logging import configure_logging
 
 celery_app = Celery(
     "assets_management",
@@ -14,6 +16,12 @@ celery_app = Celery(
         "app.infrastructure.celery.tasks.asset_file_cleanup_tasks",
     ],
 )
+
+
+@setup_logging.connect
+def configure_celery_logging(**kwargs) -> None:
+    configure_logging()
+
 
 celery_app.conf.update(
     task_serializer="json",
