@@ -12,11 +12,15 @@ from app.api.exception_handlers import (
     validation_exception_handler,
 )
 from app.api.health.router import router as health_router
+from app.api.middleware import request_logging_middleware
 from app.api.router import router as api_router
 from app.core.config import settings
 from app.core.exceptions import AppError
+from app.core.logging import configure_logging
 from app.infrastructure.lifespan import lifespan
 from app.infrastructure.rate_limiter import limiter
+
+configure_logging()
 
 app = FastAPI(
     title="Assets Management API",
@@ -51,7 +55,9 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-Request-ID"],
 )
+app.middleware("http")(request_logging_middleware)
 
 app.state.limiter = limiter
 app.add_exception_handler(

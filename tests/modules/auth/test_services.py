@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from fastapi import Response
 from sqlalchemy.exc import IntegrityError
+from starlette.requests import Request
 from uuid6 import uuid7
 
 import app.shared.models.registry  # noqa: F401
@@ -1245,6 +1246,7 @@ async def test_get_current_user_success(
     created_user,
 ) -> None:
     mock_redis = AsyncMock()
+    request = AsyncMock(spec=Request)
     token = "valid access token"
 
     created_user.id = uuid7()
@@ -1276,6 +1278,7 @@ async def test_get_current_user_success(
         ),
     ):
         result = await get_current_user(
+            request=request,
             access_token=token,
             refresh_token="valid-refresh-token",
             session=mock_session,
@@ -1300,6 +1303,7 @@ async def test_get_current_user_redis_miss(
     mock_session,
     created_user,
 ) -> None:
+    request = AsyncMock(spec=Request)
     mock_redis = AsyncMock()
     token = "valid access token"
 
@@ -1332,6 +1336,7 @@ async def test_get_current_user_redis_miss(
         ),
     ):
         result = await get_current_user(
+            request=request,
             access_token=token,
             refresh_token="valid-refresh-token",
             session=mock_session,
@@ -1351,6 +1356,7 @@ async def test_get_current_user_token_version_mismatch(
     mock_session,
     created_user,
 ) -> None:
+    request = AsyncMock(spec=Request)
     mock_redis = AsyncMock()
 
     created_user.id = uuid7()
@@ -1382,6 +1388,7 @@ async def test_get_current_user_token_version_mismatch(
     ):
         with pytest.raises(InvalidAccessTokenError):
             await get_current_user(
+                request=request,
                 access_token="valid-access-token",
                 session=mock_session,
                 redis_client=mock_redis,

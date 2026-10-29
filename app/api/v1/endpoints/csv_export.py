@@ -47,6 +47,7 @@ async def create_asset_export(
             exclude_none=True,
             mode="json",
         ),
+        request_id=getattr(request.state, "request_id", None),
     )
 
     data = {
