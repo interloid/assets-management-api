@@ -81,6 +81,75 @@ async def test_register_then_login(
 
 
 @pytest.mark.asyncio
+async def test_login_rate_limit(
+    integration_client,
+    user_payload,
+) -> None:
+    # Create a valid user so requests can reach the login logic.
+    register_response = await integration_client.post(
+        "/api/v1/auth/register",
+        json=user_payload,
+    )
+    assert register_response.status_code == 201
+
+    payload = {
+        "email": user_payload["email"],
+        "password": user_payload["password"],
+    }
+
+    # Five requests are allowed.
+    for _ in range(5):
+        response = await integration_client.post(
+            "/api/v1/auth/login",
+            json=payload,
+        )
+        assert response.status_code == 200
+
+    # The sixth request should be throttled.
+    response = await integration_client.post(
+        "/api/v1/auth/login",
+        json=payload,
+    )
+
+    assert response.status_code == 429
+    assert "Retry-After" in response.headers
+
+
+@pytest.mark.asyncio
+async def test_register_rate_limit(
+    integration_client,
+    user_payload,
+) -> None:
+    # Three requests are allowed by the assumed policy.
+    for index in range(3):
+        payload = {
+            **user_payload,
+            "email": f"ratelimit-{index}-{user_payload['email']}",
+        }
+
+        response = await integration_client.post(
+            "/api/v1/auth/register",
+            json=payload,
+        )
+
+        assert response.status_code == 201
+
+    # The fourth request should be throttled.
+    payload = {
+        **user_payload,
+        "email": f"ratelimit-blocked-{user_payload['email']}",
+    }
+
+    response = await integration_client.post(
+        "/api/v1/auth/register",
+        json=payload,
+    )
+
+    assert response.status_code == 429
+    assert "Retry-After" in response.headers
+
+
+@pytest.mark.asyncio
 async def test_login_then_refresh(
     integration_client,
     db_session: AsyncSession,

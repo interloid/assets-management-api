@@ -1,4 +1,5 @@
 from collections.abc import AsyncGenerator
+from itertools import count
 
 import pytest_asyncio
 from asgi_lifespan import LifespanManager
@@ -18,6 +19,8 @@ from app.main import app
 from app.modules.user.models import User
 from app.shared.models.enums import UserRole
 from tests.config import test_settings
+
+_test_client_ips = count(1)
 
 
 @pytest_asyncio.fixture
@@ -71,10 +74,15 @@ async def integration_client(
 
     app.dependency_overrides[get_db] = override_get_db
 
+    client_ip = f"127.0.0.{next(_test_client_ips)}"
+
     try:
         async with LifespanManager(app):
             async with AsyncClient(
-                transport=ASGITransport(app=app),
+                transport=ASGITransport(
+                    app=app,
+                    client=(client_ip, 12345),
+                ),
                 base_url="http://test",
             ) as client:
                 yield client

@@ -4,7 +4,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Query, Request, Response, status
 
-from app.api.deps import DBSession
+from app.api.deps import DBSession, RedisClient
 from app.api.v1.cookies import clear_auth_cookies
 from app.api.v1.dependencies import AdminUser, CurrentUser
 from app.api.v1.responses import (
@@ -118,6 +118,7 @@ async def change_password(
 async def get_my_assets(
     request: Request,
     session: DBSession,
+    redis_client: RedisClient,
     current_user: CurrentUser,
     page: int = Query(default=1, ge=1, le=1000),
     size: int = Query(
@@ -126,7 +127,7 @@ async def get_my_assets(
         le=100,
     ),
 ) -> SuccessResponse[list[AssetResponse]]:
-    service = AssetService(session)
+    service = AssetService(session, redis_client)
 
     assets, total = await service.list(
         page=page,
@@ -173,9 +174,10 @@ async def get_user_history(
     request: Request,
     id: UUID,
     session: DBSession,
+    redis_client: RedisClient,
     current_user: CurrentUser,
 ) -> SuccessResponse[UserAssetHistoryListResponse]:
-    service = AssetService(session)
+    service = AssetService(session, redis_client)
 
     asset_history = await service.get_history_by_user(
         user_id=id,
