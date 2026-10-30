@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from uuid import UUID
 
-from sqlalchemy import select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.auth.models import RefreshToken
@@ -97,3 +97,19 @@ class RefreshTokenRepository:
         )
 
         await self.session.execute(stmt)
+
+    async def delete_old_tokens(
+        self,
+        cutoff: datetime,
+    ) -> int:
+        stmt = delete(RefreshToken).where(
+            func.coalesce(
+                RefreshToken.revoked_at,
+                RefreshToken.expires_at,
+            )
+            < cutoff
+        )
+
+        result = await self.session.execute(stmt)
+
+        return result.rowcount or 0
