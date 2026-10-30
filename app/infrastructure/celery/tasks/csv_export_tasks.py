@@ -2,7 +2,6 @@ import asyncio
 import logging
 import os
 from datetime import UTC, datetime
-from pathlib import Path
 from uuid import UUID
 
 from sqlalchemy import select, update
@@ -13,6 +12,7 @@ from app.infrastructure.celery.idempotency import (
     mark_failed,
 )
 from app.infrastructure.database import AsyncSessionLocal, engine
+from app.modules.asset.csv_export.csv_export_config import EXPORT_DIR
 from app.modules.asset.csv_export.csv_export_model import AssetExport
 from app.modules.asset.csv_export.csv_export_writter import (
     asset_to_csv,
@@ -26,7 +26,6 @@ from app.shared.background_jobs.models import BackgroundJob  # noqa: F401
 logger = logging.getLogger(__name__)
 
 JOB_TYPE = "asset_csv_export"
-EXPORT_DIR = Path(os.getenv("EXPORT_DIR", "/app/exports"))
 
 
 async def finish_export(

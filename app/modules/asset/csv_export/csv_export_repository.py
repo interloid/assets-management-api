@@ -1,6 +1,7 @@
+from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import update
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.asset.csv_export.csv_export_model import AssetExport
@@ -31,3 +32,17 @@ class AssetExportRepository:
             .where(AssetExport.id == export_id)
             .values(status=new_status)
         )
+
+    async def get_expired_exports(
+        self,
+        cutoff: datetime,
+    ) -> list[AssetExport]:
+        result = await self.session.execute(
+            select(AssetExport).where(
+                AssetExport.status == "completed",
+                AssetExport.file_path.is_not(None),
+                AssetExport.created_at < cutoff,
+            )
+        )
+
+        return list(result.scalars().all())
