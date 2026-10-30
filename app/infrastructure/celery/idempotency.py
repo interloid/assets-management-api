@@ -6,7 +6,7 @@ from sqlalchemy import and_, or_, update
 from sqlalchemy.dialects.postgresql import insert
 
 from app.infrastructure.database import AsyncSessionLocal
-from app.shared.models.background_job import BackgroundJob
+from app.shared.background_jobs.models import BackgroundJob
 
 logger = logging.getLogger(__name__)
 
@@ -143,6 +143,7 @@ async def mark_failed(
                 )
                 .values(
                     status="failed",
+                    completed_at=datetime.now(UTC),
                     last_error=error[:4000],
                 )
                 .returning(BackgroundJob.id)

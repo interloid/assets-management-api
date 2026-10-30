@@ -6,7 +6,7 @@ from app.modules.asset.tag.model import AssetTagCounter
 from app.modules.asset_files.models import AssetFiles
 from app.modules.auth.models import RefreshToken
 from app.modules.user.models import User
-from app.shared.models.background_job import BackgroundJob
+from app.shared.background_jobs.models import BackgroundJob
 
 __all__ = [
     "Asset",

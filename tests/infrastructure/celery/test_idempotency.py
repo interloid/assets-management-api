@@ -14,7 +14,7 @@ from app.modules.asset.models import Asset  # noqa: F401
 from app.modules.asset.tag.model import AssetTagCounter  # noqa: F401
 from app.modules.auth.models import RefreshToken  # noqa: F401
 from app.modules.user.models import User  # noqa: F401
-from app.shared.models.background_job import BackgroundJob
+from app.shared.background_jobs.models import BackgroundJob
 
 
 async def get_job(
