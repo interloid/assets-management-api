@@ -4,7 +4,7 @@ from pathlib import Path
 from uuid import UUID
 
 from app.modules.asset.models import Asset  # noqa: F401
-from app.shared.models.background_job import BackgroundJob  # noqa: F401
+from app.shared.background_jobs.models import BackgroundJob  # noqa: F401
 from app.shared.models.enums import AssetStatus, AssetType, WarrantyExpiry
 
 CSV_COLUMNS = [

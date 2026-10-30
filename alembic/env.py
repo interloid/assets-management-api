@@ -15,7 +15,7 @@ from app.modules.asset.tag.model import AssetTagCounter  # noqa: F401
 from app.modules.asset_files.models import AssetFiles  # noqa: F401
 from app.modules.auth.models import RefreshToken  # noqa: F401
 from app.modules.user.models import User  # noqa: F401
-from app.shared.models.background_job import BackgroundJob  # noqa: F401
+from app.shared.background_jobs.models import BackgroundJob  # noqa: F401
 from app.shared.models.base import Base
 
 # this is the Alembic Config object, which provides

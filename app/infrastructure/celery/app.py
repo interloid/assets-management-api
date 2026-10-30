@@ -15,6 +15,7 @@ celery_app = Celery(
         "app.infrastructure.celery.tasks.weekly_tasks",
         "app.infrastructure.celery.tasks.asset_file_cleanup_tasks",
         "app.infrastructure.celery.tasks.refresh_token_cleanup_tasks",
+        "app.infrastructure.celery.tasks.background_job_cleanup_tasks",
     ],
 )
 
@@ -51,6 +52,13 @@ celery_app.conf.update(
                 "app.infrastructure.celery.tasks.refresh_token_cleanup_tasks.cleanup_expired_refresh_tokens"
             ),
             "schedule": crontab(hour=2, minute=30),
+        },
+        "daily-expired-background-job-cleanup": {
+            "task": (
+                "app.infrastructure.celery.tasks.background_job_cleanup_tasks."
+                "cleanup_expired_background_jobs"
+            ),
+            "schedule": crontab(hour=3, minute=0),
         },
     },
 )

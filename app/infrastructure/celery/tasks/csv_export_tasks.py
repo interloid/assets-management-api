@@ -21,7 +21,7 @@ from app.modules.asset.csv_export.csv_export_writter import (
 )
 from app.modules.asset.models import Asset  # noqa: F401
 from app.modules.asset.repositories import AssetRepository
-from app.shared.models.background_job import BackgroundJob  # noqa: F401
+from app.shared.background_jobs.models import BackgroundJob  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
