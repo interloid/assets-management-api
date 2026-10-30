@@ -11,6 +11,7 @@ from app.shared.models.mixins import CreatedAtMixin, UpdatedAtMixin
 if TYPE_CHECKING:
     from app.modules.asset.asset_assignment import AssetAssignment
     from app.modules.asset.models import Asset
+    from app.modules.asset.tag.asset_tag_history import AssetTagHistory
     from app.modules.auth.models import RefreshToken
 
 
@@ -71,6 +72,12 @@ class User(BaseModel, CreatedAtMixin, UpdatedAtMixin):
         "AssetAssignment",
         foreign_keys="AssetAssignment.unassigned_by",
         back_populates="un_assigner",
+    )
+
+    asset_tag_changes: Mapped[list["AssetTagHistory"]] = relationship(
+        "AssetTagHistory",
+        foreign_keys="AssetTagHistory.changed_by",
+        back_populates="changed_by_user",
     )
 
     assets: Mapped[list["Asset"]] = relationship(back_populates="assigned_user")

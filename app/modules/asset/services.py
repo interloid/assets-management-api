@@ -21,6 +21,7 @@ from app.modules.asset.exceptions import (
 )
 from app.modules.asset.models import Asset
 from app.modules.asset.repositories import AssetRepository
+from app.modules.asset.tag.asset_tag_history import AssetTagHistory
 from app.modules.asset.tag.generator import build_asset_tag, get_company_prefix
 from app.modules.asset.tag.repository import AssetTagCounterRepository
 from app.modules.auth.exceptions import AuthorizationError
@@ -411,11 +412,26 @@ class AssetService:
         new_status = update_data.pop("status", None)
         user_id = update_data.pop("user_id", None)
 
+        old_asset_tag = asset.asset_tag
+        old_asset_type = asset.type
+
         try:
             await self._update_asset_details(
                 asset=asset,
                 update_data=update_data,
             )
+
+            if "type" in update_data and update_data["type"] != old_asset_type:
+                history = AssetTagHistory(
+                    asset_id=asset.id,
+                    old_asset_tag=old_asset_tag,
+                    old_asset_type=old_asset_type,
+                    new_asset_tag=asset.asset_tag,
+                    new_asset_type=update_data["type"],
+                    changed_by=changed_by,
+                )
+
+                self.session.add(history)
 
             if new_status is not None:
                 await self._apply_status_transition(
@@ -604,3 +620,13 @@ class AssetService:
             return user_history
 
         raise AuthorizationError()
+
+    async def get_tag_history(self, asset_id: UUID):
+        asset = await self.asset_repository.get_by_id(asset_id)
+
+        if asset is None:
+            raise AssetNotFoundError()
+
+        tag_history = await self.asset_repository.get_tag_history(asset_id)
+
+        return tag_history

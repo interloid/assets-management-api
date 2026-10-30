@@ -6,6 +6,7 @@ from sqlalchemy import select
 
 from app.core.security import create_access_token
 from app.modules.asset.models import Asset
+from app.modules.asset.tag.asset_tag_history import AssetTagHistory
 from app.modules.asset.tag.model import AssetTagCounter
 from app.modules.user.models import User
 from app.shared.models.enums import AssetStatus, AssetType
@@ -1304,3 +1305,156 @@ async def test_update_asset_rejects_duplicate_asset_tag(
     data = response.json()["data"]
 
     assert data["asset_tag"] != first["asset_tag"]
+
+
+@pytest.mark.asyncio
+async def test_get_asset_tag_history_returns_type_change(
+    integration_client: AsyncClient,
+    admin_access_token: str,
+) -> None:
+    integration_client.cookies.set("access_token", admin_access_token)
+
+    asset = await create_asset(
+        integration_client,
+        admin_access_token,
+        serial_number="SN-TAG-GET-001",
+    )
+
+    old_tag = asset["asset_tag"]
+    old_type = asset["type"]
+    new_type = "monitor" if old_type != "monitor" else "laptop"
+
+    update_response = await integration_client.patch(
+        f"/api/v1/assets/{asset['id']}",
+        json={"type": new_type},
+    )
+    assert update_response.status_code == 200
+
+    history_response = await integration_client.get(
+        f"/api/v1/assets/assets/{asset['id']}/tag-history",
+    )
+
+    assert history_response.status_code == 200
+
+    body = history_response.json()
+    data = body.get("data", body)
+    history = data.get("history", data) if isinstance(data, dict) else data
+
+    assert len(history) == 1
+    assert history[0]["old_asset_tag"] == old_tag
+    assert history[0]["old_asset_type"] == old_type
+    assert history[0]["new_asset_type"] == new_type
+    assert history[0]["changed_by_user"] is not None
+
+
+@pytest.mark.asyncio
+async def test_get_asset_tag_history_returns_empty_list(
+    integration_client: AsyncClient,
+    admin_access_token: str,
+) -> None:
+    integration_client.cookies.set("access_token", admin_access_token)
+
+    asset = await create_asset(
+        integration_client,
+        admin_access_token,
+        serial_number="SN-TAG-EMPTY-001",
+    )
+
+    response = await integration_client.get(
+        f"/api/v1/assets/assets/{asset['id']}/tag-history",
+    )
+
+    assert response.status_code == 200
+
+    body = response.json()
+    data = body.get("data", body)
+    history = data.get("history", data) if isinstance(data, dict) else data
+
+    assert history == []
+
+
+@pytest.mark.asyncio
+async def test_update_asset_type_generates_new_tag_and_history(
+    integration_client: AsyncClient,
+    admin_access_token: str,
+    db_session,
+) -> None:
+    integration_client.cookies.set("access_token", admin_access_token)
+
+    asset = await create_asset(
+        integration_client,
+        admin_access_token,
+        serial_number="SN-TAG-HISTORY-001",
+    )
+
+    old_tag = asset["asset_tag"]
+    old_type = asset["type"]
+
+    new_type = "monitor" if old_type != "monitor" else "laptop"
+
+    response = await integration_client.patch(
+        f"/api/v1/assets/{asset['id']}",
+        json={"type": new_type},
+    )
+
+    assert response.status_code == 200
+
+    body = response.json()
+    updated_asset = body.get("data", body)
+
+    assert updated_asset["id"] == asset["id"]
+    assert updated_asset["type"] == new_type
+    assert updated_asset["asset_tag"] != old_tag
+
+    result = await db_session.execute(
+        select(AssetTagHistory).where(AssetTagHistory.asset_id == asset["id"])
+    )
+    history = result.scalars().all()
+
+    assert len(history) == 1
+    assert history[0].old_asset_tag == old_tag
+    assert history[0].old_asset_type.value == old_type
+    assert history[0].new_asset_tag == updated_asset["asset_tag"]
+    assert history[0].new_asset_type.value == new_type
+
+
+@pytest.mark.asyncio
+async def test_update_asset_notes_does_not_create_tag_history(
+    integration_client: AsyncClient,
+    admin_access_token: str,
+    db_session,
+) -> None:
+    integration_client.cookies.set("access_token", admin_access_token)
+
+    asset = await create_asset(
+        integration_client,
+        admin_access_token,
+        serial_number="SN-TAG-NOTES-001",
+    )
+
+    response = await integration_client.patch(
+        f"/api/v1/assets/{asset['id']}",
+        json={"notes": "Updated notes"},
+    )
+
+    assert response.status_code == 200
+
+    result = await db_session.execute(
+        select(AssetTagHistory).where(AssetTagHistory.asset_id == asset["id"])
+    )
+
+    assert result.scalars().all() == []
+
+
+@pytest.mark.asyncio
+async def test_get_asset_tag_history_returns_404_for_missing_asset(
+    integration_client: AsyncClient,
+    admin_access_token: str,
+) -> None:
+    integration_client.cookies.set("access_token", admin_access_token)
+
+    response = await integration_client.get(
+        f"/api/v1/assets/assets/{uuid4()}/tag-history",
+    )
+
+    assert response.status_code == 404

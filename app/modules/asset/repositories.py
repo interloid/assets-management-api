@@ -8,6 +8,7 @@ from sqlalchemy.orm import selectinload
 
 from app.modules.asset.asset_assignment import AssetAssignment
 from app.modules.asset.models import Asset
+from app.modules.asset.tag.asset_tag_history import AssetTagHistory
 from app.shared.models.enums import AssetStatus, AssetType, WarrantyExpiry
 from app.shared.utils.query import escape_like
 
@@ -338,4 +339,14 @@ class AssetRepository:
         )
 
         result = await self.session.execute(stmt)
+        return result.scalars().all()
+
+    async def get_tag_history(self, asset_id: UUID):
+        result = await self.session.execute(
+            select(AssetTagHistory)
+            .where(AssetTagHistory.asset_id == asset_id)
+            .options(selectinload(AssetTagHistory.changed_by_user))
+            .order_by(AssetTagHistory.changed_at.desc())
+        )
+
         return result.scalars().all()
