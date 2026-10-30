@@ -229,3 +229,19 @@ class AssetAssignmentHistoryListResponse(BaseModel):
 class UserAssetHistoryListResponse(BaseModel):
     user_id: UUID
     assets: list[UserAssetHistoryResponse]
+
+
+class AssetTagHistoryResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    old_asset_tag: str
+    old_asset_type: AssetType
+    new_asset_tag: str
+    new_asset_type: AssetType
+    changed_by_user: AssignedUserResponse | None = None
+
+
+class AssetTagHistoryListResponse(BaseModel):
+    asset_id: UUID
+    history: list[AssetTagHistoryResponse]

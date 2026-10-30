@@ -12,6 +12,7 @@ from app.shared.models.mixins import CreatedAtMixin, UpdatedAtMixin
 
 if TYPE_CHECKING:
     from app.modules.asset.asset_assignment import AssetAssignment
+    from app.modules.asset.tag.asset_tag_history import AssetTagHistory
     from app.modules.asset_files.models import AssetFiles
     from app.modules.user.models import User
 
@@ -95,6 +96,11 @@ class Asset(
 
     assignments: Mapped[list["AssetAssignment"]] = relationship(
         "AssetAssignment",
+        back_populates="asset",
+    )
+
+    tag_history: Mapped[list["AssetTagHistory"]] = relationship(
+        "AssetTagHistory",
         back_populates="asset",
     )
 

@@ -311,6 +311,7 @@ async def test_update_asset_success(mock_session) -> None:
     result = await service.update(
         asset_id=asset.id,
         update_data=update_data,
+        changed_by=uuid7(),
     )
 
     service.asset_repository.update.assert_awaited_once_with(
@@ -337,6 +338,7 @@ async def test_update_asset_not_found(mock_session) -> None:
         await service.update(
             asset_id=asset_id,
             update_data={"notes": "Updated notes"},
+            changed_by=uuid7(),
         )
 
     service.asset_repository.update.assert_not_awaited()
@@ -382,6 +384,7 @@ async def test_update_asset_type_generates_new_tag(
         result = await service.update(
             asset_id=asset.id,
             update_data=update_data,
+            changed_by=uuid7(),
         )
 
     service.asset_tag_counter_repository.get_next_number.assert_awaited_once_with(
@@ -988,3 +991,60 @@ async def test_stats_cache_hit(mock_session) -> None:
     redis_client.get.assert_awaited_once_with("assets:stats")
     service.asset_repository.stats.assert_not_awaited()
     redis_client.set.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_get_tag_history_returns_repository_records(
+    mock_session,
+) -> None:
+    redis_client = AsyncMock()
+    service = AssetService(mock_session, redis_client)
+
+    asset_id = uuid7()
+    asset = object()
+    history_records = [object(), object()]
+
+    service.asset_repository.get_by_id = AsyncMock(
+        return_value=asset,
+    )
+
+    service.asset_repository.get_tag_history = AsyncMock(
+        return_value=history_records,
+    )
+
+    result = await service.get_tag_history(asset_id)
+
+    service.asset_repository.get_by_id.assert_awaited_once_with(
+        asset_id,
+    )
+
+    service.asset_repository.get_tag_history.assert_awaited_once_with(
+        asset_id,
+    )
+
+    assert result == history_records
+
+
+@pytest.mark.asyncio
+async def test_get_tag_history_raises_when_asset_does_not_exist(
+    mock_session,
+) -> None:
+    redis_client = AsyncMock()
+    service = AssetService(mock_session, redis_client)
+
+    asset_id = uuid7()
+
+    service.asset_repository.get_by_id = AsyncMock(
+        return_value=None,
+    )
+
+    service.asset_repository.get_tag_history = AsyncMock()
+
+    with pytest.raises(AssetNotFoundError):
+        await service.get_tag_history(asset_id)
+
+    service.asset_repository.get_by_id.assert_awaited_once_with(
+        asset_id,
+    )
+
+    service.asset_repository.get_tag_history.assert_not_awaited()

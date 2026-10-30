@@ -22,6 +22,7 @@ from app.api.v1.schemas.assets import (
     AssetResponse,
     AssetStatsResponse,
     AssetStatusUpdate,
+    AssetTagHistoryListResponse,
     AssetUpdate,
 )
 from app.modules.asset.services import AssetService
@@ -240,7 +241,7 @@ async def update_asset(
     data: AssetUpdate,
     session: DBSession,
     redis_client: RedisClient,
-    _admin_user: AdminUser,
+    admin_user: AdminUser,
 ) -> SuccessResponse[AssetResponse]:
     service = AssetService(session, redis_client)
 
@@ -249,6 +250,7 @@ async def update_asset(
     asset = await service.update(
         asset_id=id,
         update_data=update_data,
+        changed_by=admin_user.id,
     )
 
     return SuccessResponse(
@@ -443,6 +445,37 @@ async def get_asset_history(
         data=AssetAssignmentHistoryListResponse(
             asset_id=asset_id,
             history=asset_history,
+        ),
+        pagination_meta=None,
+        request_id=None,
+        timestamp=datetime.now(UTC),
+        path=request.url.path,
+    )
+
+
+@router.get(
+    "/assets/{id}/tag-history",
+    status_code=status.HTTP_200_OK,
+)
+async def get_tag_history(
+    request: Request,
+    id: UUID,
+    session: DBSession,
+    current_user: AdminUser,
+    redis_client: RedisClient,
+) -> SuccessResponse[AssetTagHistoryListResponse]:
+
+    service = AssetService(session, redis_client)
+
+    tag_history = await service.get_tag_history(id)
+
+    return SuccessResponse(
+        success=True,
+        status_code=status.HTTP_200_OK,
+        message="Asset tag history retrieved successfully",
+        data=AssetTagHistoryListResponse(
+            asset_id=id,
+            history=tag_history,
         ),
         pagination_meta=None,
         request_id=None,
