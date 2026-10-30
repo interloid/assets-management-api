@@ -1,13 +1,13 @@
 import asyncio
+import logging
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.infrastructure.celery.tasks.csv_export_tasks import (
-    EXPORT_DIR,
-    generate_asset_csv,
-)
+from app.infrastructure.celery.tasks.csv_export_tasks import generate_asset_csv
+from app.modules.asset.csv_export.csv_export_config import EXPORT_DIR
 from app.modules.asset.csv_export.csv_export_exception import (
     ExportFileNotFoundError,
     ExportNotFoundError,
@@ -17,6 +17,8 @@ from app.modules.asset.csv_export.csv_export_exception import (
 )
 from app.modules.asset.csv_export.csv_export_model import AssetExport
 from app.modules.asset.csv_export.csv_export_repository import AssetExportRepository
+
+logger = logging.getLogger(__name__)
 
 
 def validate_export_file_path(file_path: str) -> Path:
@@ -33,6 +35,8 @@ def validate_export_file_path(file_path: str) -> Path:
 
 
 class AssetExportService:
+    RETENTION_DAYS = 7
+
     def __init__(
         self,
         session: AsyncSession,
@@ -93,3 +97,40 @@ class AssetExportService:
             validate_export_file_path,
             export.file_path,
         )
+
+    async def cleanup_expired_exports(self) -> dict[str, int]:
+        cutoff = datetime.now(UTC) - timedelta(days=self.RETENTION_DAYS)
+
+        exports = await self.repository.get_expired_exports(cutoff)
+
+        deleted_count = 0
+        missing_count = 0
+        skipped_count = 0
+
+        for export in exports:
+            if not export.file_path:
+                skipped_count += 1
+                continue
+
+            try:
+                file_path = validate_export_file_path(export.file_path)
+
+                await asyncio.to_thread(file_path.unlink)
+                deleted_count += 1
+
+            except ExportFileNotFoundError:
+                missing_count += 1
+
+            except (InvalidExportPathError, OSError):
+                skipped_count += 1
+                logger.exception(
+                    "Could not clean expired CSV export. export_id=%s file_path=%s",
+                    export.id,
+                    export.file_path,
+                )
+
+        return {
+            "deleted_files": deleted_count,
+            "missing_files": missing_count,
+            "skipped_files": skipped_count,
+        }
