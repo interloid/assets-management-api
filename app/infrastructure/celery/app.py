@@ -14,6 +14,7 @@ celery_app = Celery(
         "app.infrastructure.celery.tasks.csv_export_tasks",
         "app.infrastructure.celery.tasks.weekly_tasks",
         "app.infrastructure.celery.tasks.asset_file_cleanup_tasks",
+        "app.infrastructure.celery.tasks.refresh_token_cleanup_tasks",
     ],
 )
 
@@ -44,6 +45,12 @@ celery_app.conf.update(
                 "app.infrastructure.celery.tasks.asset_file_cleanup_tasks.cleanup_expired_asset_files"
             ),
             "schedule": crontab(hour=1, minute=0),
+        },
+        "daily-expired-refresh-token-cleanup": {
+            "task": (
+                "app.infrastructure.celery.tasks.refresh_token_cleanup_tasks.cleanup_expired_refresh_tokens"
+            ),
+            "schedule": crontab(hour=2, minute=30),
         },
     },
 )

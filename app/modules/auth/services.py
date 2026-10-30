@@ -33,6 +33,8 @@ from app.modules.user.repositories import UserRepository
 
 
 class AuthService:
+    RETENTION_DAYS = 90
+
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
         self.user_repository = UserRepository(session)
@@ -295,3 +297,19 @@ class AuthService:
         await self.user_repository.increment_token_version(user)
 
         await self.session.commit()
+
+    async def cleanup_expired_refresh_tokens(self) -> dict[str, int]:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=self.RETENTION_DAYS)
+
+        try:
+            deleted_count = await self.refresh_token_repository.delete_old_tokens(
+                cutoff
+            )
+
+            await self.session.commit()
+
+        except Exception:
+            await self.session.rollback()
+            raise
+
+        return {"deleted_refresh_tokens": deleted_count}
