@@ -299,7 +299,7 @@ class AuthService:
         await self.session.commit()
 
     async def cleanup_expired_refresh_tokens(self) -> dict[str, int]:
-        cutoff = datetime.now(timezone.utc) - timedelta(days=self.RETENTION_DAYS)
+        cutoff = datetime.now(UTC) - timedelta(days=self.RETENTION_DAYS)
 
         try:
             deleted_count = await self.refresh_token_repository.delete_old_tokens(

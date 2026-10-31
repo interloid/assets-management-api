@@ -225,10 +225,7 @@ class AssetService:
             allowed_map=MANUAL_STATUS_TRANSITIONS,
         )
 
-        if (
-            asset.status == AssetStatus.ASSIGNED
-            and new_status == AssetStatus.REPAIR
-        ):
+        if asset.status == AssetStatus.ASSIGNED and new_status == AssetStatus.REPAIR:
             asset_history = await self.asset_repository.get_active_assignment_by_id(
                 asset.id
             )
@@ -352,7 +349,7 @@ class AssetService:
         await self.redis_client.delete(ASSET_STATS_CACHE_KEY)
         return asset
 
-    async def list(
+    async def list_assets(
         self,
         *,
         page: int,
@@ -367,7 +364,7 @@ class AssetService:
         ] = "created_at",
         order: Literal["asc", "desc"] = "desc",
     ) -> tuple[list[Asset], int]:
-        assets, total = await self.asset_repository.list(
+        assets, total = await self.asset_repository.list_assets(
             page=page,
             size=size,
             asset_type=asset_type,
@@ -508,7 +505,6 @@ class AssetService:
 
         return asset
 
-
     async def unassign(
         self,
         asset_id: UUID,
@@ -587,46 +583,66 @@ class AssetService:
     async def get_history_by_asset(
         self,
         asset_id: UUID,
+        page: int,
+        size: int,
+        search: str | None = None,
     ):
         asset = await self.asset_repository.get_by_id(asset_id)
 
         if asset is None:
             raise AssetNotFoundError()
 
-        asset_history = await self.asset_repository.get_history_by_asset_id(asset_id)
+        history, total = await self.asset_repository.get_history_by_asset_id(
+            asset_id=asset_id,
+            page=page,
+            size=size,
+            search=search,
+        )
 
-        if asset_history is None:
-            raise AssetHistoryNotFoundError()
-
-        return asset_id, asset_history
+        return asset_id, history, total
 
     async def get_history_by_user(
         self,
         user_id: UUID,
         current_user: User,
+        page: int,
+        size: int,
+        search: str | None = None,
     ):
         user = await self.user_repository.get_by_id(user_id=user_id)
 
         if user is None:
             raise AssetAssignmentUserNotFoundError()
-        user_history = await self.asset_repository.get_history_by_user_id(
-            user_id=user_id
+
+        if current_user.role != UserRole.ADMIN and current_user.id != user_id:
+            raise AuthorizationError()
+
+        history, total = await self.asset_repository.get_history_by_user_id(
+            user_id=user_id,
+            page=page,
+            size=size,
+            search=search,
         )
 
-        if current_user.role == UserRole.ADMIN:
-            return user_history
+        return history, total
 
-        if current_user.id == user_id:
-            return user_history
-
-        raise AuthorizationError()
-
-    async def get_tag_history(self, asset_id: UUID):
+    async def get_tag_history(
+        self,
+        asset_id: UUID,
+        page: int,
+        size: int,
+        search: str | None = None,
+    ):
         asset = await self.asset_repository.get_by_id(asset_id)
 
         if asset is None:
             raise AssetNotFoundError()
 
-        tag_history = await self.asset_repository.get_tag_history(asset_id)
+        history, total = await self.asset_repository.get_tag_history(
+            asset_id=asset_id,
+            page=page,
+            size=size,
+            search=search,
+        )
 
-        return tag_history
+        return history, total

@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -19,11 +19,11 @@ async def test_cleanup_expired_refresh_tokens_success(
     ):
         service = AuthService(mock_session)
 
-        before_cleanup = datetime.now(timezone.utc)
+        before_cleanup = datetime.now(UTC)
 
         result = await service.cleanup_expired_refresh_tokens()
 
-        after_cleanup = datetime.now(timezone.utc)
+        after_cleanup = datetime.now(UTC)
 
     assert result == {
         "deleted_refresh_tokens": 5,

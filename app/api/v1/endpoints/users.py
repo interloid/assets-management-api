@@ -55,7 +55,7 @@ async def get_me(
         message="Current user retrieved successfully",
         data=UserResponse.model_validate(current_user),
         pagination_meta=None,
-        request_id=None,
+        request_id=request.state.request_id,
         timestamp=datetime.now(UTC),
         path=request.url.path,
     )
@@ -100,7 +100,7 @@ async def change_password(
         message="Password changed successfully",
         data=None,
         pagination_meta=None,
-        request_id=None,
+        request_id=request.state.request_id,
         timestamp=datetime.now(UTC),
         path=request.url.path,
     )
@@ -129,7 +129,7 @@ async def get_my_assets(
 ) -> SuccessResponse[list[AssetResponse]]:
     service = AssetService(session, redis_client)
 
-    assets, total = await service.list(
+    assets, total = await service.list_assets(
         page=page,
         size=size,
         assigned_to=current_user.id,
@@ -153,7 +153,7 @@ async def get_my_assets(
         message="Assigned assets retrieved successfully",
         data=data,
         pagination_meta=pagination,
-        request_id=None,
+        request_id=request.state.request_id,
         timestamp=datetime.now(UTC),
         path=request.url.path,
     )
@@ -161,6 +161,7 @@ async def get_my_assets(
 
 @router.get(
     "/{id}/assignments",
+    tags=["Assets History"],
     status_code=status.HTTP_200_OK,
     responses={
         **FORBIDDEN_RESPONSE,
@@ -176,12 +177,26 @@ async def get_user_history(
     session: DBSession,
     redis_client: RedisClient,
     current_user: CurrentUser,
+    page: int = Query(default=1, ge=1, le=1000),
+    size: int = Query(default=20, ge=1, le=100),
+    search: str | None = Query(default=None, max_length=100),
 ) -> SuccessResponse[UserAssetHistoryListResponse]:
     service = AssetService(session, redis_client)
 
-    asset_history = await service.get_history_by_user(
+    asset_history, total = await service.get_history_by_user(
         user_id=id,
         current_user=current_user,
+        page=page,
+        size=size,
+        search=search,
+    )
+
+    pagination = PaginationMeta(
+        items_on_page=len(asset_history),
+        page=page,
+        records_per_page=size,
+        total_items=total,
+        total_pages=ceil(total / size) if total else 0,
     )
 
     return SuccessResponse(
@@ -192,8 +207,8 @@ async def get_user_history(
             user_id=id,
             assets=asset_history,
         ),
-        pagination_meta=None,
-        request_id=None,
+        pagination_meta=pagination,
+        request_id=request.state.request_id,
         timestamp=datetime.now(UTC),
         path=request.url.path,
     )
@@ -243,7 +258,7 @@ async def list_users(
         message="Users retrieved successfully",
         data=data,
         pagination_meta=pagination,
-        request_id=None,
+        request_id=request.state.request_id,
         timestamp=datetime.now(UTC),
         path=request.url.path,
     )

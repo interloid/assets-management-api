@@ -61,7 +61,7 @@ async def generate_upload_url(
         status_code=status.HTTP_201_CREATED,
         message="Upload URL generated successfully",
         data=AssetFileUploadResponse.model_validate(file),
-        request_id=None,
+        request_id=request.state.request_id,
         timestamp=datetime.now(UTC),
         path=request.url.path,
     )
@@ -92,7 +92,7 @@ async def confirm_upload(
         status_code=status.HTTP_200_OK,
         message="File upload confirmed successfully",
         data=AssetFileConfirmResponse.model_validate(file),
-        request_id=None,
+        request_id=request.state.request_id,
         timestamp=datetime.now(UTC),
         path=request.url.path,
     )
@@ -129,7 +129,7 @@ async def get_files(
         status_code=status.HTTP_200_OK,
         message="Asset files retrieved successfully",
         data=data,
-        request_id=None,
+        request_id=request.state.request_id,
         timestamp=datetime.now(UTC),
         path=request.url.path,
     )

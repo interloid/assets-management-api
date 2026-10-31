@@ -1,5 +1,5 @@
 from contextlib import asynccontextmanager
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
@@ -12,7 +12,7 @@ from app.infrastructure.celery.tasks.weekly_tasks import send_weekly_summary
 from app.shared.models.enums import AssetStatus
 from tests.config import test_settings
 
-REPORT_DATE = date.today()
+REPORT_DATE = datetime.now(UTC).date()
 PURCHASE_DATE = REPORT_DATE - timedelta(days=30)
 WARRANTY_EXPIRY = REPORT_DATE + timedelta(days=90)
 CREATED_AT = datetime.combine(

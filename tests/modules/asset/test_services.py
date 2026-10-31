@@ -1,3 +1,4 @@
+import json
 from datetime import UTC, date, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
@@ -87,16 +88,16 @@ async def test_list_assets(
         updated_at=now,
     )
 
-    service.asset_repository.list = AsyncMock(
+    service.asset_repository.list_assets = AsyncMock(
         return_value=([asset], 1),
     )
 
-    assets_result, total = await service.list(
+    assets_result, total = await service.list_assets(
         page=1,
         size=20,
     )
 
-    service.asset_repository.list.assert_awaited_once_with(
+    service.asset_repository.list_assets.assert_awaited_once_with(
         page=1,
         size=20,
         asset_type=None,
@@ -138,11 +139,11 @@ async def test_list_assets_returns_total(
         for i in range(1, 3)
     ]
 
-    service.asset_repository.list = AsyncMock(
+    service.asset_repository.list_assets = AsyncMock(
         return_value=(assets, 25),
     )
 
-    assets_result, total = await service.list(
+    assets_result, total = await service.list_assets(
         page=2,
         size=10,
     )
@@ -158,11 +159,11 @@ async def test_list_assets_empty_result(
     redis_client = AsyncMock()
     service = AssetService(mock_session, redis_client)
 
-    service.asset_repository.list = AsyncMock(
+    service.asset_repository.list_assets = AsyncMock(
         return_value=([], 0),
     )
 
-    assets_result, total = await service.list(
+    assets_result, total = await service.list_assets(
         page=1,
         size=20,
     )
@@ -407,7 +408,8 @@ async def test_update_asset_type_generates_new_tag(
 
 @pytest.mark.asyncio
 async def test_update_asset_status_only(mock_session) -> None:
-    service = AssetService(mock_session)
+    redis_client = AsyncMock()
+    service = AssetService(mock_session, redis_client)
 
     asset = Asset(
         id=uuid7(),
@@ -441,7 +443,8 @@ async def test_update_asset_status_only(mock_session) -> None:
 
 @pytest.mark.asyncio
 async def test_update_asset_details_and_status(mock_session) -> None:
-    service = AssetService(mock_session)
+    redis_client = AsyncMock()
+    service = AssetService(mock_session, redis_client)
 
     asset = Asset(
         id=uuid7(),
@@ -484,7 +487,8 @@ async def test_update_asset_assigns_user(
     mock_session,
     created_user,
 ) -> None:
-    service = AssetService(mock_session)
+    redis_client = AsyncMock()
+    service = AssetService(mock_session, redis_client)
 
     asset = Asset(
         id=uuid7(),
@@ -528,7 +532,8 @@ async def test_update_asset_assigns_user(
 
 @pytest.mark.asyncio
 async def test_update_asset_assign_without_user_id(mock_session) -> None:
-    service = AssetService(mock_session)
+    redis_client = AsyncMock()
+    service = AssetService(mock_session, redis_client)
 
     asset = Asset(
         id=uuid7(),
@@ -557,7 +562,8 @@ async def test_update_asset_assign_without_user_id(mock_session) -> None:
 
 @pytest.mark.asyncio
 async def test_update_asset_unassigns_user(mock_session) -> None:
-    service = AssetService(mock_session)
+    redis_client = AsyncMock()
+    service = AssetService(mock_session, redis_client)
 
     asset = Asset(
         id=uuid7(),
@@ -600,7 +606,8 @@ async def test_update_asset_unassigns_user(mock_session) -> None:
 
 @pytest.mark.asyncio
 async def test_update_asset_assigned_to_repair(mock_session) -> None:
-    service = AssetService(mock_session)
+    redis_client = AsyncMock()
+    service = AssetService(mock_session, redis_client)
 
     asset = Asset(
         id=uuid7(),
@@ -647,7 +654,8 @@ async def test_update_asset_assigned_to_repair(mock_session) -> None:
 async def test_update_asset_invalid_status_transition_rolls_back(
     mock_session,
 ) -> None:
-    service = AssetService(mock_session)
+    redis_client = AsyncMock()
+    service = AssetService(mock_session, redis_client)
 
     asset = Asset(
         id=uuid7(),
@@ -1276,26 +1284,36 @@ async def test_get_tag_history_returns_repository_records(
     asset_id = uuid7()
     asset = object()
     history_records = [object(), object()]
+    total = 10
 
     service.asset_repository.get_by_id = AsyncMock(
         return_value=asset,
     )
 
     service.asset_repository.get_tag_history = AsyncMock(
-        return_value=history_records,
+        return_value=(history_records, total),
     )
 
-    result = await service.get_tag_history(asset_id)
+    result, result_total = await service.get_tag_history(
+        asset_id=asset_id,
+        page=2,
+        size=5,
+        search="IL-LAP",
+    )
 
     service.asset_repository.get_by_id.assert_awaited_once_with(
         asset_id,
     )
 
     service.asset_repository.get_tag_history.assert_awaited_once_with(
-        asset_id,
+        asset_id=asset_id,
+        page=2,
+        size=5,
+        search="IL-LAP",
     )
 
     assert result == history_records
+    assert result_total == total
 
 
 @pytest.mark.asyncio
@@ -1314,7 +1332,7 @@ async def test_get_tag_history_raises_when_asset_does_not_exist(
     service.asset_repository.get_tag_history = AsyncMock()
 
     with pytest.raises(AssetNotFoundError):
-        await service.get_tag_history(asset_id)
+        await service.get_tag_history(asset_id=asset_id, size=5, page=1)
 
     service.asset_repository.get_by_id.assert_awaited_once_with(
         asset_id,

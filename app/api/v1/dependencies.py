@@ -79,13 +79,8 @@ async def _get_user_from_refresh_token(
     response: Response,
     refresh_token: RefreshToken,
 ):
-    if not refresh_token:
-        raise InvalidAccessTokenError()
-
-    token_hash = hash_refresh_token(refresh_token)
-
-    lock_key = f"lock:refresh:{token_hash}"
-    cache_key = f"cache:rotated:{token_hash}"
+    lock_key = f"lock:refresh:{hash_refresh_token(refresh_token)}"
+    cache_key = f"cache:rotated:{hash_refresh_token(refresh_token)}"
 
     cached_result = await redis_client.get(cache_key)
 

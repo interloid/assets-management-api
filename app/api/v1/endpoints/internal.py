@@ -74,7 +74,7 @@ async def s3_upload_completed(
             "file_id": str(file.id),
             "status": file.status.value,
         },
-        request_id=None,
+        request_id=request.state.request_id,
         timestamp=datetime.now(UTC),
         path=request.url.path,
     )

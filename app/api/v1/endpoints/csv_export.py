@@ -61,7 +61,7 @@ async def create_asset_export(
         message="Asset export queued successfully",
         data=data,
         pagination_meta=None,
-        request_id=None,
+        request_id=request.state.request_id,
         timestamp=datetime.now(UTC),
         path=request.url.path,
     )
@@ -105,7 +105,7 @@ async def get_asset_export_status(
         message="Asset export status retrieved successfully",
         data=data,
         pagination_meta=None,
-        request_id=None,
+        request_id=request.state.request_id,
         timestamp=datetime.now(UTC),
         path=request.url.path,
     )
