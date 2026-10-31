@@ -74,7 +74,7 @@ async def create_asset(
             asset,
         ),
         pagination_meta=None,
-        request_id=None,
+        request_id=request.state.request_id,
         timestamp=datetime.now(UTC),
         path=request.url.path,
     )
@@ -115,7 +115,7 @@ async def list_assets(
 ) -> SuccessResponse[list[AssetResponse]]:
     service = AssetService(session, redis_client)
 
-    assets, total = await service.list(
+    assets, total = await service.list_assets(
         page=page,
         size=size,
         asset_type=asset_type,
@@ -145,7 +145,7 @@ async def list_assets(
         message="Assets retrieved successfully",
         data=data,
         pagination_meta=pagination,
-        request_id=None,
+        request_id=request.state.request_id,
         timestamp=datetime.now(UTC),
         path=request.url.path,
     )
@@ -177,7 +177,7 @@ async def get_asset_stats(
         message="Asset statistics retrieved successfully",
         data=result,
         pagination_meta=None,
-        request_id=None,
+        request_id=request.state.request_id,
         timestamp=datetime.now(UTC),
         path=request.url.path,
     )
@@ -216,7 +216,7 @@ async def get_by_id(
             asset,
         ),
         pagination_meta=None,
-        request_id=None,
+        request_id=request.state.request_id,
         timestamp=datetime.now(UTC),
         path=request.url.path,
     )
@@ -261,7 +261,7 @@ async def update_asset(
             asset,
         ),
         pagination_meta=None,
-        request_id=None,
+        request_id=request.state.request_id,
         timestamp=datetime.now(UTC),
         path=request.url.path,
     )
@@ -328,7 +328,7 @@ async def assign_asset(
             asset,
         ),
         pagination_meta=None,
-        request_id=None,
+        request_id=request.state.request_id,
         timestamp=datetime.now(UTC),
         path=request.url.path,
     )
@@ -366,7 +366,7 @@ async def unassign_asset(
             asset,
         ),
         pagination_meta=None,
-        request_id=None,
+        request_id=request.state.request_id,
         timestamp=datetime.now(UTC),
         path=request.url.path,
     )
@@ -409,14 +409,14 @@ async def change_status(
             asset,
         ),
         pagination_meta=None,
-        request_id=None,
+        request_id=request.state.request_id,
         timestamp=datetime.now(UTC),
         path=request.url.path,
     )
 
 
 @router.get(
-    "/{id}/history",
+    "/{id}/assignments",
     tags=["Assets History"],
     status_code=status.HTTP_200_OK,
     responses={
@@ -433,10 +433,26 @@ async def get_asset_history(
     session: DBSession,
     redis_client: RedisClient,
     current_user: AdminUser,
+    page: int = Query(default=1, ge=1, le=1000),
+    size: int = Query(default=20, ge=1, le=100),
+    search: str | None = Query(default=None, max_length=100),
 ) -> SuccessResponse[AssetAssignmentHistoryListResponse]:
     service = AssetService(session, redis_client)
 
-    asset_id, asset_history = await service.get_history_by_asset(id)
+    asset_id, asset_history, total = await service.get_history_by_asset(
+        asset_id=id,
+        page=page,
+        size=size,
+        search=search,
+    )
+
+    pagination = PaginationMeta(
+        items_on_page=len(asset_history),
+        page=page,
+        records_per_page=size,
+        total_items=total,
+        total_pages=ceil(total / size) if total else 0,
+    )
 
     return SuccessResponse(
         success=True,
@@ -446,16 +462,24 @@ async def get_asset_history(
             asset_id=asset_id,
             history=asset_history,
         ),
-        pagination_meta=None,
-        request_id=None,
+        pagination_meta=pagination,
+        request_id=request.state.request_id,
         timestamp=datetime.now(UTC),
         path=request.url.path,
     )
 
 
 @router.get(
-    "/assets/{id}/tag-history",
+    "/{id}/tag-history",
+    tags=["Asset Tag History"],
     status_code=status.HTTP_200_OK,
+    responses={
+        **FORBIDDEN_RESPONSE,
+        **INTERNAL_SERVER_ERROR_RESPONSE,
+        **NOT_FOUND_RESPONSE,
+        **UNAUTHORIZED_RESPONSE,
+        **VALIDATION_RESPONSE,
+    },
 )
 async def get_tag_history(
     request: Request,
@@ -463,11 +487,26 @@ async def get_tag_history(
     session: DBSession,
     current_user: AdminUser,
     redis_client: RedisClient,
+    page: int = Query(default=1, ge=1, le=1000),
+    size: int = Query(default=20, ge=1, le=100),
+    search: str | None = Query(default=None, max_length=100),
 ) -> SuccessResponse[AssetTagHistoryListResponse]:
-
     service = AssetService(session, redis_client)
 
-    tag_history = await service.get_tag_history(id)
+    tag_history, total = await service.get_tag_history(
+        asset_id=id,
+        page=page,
+        size=size,
+        search=search,
+    )
+
+    pagination = PaginationMeta(
+        items_on_page=len(tag_history),
+        page=page,
+        records_per_page=size,
+        total_items=total,
+        total_pages=ceil(total / size) if total else 0,
+    )
 
     return SuccessResponse(
         success=True,
@@ -477,8 +516,8 @@ async def get_tag_history(
             asset_id=id,
             history=tag_history,
         ),
-        pagination_meta=None,
-        request_id=None,
+        pagination_meta=pagination,
+        request_id=request.state.request_id,
         timestamp=datetime.now(UTC),
         path=request.url.path,
     )

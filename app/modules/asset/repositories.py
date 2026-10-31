@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, timezone
-from typing import Literal
+from typing import List, Literal
 from uuid import UUID
 
 from sqlalchemy import func, or_, select
@@ -9,6 +9,7 @@ from sqlalchemy.orm import selectinload
 from app.modules.asset.asset_assignment import AssetAssignment
 from app.modules.asset.models import Asset
 from app.modules.asset.tag.asset_tag_history import AssetTagHistory
+from app.modules.user.models import User
 from app.shared.models.enums import AssetStatus, AssetType, WarrantyExpiry
 from app.shared.utils.query import escape_like
 
@@ -148,7 +149,7 @@ class AssetRepository:
 
         return list(result.scalars().all())
 
-    async def list(
+    async def list_assets(
         self,
         *,
         page: int,
@@ -300,20 +301,50 @@ class AssetRepository:
 
         return dict(result.all())
 
-    async def get_history_by_asset_id(self, asset_id: UUID):
+    async def get_history_by_asset_id(
+        self,
+        asset_id: UUID,
+        page: int,
+        size: int,
+        search: str | None = None,
+    ) -> tuple[list[AssetAssignment], int]:
+        filters = [AssetAssignment.asset_id == asset_id]
+
+        if search and (term := search.strip()):
+            pattern = f"%{escape_like(term)}%"
+            filters.append(
+                or_(
+                    User.full_name.ilike(pattern, escape="\\"),
+                    User.email.ilike(pattern, escape="\\"),
+                )
+            )
+
+        count_stmt = (
+            select(func.count(AssetAssignment.id))
+            .join(User, AssetAssignment.user_id == User.id)
+            .where(*filters)
+        )
+        total = await self.session.scalar(count_stmt) or 0
+
         stmt = (
             select(AssetAssignment)
-            .where(AssetAssignment.asset_id == asset_id)
+            .join(User, AssetAssignment.user_id == User.id)
+            .where(*filters)
             .options(
                 selectinload(AssetAssignment.user),
                 selectinload(AssetAssignment.assigner),
                 selectinload(AssetAssignment.un_assigner),
             )
-            .order_by(AssetAssignment.assigned_at.asc())
+            .order_by(
+                AssetAssignment.assigned_at.asc(),
+                AssetAssignment.id.asc(),
+            )
+            .offset((page - 1) * size)
+            .limit(size)
         )
 
         result = await self.session.execute(stmt)
-        return result.scalars().all()
+        return result.scalars().all(), total
 
     async def get_active_assignment_by_id(
         self,
@@ -330,23 +361,87 @@ class AssetRepository:
     async def get_history_by_user_id(
         self,
         user_id: UUID,
-    ):
+        page: int,
+        size: int,
+        search: str | None = None,
+    ) -> tuple[List[AssetAssignment], int]:
+        filters = [AssetAssignment.user_id == user_id]
+
+        if search and (term := search.strip()):
+            pattern = f"%{escape_like(term)}%"
+            filters.append(
+                or_(
+                    Asset.asset_tag.ilike(pattern, escape="\\"),
+                    Asset.serial_number.ilike(pattern, escape="\\"),
+                    Asset.notes.ilike(pattern, escape="\\"),
+                )
+            )
+
+        count_stmt = (
+            select(func.count(AssetAssignment.id))
+            .join(Asset, AssetAssignment.asset_id == Asset.id)
+            .where(*filters)
+        )
+        total = await self.session.scalar(count_stmt) or 0
+
         stmt = (
             select(AssetAssignment)
-            .where(AssetAssignment.user_id == user_id)
-            .options(selectinload(AssetAssignment.asset))
-            .order_by(AssetAssignment.assigned_at.desc())
+            .join(Asset, AssetAssignment.asset_id == Asset.id)
+            .where(*filters)
+            .options(
+                selectinload(AssetAssignment.asset),
+                selectinload(AssetAssignment.assigner),
+                selectinload(AssetAssignment.un_assigner),
+            )
+            .order_by(
+                AssetAssignment.assigned_at.desc(),
+                AssetAssignment.id.desc(),
+            )
+            .offset((page - 1) * size)
+            .limit(size)
         )
 
         result = await self.session.execute(stmt)
-        return result.scalars().all()
+        return result.scalars().all(), total
 
-    async def get_tag_history(self, asset_id: UUID):
-        result = await self.session.execute(
+    async def get_tag_history(
+        self,
+        asset_id: UUID,
+        page: int,
+        size: int,
+        search: str | None = None,
+    ) -> tuple[list[AssetTagHistory], int]:
+        filters = [AssetTagHistory.asset_id == asset_id]
+
+        if search and (term := search.strip()):
+            pattern = f"%{escape_like(term)}%"
+            filters.append(
+                or_(
+                    AssetTagHistory.old_asset_tag.ilike(
+                        pattern,
+                        escape="\\",
+                    ),
+                    AssetTagHistory.new_asset_tag.ilike(
+                        pattern,
+                        escape="\\",
+                    ),
+                )
+            )
+
+        count_stmt = select(func.count(AssetTagHistory.id)).where(*filters)
+        total = await self.session.scalar(count_stmt) or 0
+
+        stmt = (
             select(AssetTagHistory)
-            .where(AssetTagHistory.asset_id == asset_id)
+            .where(*filters)
             .options(selectinload(AssetTagHistory.changed_by_user))
-            .order_by(AssetTagHistory.changed_at.desc())
+            .order_by(
+                AssetTagHistory.changed_at.desc(),
+                AssetTagHistory.id.desc(),
+            )
+            .offset((page - 1) * size)
+            .limit(size)
         )
 
-        return result.scalars().all()
+        result = await self.session.execute(stmt)
+        return result.scalars().all(), total

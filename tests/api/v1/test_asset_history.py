@@ -33,7 +33,7 @@ async def test_admin_can_get_asset_history(
 
     assert unassign_response.status_code == 200
 
-    response = await integration_client.get(f"api/v1/assets/{asset['id']}/history")
+    response = await integration_client.get(f"api/v1/assets/{asset['id']}/assignments")
 
     assert response.status_code == 200
 
@@ -61,7 +61,7 @@ async def test_non_admin_cannot_get_asset_history(
 
     integration_client.cookies.set("access_token", user_token(integration_user))
 
-    response = await integration_client.get(f"api/v1/assets/{asset['id']}/history")
+    response = await integration_client.get(f"api/v1/assets/{asset['id']}/assignments")
 
     assert response.status_code == 403
     assert response.json()["error_code"] == "AUTHORIZATION_ERROR"
@@ -78,7 +78,7 @@ async def test_asset_history_returns_404_for_missing_asset(
     )
 
     response = await integration_client.get(
-        f"/api/v1/assets/{uuid4()}/history",
+        f"/api/v1/assets/{uuid4()}/assignments",
     )
 
     assert response.status_code == 404
@@ -100,7 +100,7 @@ async def test_asset_history_returns_empty_list_when_no_assignments(
         admin_access_token,
     )
 
-    response = await integration_client.get(f"api/v1/assets/{asset['id']}/history")
+    response = await integration_client.get(f"api/v1/assets/{asset['id']}/assignments")
 
     assert response.status_code == 200
     assert response.json()["data"]["history"] == []

@@ -36,19 +36,31 @@ async def test_get_history_by_asset_returns_asset_id_and_history(service):
     asset_id = uuid4()
     asset = MagicMock()
     history = [MagicMock(), MagicMock()]
+    total = 10
 
     service.asset_repository.get_by_id.return_value = asset
-    service.asset_repository.get_history_by_asset_id.return_value = history
+    service.asset_repository.get_history_by_asset_id.return_value = (
+        history,
+        total,
+    )
 
-    returned_id, returned_history = await service.get_history_by_asset(
-        asset_id,
+    returned_id, returned_history, returned_total = await service.get_history_by_asset(
+        asset_id=asset_id,
+        page=1,
+        size=5,
+        search="john",
     )
 
     assert returned_id == asset_id
     assert returned_history == history
+    assert returned_total == total
+
     service.asset_repository.get_by_id.assert_awaited_once_with(asset_id)
     service.asset_repository.get_history_by_asset_id.assert_awaited_once_with(
-        asset_id,
+        asset_id=asset_id,
+        page=1,
+        size=5,
+        search="john",
     )
 
 
@@ -58,7 +70,7 @@ async def test_get_history_by_asset_raises_when_asset_missing(service):
     service.asset_repository.get_by_id.return_value = None
 
     with pytest.raises(AssetNotFoundError):
-        await service.get_history_by_asset(asset_id)
+        await service.get_history_by_asset(asset_id=asset_id, page=1, size=5)
 
     service.asset_repository.get_history_by_asset_id.assert_not_awaited()
 
@@ -67,12 +79,26 @@ async def test_get_history_by_asset_raises_when_asset_missing(service):
 async def test_get_history_by_asset_returns_empty_history(service):
     asset_id = uuid4()
     service.asset_repository.get_by_id.return_value = MagicMock()
-    service.asset_repository.get_history_by_asset_id.return_value = []
+    service.asset_repository.get_history_by_asset_id.return_value = ([], 0)
 
-    returned_id, history = await service.get_history_by_asset(asset_id)
+    returned_id, history, total = await service.get_history_by_asset(
+        asset_id=asset_id,
+        page=1,
+        size=5,
+        search=None,
+    )
 
     assert returned_id == asset_id
     assert history == []
+    assert total == 0
+
+    service.asset_repository.get_by_id.assert_awaited_once_with(asset_id)
+    service.asset_repository.get_history_by_asset_id.assert_awaited_once_with(
+        asset_id=asset_id,
+        page=1,
+        size=5,
+        search=None,
+    )
 
 
 @pytest.mark.asyncio
@@ -84,21 +110,33 @@ async def test_admin_can_get_any_users_history(service):
 
     user = MagicMock()
     history = [MagicMock()]
+    total = 10
 
     service.user_repository.get_by_id.return_value = user
-    service.asset_repository.get_history_by_user_id.return_value = history
+    service.asset_repository.get_history_by_user_id.return_value = (
+        history,
+        total,
+    )
 
-    result = await service.get_history_by_user(
+    result, result_total = await service.get_history_by_user(
         user_id=user_id,
         current_user=admin,
+        page=2,
+        size=5,
+        search="IL-LAP",
     )
 
     assert result == history
+    assert result_total == total
+
     service.user_repository.get_by_id.assert_awaited_once_with(
         user_id=user_id,
     )
     service.asset_repository.get_history_by_user_id.assert_awaited_once_with(
         user_id=user_id,
+        page=2,
+        size=5,
+        search="IL-LAP",
     )
 
 
@@ -110,15 +148,29 @@ async def test_user_can_get_own_history(service):
     current_user.role = UserRole.USER
 
     history = [MagicMock()]
-    service.user_repository.get_by_id.return_value = MagicMock()
-    service.asset_repository.get_history_by_user_id.return_value = history
 
-    result = await service.get_history_by_user(
+    service.user_repository.get_by_id.return_value = MagicMock()
+    service.asset_repository.get_history_by_user_id.return_value = (
+        history,
+        1,
+    )
+
+    result, total = await service.get_history_by_user(
         user_id=user_id,
         current_user=current_user,
+        page=1,
+        size=5,
     )
 
     assert result == history
+    assert total == 1
+
+    service.asset_repository.get_history_by_user_id.assert_awaited_once_with(
+        user_id=user_id,
+        page=1,
+        size=5,
+        search=None,
+    )
 
 
 @pytest.mark.asyncio
@@ -129,15 +181,16 @@ async def test_user_cannot_get_another_users_history(service):
     current_user.role = UserRole.USER
 
     service.user_repository.get_by_id.return_value = MagicMock()
-    service.asset_repository.get_history_by_user_id.return_value = [
-        MagicMock(),
-    ]
 
     with pytest.raises(AuthorizationError):
         await service.get_history_by_user(
             user_id=requested_user_id,
             current_user=current_user,
+            page=1,
+            size=5,
         )
+
+    service.asset_repository.get_history_by_user_id.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -153,6 +206,8 @@ async def test_get_history_by_user_raises_when_user_missing(service):
         await service.get_history_by_user(
             user_id=user_id,
             current_user=current_user,
+            page=1,
+            size=5,
         )
 
     service.asset_repository.get_history_by_user_id.assert_not_awaited()
@@ -166,11 +221,14 @@ async def test_get_history_by_user_returns_empty_history(service):
     current_user.role = UserRole.USER
 
     service.user_repository.get_by_id.return_value = MagicMock()
-    service.asset_repository.get_history_by_user_id.return_value = []
+    service.asset_repository.get_history_by_user_id.return_value = ([], 0)
 
-    result = await service.get_history_by_user(
+    result, total = await service.get_history_by_user(
         user_id=user_id,
         current_user=current_user,
+        page=1,
+        size=5,
     )
 
     assert result == []
+    assert total == 0

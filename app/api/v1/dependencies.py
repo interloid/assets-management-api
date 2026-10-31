@@ -10,6 +10,7 @@ from app.core.exceptions import InvalidAccessTokenError
 from app.core.security import (
     decode_access_token,
     decode_access_token_allow_expired,
+    hash_refresh_token,
     validate_logout_token_expiry,
 )
 from app.modules.auth.exceptions import (
@@ -70,8 +71,8 @@ async def _get_user_from_refresh_token(
     response: Response,
     refresh_token: RefreshToken,
 ):
-    lock_key = f"lock:refresh:{hash(refresh_token)}"
-    cache_key = f"cache:rotated:{hash(refresh_token)}"
+    lock_key = f"lock:refresh:{hash_refresh_token(refresh_token)}"
+    cache_key = f"cache:rotated:{hash_refresh_token(refresh_token)}"
 
     cached_result = await redis_client.get(cache_key)
     if cached_result:

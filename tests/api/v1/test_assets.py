@@ -1331,7 +1331,7 @@ async def test_get_asset_tag_history_returns_type_change(
     assert update_response.status_code == 200
 
     history_response = await integration_client.get(
-        f"/api/v1/assets/assets/{asset['id']}/tag-history",
+        f"/api/v1/assets/{asset['id']}/tag-history",
     )
 
     assert history_response.status_code == 200
@@ -1361,7 +1361,7 @@ async def test_get_asset_tag_history_returns_empty_list(
     )
 
     response = await integration_client.get(
-        f"/api/v1/assets/assets/{asset['id']}/tag-history",
+        f"/api/v1/assets/{asset['id']}/tag-history",
     )
 
     assert response.status_code == 200
@@ -1454,7 +1454,7 @@ async def test_get_asset_tag_history_returns_404_for_missing_asset(
     integration_client.cookies.set("access_token", admin_access_token)
 
     response = await integration_client.get(
-        f"/api/v1/assets/assets/{uuid4()}/tag-history",
+        f"/api/v1/assets/{uuid4()}/tag-history",
     )
 
     assert response.status_code == 404

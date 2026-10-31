@@ -63,7 +63,7 @@ async def register(
         message="User registered successfully",
         data=UserResponse.model_validate(user),
         pagination_meta=None,
-        request_id=None,
+        request_id=request.state.request_id,
         timestamp=datetime.now(UTC),
         path=request.url.path,
     )
@@ -105,7 +105,7 @@ async def login(
         message="Login successful",
         data=None,
         pagination_meta=None,
-        request_id=None,
+        request_id=request.state.request_id,
         timestamp=datetime.now(UTC),
         path=request.url.path,
     )
@@ -142,7 +142,7 @@ async def refresh(
         message="Access and refresh tokens renewed successfully",
         data=None,
         pagination_meta=None,
-        request_id=None,
+        request_id=request.state.request_id,
         timestamp=datetime.now(UTC),
         path=request.url.path,
     )
