@@ -1,16 +1,16 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from uuid6 import uuid7
 
-from app.models.enums import UserRole
-from app.models.user import User
-from app.schemas.auth import LoginRequest, RegisterRequest
+from app.api.v1.schemas.auth import LoginRequest, RegisterRequest
+from app.modules.user.models import User
+from app.shared.models.enums import UserRole
 
 
 @pytest.fixture
 def user() -> User:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     return User(
         id=uuid7(),
