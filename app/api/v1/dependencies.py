@@ -1,4 +1,5 @@
 import json
+from datetime import UTC, datetime
 from typing import Annotated, Any
 from uuid import UUID
 
@@ -10,6 +11,7 @@ from app.core.exceptions import InvalidAccessTokenError
 from app.core.security import (
     decode_access_token,
     decode_access_token_allow_expired,
+    hash_refresh_token,
     validate_logout_token_expiry,
 )
 from app.modules.auth.exceptions import (
@@ -19,6 +21,7 @@ from app.modules.auth.exceptions import (
 from app.modules.auth.jwt_blacklist import (
     is_access_token_family_blacklisted,
 )
+from app.modules.auth.repositories import RefreshTokenRepository
 from app.modules.auth.services import AuthService
 from app.modules.user.models import User
 from app.modules.user.repositories import UserRepository
@@ -49,17 +52,23 @@ async def _get_user_from_access_token(
     except (KeyError, ValueError, TypeError) as exc:
         raise InvalidAccessTokenError() from exc
 
-    if await is_access_token_family_blacklisted(redis_client, family_id):
+    if await is_access_token_family_blacklisted(
+        redis_client,
+        family_id,
+    ):
         raise InvalidAccessTokenError()
 
     repository = UserRepository(session)
     user = await repository.get_by_id(user_id)
 
-    if user is None or token_version != user.token_version:
+    if user is None:
         raise InvalidAccessTokenError()
 
     if not user.is_active:
         raise UserInactiveError()
+
+    if token_version != user.token_version:
+        raise InvalidAccessTokenError()
 
     return user
 
@@ -70,23 +79,39 @@ async def _get_user_from_refresh_token(
     response: Response,
     refresh_token: RefreshToken,
 ):
-    lock_key = f"lock:refresh:{hash(refresh_token)}"
-    cache_key = f"cache:rotated:{hash(refresh_token)}"
+    if not refresh_token:
+        raise InvalidAccessTokenError()
+
+    token_hash = hash_refresh_token(refresh_token)
+
+    lock_key = f"lock:refresh:{token_hash}"
+    cache_key = f"cache:rotated:{token_hash}"
 
     cached_result = await redis_client.get(cache_key)
+
     if cached_result:
         data = json.loads(cached_result)
+
         new_access_token = data["access_token"]
         new_refresh_token = data["refresh_token"]
+
     else:
-        async with redis_client.lock(lock_key, timeout=5, blocking_timeout=5):
+        async with redis_client.lock(
+            lock_key,
+            timeout=5,
+            blocking_timeout=5,
+        ):
             cached_result = await redis_client.get(cache_key)
+
             if cached_result:
                 data = json.loads(cached_result)
+
                 new_access_token = data["access_token"]
                 new_refresh_token = data["refresh_token"]
+
             else:
                 auth_service = AuthService(session)
+
                 try:
                     new_access_token, new_refresh_token = await auth_service.refresh(
                         refresh_token
@@ -105,20 +130,59 @@ async def _get_user_from_refresh_token(
                     ),
                 )
 
+    new_payload = decode_access_token(new_access_token)
+
+    try:
+        user_id = UUID(new_payload["sub"])
+        token_version = int(new_payload["token_version"])
+        family_id = UUID(new_payload["family_id"])
+    except (KeyError, ValueError, TypeError) as exc:
+        raise InvalidAccessTokenError() from exc
+
+    user_repository = UserRepository(session)
+    user = await user_repository.get_by_id(user_id)
+
+    if user is None:
+        raise InvalidAccessTokenError()
+
+    if not user.is_active:
+        raise UserInactiveError()
+
+    if token_version != user.token_version:
+        raise InvalidAccessTokenError()
+
+    if await is_access_token_family_blacklisted(
+        redis_client,
+        family_id,
+    ):
+        raise InvalidAccessTokenError()
+
+    refresh_repository = RefreshTokenRepository(session)
+
+    stored_token = await refresh_repository.get_by_hash(
+        hash_refresh_token(new_refresh_token),
+    )
+
+    if stored_token is None:
+        raise InvalidAccessTokenError()
+
+    if stored_token.revoked_at is not None:
+        raise InvalidAccessTokenError()
+
+    if stored_token.expires_at <= datetime.now(UTC):
+        raise InvalidAccessTokenError()
+
+    if stored_token.user_id != user.id:
+        raise InvalidAccessTokenError()
+
+    if stored_token.family_id != family_id:
+        raise InvalidAccessTokenError()
+
     set_auth_cookies(
         response,
         access_token=new_access_token,
         refresh_token=new_refresh_token,
     )
-
-    new_payload = decode_access_token(new_access_token)
-    user_id = UUID(new_payload["sub"])
-
-    repository = UserRepository(session)
-    user = await repository.get_by_id(user_id)
-
-    if user is None or not user.is_active:
-        raise UserInactiveError()
 
     return user
 
@@ -248,6 +312,7 @@ LogoutAccessTokenPayload = Annotated[
     dict[str, Any] | None,
     Depends(get_logout_access_token),
 ]
+
 
 LogoutAllContext = Annotated[
     dict[str, Any] | None,

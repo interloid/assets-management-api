@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from uuid6 import uuid7
@@ -10,7 +10,7 @@ from app.shared.models.enums import UserRole
 
 @pytest.fixture
 def user() -> User:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     return User(
         id=uuid7(),

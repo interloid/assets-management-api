@@ -107,9 +107,9 @@ class AssetService:
         return asset
 
     async def _update_asset_details(
-            self,
-            asset: Asset,
-            update_data: dict,
+        self,
+        asset: Asset,
+        update_data: dict,
     ) -> None:
         if not update_data:
             return
@@ -145,15 +145,12 @@ class AssetService:
                     number=number,
                 )
 
-        await self.asset_repository.update(
-            asset=asset,
-            update_data=update_data
-        )
+        await self.asset_repository.update(asset=asset, update_data=update_data)
 
     async def _assign_asset(
-            self,
-            asset:Asset,
-            user_id: UUID,
+        self,
+        asset: Asset,
+        user_id: UUID,
     ) -> None:
         self._validate_status_transition(
             current_status=asset.status,
@@ -172,8 +169,8 @@ class AssetService:
         await self.asset_repository.assign(asset=asset, user_id=user_id)
 
     async def _unassign_asset(
-            self,
-            asset:Asset,
+        self,
+        asset: Asset,
     ) -> None:
         self._validate_status_transition(
             current_status=asset.status,
@@ -184,9 +181,9 @@ class AssetService:
         await self.asset_repository.unassign(asset=asset)
 
     async def _change_asset_status(
-            self,
-            asset: Asset,
-            new_status: AssetStatus,
+        self,
+        asset: Asset,
+        new_status: AssetStatus,
     ) -> None:
         self._validate_status_transition(
             current_status=asset.status,
@@ -194,16 +191,10 @@ class AssetService:
             allowed_map=MANUAL_STATUS_TRANSITIONS,
         )
 
-        await self.asset_repository.change_status(
-            asset=asset,
-            new_status=new_status
-        )
+        await self.asset_repository.change_status(asset=asset, new_status=new_status)
 
     async def _apply_status_transition(
-            self,
-            asset: Asset,
-            new_status: AssetStatus,
-            user_id: UUID | None = None
+        self, asset: Asset, new_status: AssetStatus, user_id: UUID | None = None
     ) -> None:
         if asset.status == new_status:
             if (
@@ -229,11 +220,10 @@ class AssetService:
             if asset.status == AssetStatus.ASSIGNED:
                 await self._unassign_asset(asset=asset)
             else:
-                await self._change_asset_status(asset=asset,new_status=new_status)
+                await self._change_asset_status(asset=asset, new_status=new_status)
             return
 
-        await self._change_asset_status(asset=asset,new_status=new_status)
-
+        await self._change_asset_status(asset=asset, new_status=new_status)
 
     async def create(
         self,
@@ -382,7 +372,6 @@ class AssetService:
             raise
 
         return asset
-
 
     async def delete(self, asset_id: UUID) -> None:
         asset = await self.asset_repository.get_by_id_including_deleted(asset_id)

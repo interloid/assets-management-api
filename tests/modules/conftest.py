@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -71,7 +71,7 @@ def valid_stored_token() -> SimpleNamespace:
         user_id="user-123",
         family_id="family-123",
         token_hash="old-token-hash",
-        expires_at=datetime.now(timezone.utc) + timedelta(days=1),
+        expires_at=datetime.now(UTC) + timedelta(days=1),
         revoked_at=None,
     )
 
@@ -83,7 +83,7 @@ def expired_stored_token() -> SimpleNamespace:
         user_id="user-123",
         family_id="family-123",
         token_hash="old-token-hash",
-        expires_at=datetime.now(timezone.utc) - timedelta(days=1),
+        expires_at=datetime.now(UTC) - timedelta(days=1),
         revoked_at=None,
     )
 
@@ -95,8 +95,8 @@ def revoked_stored_token() -> SimpleNamespace:
         user_id="user-123",
         family_id="family-123",
         token_hash="old-token-hash",
-        expires_at=datetime.now(timezone.utc) + timedelta(days=1),
-        revoked_at=datetime.now(timezone.utc),
+        expires_at=datetime.now(UTC) + timedelta(days=1),
+        revoked_at=datetime.now(UTC),
     )
 
 
@@ -120,6 +120,6 @@ def created_refresh_token() -> RefreshToken:
         user_id=uuid7(),
         token_hash="hashed_refresh_token",
         family_id=uuid7(),
-        expires_at=datetime.now(timezone.utc) + timedelta(days=7),
+        expires_at=datetime.now(UTC) + timedelta(days=7),
         revoked_at=None,
     )

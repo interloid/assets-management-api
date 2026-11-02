@@ -1,4 +1,4 @@
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -66,7 +66,7 @@ async def test_list_assets(
 ) -> None:
     service = AssetService(mock_session)
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     asset = Asset(
         id=uuid7(),
@@ -113,7 +113,7 @@ async def test_list_assets_returns_total(
 ) -> None:
     service = AssetService(mock_session)
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     assets = [
         Asset(
@@ -385,6 +385,7 @@ async def test_update_asset_type_generates_new_tag(
     mock_session.commit.assert_awaited_once()
     assert result is asset
 
+
 @pytest.mark.asyncio
 async def test_update_asset_status_only(mock_session) -> None:
     service = AssetService(mock_session)
@@ -416,6 +417,7 @@ async def test_update_asset_status_only(mock_session) -> None:
 
     mock_session.commit.assert_awaited_once()
     assert result is asset
+
 
 @pytest.mark.asyncio
 async def test_update_asset_details_and_status(mock_session) -> None:
@@ -454,6 +456,7 @@ async def test_update_asset_details_and_status(mock_session) -> None:
 
     mock_session.commit.assert_awaited_once()
     assert result is asset
+
 
 @pytest.mark.asyncio
 async def test_update_asset_assigns_user(
@@ -500,6 +503,7 @@ async def test_update_asset_assigns_user(
 
     assert result is asset
 
+
 @pytest.mark.asyncio
 async def test_update_asset_assign_without_user_id(mock_session) -> None:
     service = AssetService(mock_session)
@@ -526,6 +530,7 @@ async def test_update_asset_assign_without_user_id(mock_session) -> None:
     service.asset_repository.assign.assert_not_awaited()
     mock_session.commit.assert_not_awaited()
     mock_session.rollback.assert_awaited_once()
+
 
 @pytest.mark.asyncio
 async def test_update_asset_unassigns_user(mock_session) -> None:
@@ -556,6 +561,7 @@ async def test_update_asset_unassigns_user(mock_session) -> None:
 
     service.asset_repository.update.assert_not_awaited()
     mock_session.commit.assert_awaited_once()
+
 
 @pytest.mark.asyncio
 async def test_update_asset_assigned_to_repair(mock_session) -> None:
@@ -588,6 +594,7 @@ async def test_update_asset_assigned_to_repair(mock_session) -> None:
 
     service.asset_repository.unassign.assert_not_awaited()
     mock_session.commit.assert_awaited_once()
+
 
 @pytest.mark.asyncio
 async def test_update_asset_invalid_status_transition_rolls_back(
@@ -722,7 +729,7 @@ async def test_delete_asset_already_deleted(mock_session) -> None:
         serial_number="ABC12345",
         status=AssetStatus.IN_STOCK,
         purchase_date=date(2026, 1, 1),
-        deleted_at=datetime.now(timezone.utc),
+        deleted_at=datetime.now(UTC),
     )
 
     service.asset_repository.get_by_id_including_deleted = AsyncMock(

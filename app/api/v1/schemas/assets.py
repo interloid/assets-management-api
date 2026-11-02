@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from uuid import UUID
 
 from pydantic import (
@@ -67,7 +67,7 @@ class AssetResponse(BaseModel):
         if not self.warranty_expiry:
             return "No Warranty"
 
-        delta = (self.warranty_expiry - date.today()).days
+        delta = (self.warranty_expiry - datetime.now(UTC).date()).days
 
         if delta <= -1:
             return "Expired"
@@ -112,6 +112,13 @@ class AssetUpdate(BaseModel):
             and self.warranty_expiry < self.purchase_date
         ):
             raise InvalidWarrantyExpiryError()
+
+        return self
+
+    @model_validator(mode="after")
+    def validate_assignment(self):
+        if self.user_id is not None and self.status != AssetStatus.ASSIGNED:
+            raise ValueError("user_id can only be provided when status is 'assigned'")
 
         return self
 

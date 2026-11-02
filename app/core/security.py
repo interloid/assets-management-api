@@ -1,6 +1,6 @@
 import hashlib
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import jwt
@@ -40,7 +40,7 @@ def create_access_token(
     token_version: int,
     family_id: str,
 ) -> str:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     expires_at = now + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
 
     payload = {
@@ -112,14 +112,14 @@ def decode_access_token_allow_expired(token: str) -> dict[str, Any]:
 
 
 def validate_logout_token_expiry(exp: int | float) -> None:
-    now = datetime.now(timezone.utc).timestamp()
+    now = datetime.now(UTC).timestamp()
 
     if exp < now - MAX_LOGOUT_GRACE_SECONDS:
         raise InvalidAccessTokenError()
 
 
 def get_token_remaining_seconds(exp: int | float) -> int:
-    now = datetime.now(timezone.utc).timestamp()
+    now = datetime.now(UTC).timestamp()
 
     return max(
         0,

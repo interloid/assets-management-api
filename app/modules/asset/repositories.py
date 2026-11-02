@@ -1,4 +1,4 @@
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Literal
 from uuid import UUID
 
@@ -161,7 +161,7 @@ class AssetRepository:
     ) -> None:
         if asset.deleted_at is not None:
             return
-        asset.deleted_at = datetime.now()
+        asset.deleted_at = datetime.now(UTC)
         await self.session.flush()
 
     async def assign(

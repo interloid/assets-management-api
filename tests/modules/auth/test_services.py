@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
@@ -290,7 +290,7 @@ async def test_valid_logout(
     access_token_payload = {
         "sub": str(created_refresh_token.user_id),
         "jti": "jti-123",
-        "exp": int(datetime.now(timezone.utc).timestamp()) + 900,
+        "exp": int(datetime.now(UTC).timestamp()) + 900,
         "family_id": str(created_refresh_token.family_id),
     }
 
@@ -342,7 +342,7 @@ async def test_logout_empty_refresh_token(
 
     access_token_payload = {
         "jti": "jti-123",
-        "exp": int(datetime.now(timezone.utc).timestamp()) + 900,
+        "exp": int(datetime.now(UTC).timestamp()) + 900,
         "family_id": str(family_id),
     }
 
@@ -377,7 +377,7 @@ async def test_logout_refresh_token_not_found(
 
     access_token_payload = {
         "jti": "jti-123",
-        "exp": int(datetime.now(timezone.utc).timestamp()) + 900,
+        "exp": int(datetime.now(UTC).timestamp()) + 900,
         "family_id": str(family_id),
     }
 

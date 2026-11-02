@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import select, update
@@ -51,7 +51,7 @@ class RefreshTokenRepository:
         self,
         token_id: UUID,
     ) -> None:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         stmt = (
             update(RefreshToken)
@@ -68,7 +68,7 @@ class RefreshTokenRepository:
         self,
         family_id: UUID,
     ) -> None:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         stmt = (
             update(RefreshToken)
@@ -85,7 +85,7 @@ class RefreshTokenRepository:
         self,
         user_id: UUID,
     ) -> None:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         stmt = (
             update(RefreshToken)

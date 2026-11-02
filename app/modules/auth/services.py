@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
@@ -97,7 +97,7 @@ class AuthService:
         refresh_token = generate_refresh_token()
         refresh_token_hash = hash_refresh_token(refresh_token)
 
-        expires_at = datetime.now(timezone.utc) + timedelta(
+        expires_at = datetime.now(UTC) + timedelta(
             days=settings.REFRESH_TOKEN_EXPIRE_DAYS
         )
 
@@ -129,7 +129,7 @@ class AuthService:
         if stored_token is None:
             raise InvalidRefreshTokenError()
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         if stored_token.revoked_at is not None:
             await self.refresh_token_repository.revoke_family(
