@@ -98,6 +98,143 @@ class AssetService:
                 new_status=new_status.value,
             )
 
+    async def _get_asset_or_raise(self, asset_id: UUID) -> Asset:
+        asset = await self.asset_repository.get_by_id(asset_id)
+
+        if asset is None:
+            raise AssetNotFoundError()
+
+        return asset
+
+    async def _update_asset_details(
+            self,
+            asset: Asset,
+            update_data: dict,
+    ) -> None:
+        if not update_data:
+            return
+
+        purchase_date = update_data.get(
+            "purchase_date",
+            asset.purchase_date,
+        )
+
+        warranty_expiry = update_data.get(
+            "warranty_expiry",
+            asset.warranty_expiry,
+        )
+
+        self.validate_warranty_expiry(
+            purchase_date=purchase_date,
+            warranty_expiry=warranty_expiry,
+        )
+
+        if "type" in update_data:
+            new_type = update_data["type"]
+
+            if new_type != asset.type:
+                company_prefix = get_company_prefix()
+
+                number = await self.asset_tag_counter_repository.get_next_number(
+                    company_prefix=company_prefix,
+                    asset_type=new_type,
+                )
+
+                update_data["asset_tag"] = build_asset_tag(
+                    asset_type=new_type,
+                    number=number,
+                )
+
+        await self.asset_repository.update(
+            asset=asset,
+            update_data=update_data
+        )
+
+    async def _assign_asset(
+            self,
+            asset:Asset,
+            user_id: UUID,
+    ) -> None:
+        self._validate_status_transition(
+            current_status=asset.status,
+            new_status=AssetStatus.ASSIGNED,
+            allowed_map=ALLOWED_STATUS_TRANSITIONS,
+        )
+
+        user = await self.user_repository.get_by_id(user_id)
+
+        if user is None:
+            raise AssetAssignmentUserNotFoundError()
+
+        if not user.is_active:
+            raise AssetAssignmentUserInactiveError()
+
+        await self.asset_repository.assign(asset=asset, user_id=user_id)
+
+    async def _unassign_asset(
+            self,
+            asset:Asset,
+    ) -> None:
+        self._validate_status_transition(
+            current_status=asset.status,
+            new_status=AssetStatus.IN_STOCK,
+            allowed_map=ALLOWED_STATUS_TRANSITIONS,
+        )
+
+        await self.asset_repository.unassign(asset=asset)
+
+    async def _change_asset_status(
+            self,
+            asset: Asset,
+            new_status: AssetStatus,
+    ) -> None:
+        self._validate_status_transition(
+            current_status=asset.status,
+            new_status=new_status,
+            allowed_map=MANUAL_STATUS_TRANSITIONS,
+        )
+
+        await self.asset_repository.change_status(
+            asset=asset,
+            new_status=new_status
+        )
+
+    async def _apply_status_transition(
+            self,
+            asset: Asset,
+            new_status: AssetStatus,
+            user_id: UUID | None = None
+    ) -> None:
+        if asset.status == new_status:
+            if (
+                new_status == AssetStatus.ASSIGNED
+                and user_id is not None
+                and user_id != asset.assigned_to
+            ):
+                raise InvalidAssetStatusTransitionError(
+                    current_status=asset.status.value,
+                    new_status=new_status.value,
+                )
+
+            return
+
+        if new_status == AssetStatus.ASSIGNED:
+            if user_id is None:
+                raise AssetAssignmentUserNotFoundError()
+
+            await self._assign_asset(asset=asset, user_id=user_id)
+            return
+
+        if new_status == AssetStatus.IN_STOCK:
+            if asset.status == AssetStatus.ASSIGNED:
+                await self._unassign_asset(asset=asset)
+            else:
+                await self._change_asset_status(asset=asset,new_status=new_status)
+            return
+
+        await self._change_asset_status(asset=asset,new_status=new_status)
+
+
     async def create(
         self,
         *,
@@ -207,46 +344,23 @@ class AssetService:
         asset_id: UUID,
         update_data: dict,
     ) -> Asset:
-        asset = await self.asset_repository.get_by_id(asset_id)
+        asset = await self._get_asset_or_raise(asset_id)
 
-        if asset is None:
-            raise AssetNotFoundError()
+        update_data = update_data.copy()
 
-        purchase_date = update_data.get(
-            "purchase_date",
-            asset.purchase_date,
-        )
-        warranty_expiry = update_data.get(
-            "warranty_expiry",
-            asset.warranty_expiry,
-        )
+        new_status = update_data.pop("status", None)
 
-        self.validate_warranty_expiry(
-            purchase_date=purchase_date,
-            warranty_expiry=warranty_expiry,
-        )
+        user_id = update_data.pop("user_id", None)
 
         try:
-            if "type" in update_data:
-                new_type = update_data["type"]
+            await self._update_asset_details(asset=asset, update_data=update_data)
 
-                if new_type != asset.type:
-                    company_prefix = get_company_prefix()
-
-                    number = await self.asset_tag_counter_repository.get_next_number(
-                        company_prefix=company_prefix,
-                        asset_type=new_type,
-                    )
-
-                    update_data["asset_tag"] = build_asset_tag(
-                        asset_type=new_type,
-                        number=number,
-                    )
-
-            await self.asset_repository.update(
-                asset=asset,
-                update_data=update_data,
-            )
+            if new_status is not None:
+                await self._apply_status_transition(
+                    asset=asset,
+                    new_status=new_status,
+                    user_id=user_id,
+                )
 
             await self.session.commit()
 
@@ -263,7 +377,12 @@ class AssetService:
 
             raise
 
+        except Exception:
+            await self.session.rollback()
+            raise
+
         return asset
+
 
     async def delete(self, asset_id: UUID) -> None:
         asset = await self.asset_repository.get_by_id_including_deleted(asset_id)
@@ -285,44 +404,26 @@ class AssetService:
         await self.session.commit()
 
     async def assign(self, asset_id: UUID, user_id: UUID) -> Asset:
-        asset = await self.asset_repository.get_by_id(asset_id)
+        asset = await self._get_asset_or_raise(asset_id)
 
-        if asset is None:
-            raise AssetNotFoundError()
-
-        self._validate_status_transition(
-            current_status=asset.status,
-            new_status=AssetStatus.ASSIGNED,
-            allowed_map=ALLOWED_STATUS_TRANSITIONS,
-        )
-
-        user = await self.user_repository.get_by_id(user_id)
-
-        if user is None:
-            raise AssetAssignmentUserNotFoundError()
-
-        if not user.is_active:
-            raise AssetAssignmentUserInactiveError()
-
-        await self.asset_repository.assign(asset, user_id)
-        await self.session.commit()
+        try:
+            await self._assign_asset(asset, user_id)
+            await self.session.commit()
+        except Exception:
+            await self.session.rollback()
+            raise
 
         return asset
 
     async def unassign(self, asset_id: UUID) -> Asset:
-        asset = await self.asset_repository.get_by_id(asset_id)
+        asset = await self._get_asset_or_raise(asset_id)
 
-        if asset is None:
-            raise AssetNotFoundError()
-
-        self._validate_status_transition(
-            current_status=asset.status,
-            new_status=AssetStatus.IN_STOCK,
-            allowed_map=ALLOWED_STATUS_TRANSITIONS,
-        )
-
-        await self.asset_repository.unassign(asset)
-        await self.session.commit()
+        try:
+            await self._unassign_asset(asset)
+            await self.session.commit()
+        except Exception:
+            await self.session.rollback()
+            raise
 
         return asset
 
@@ -331,23 +432,14 @@ class AssetService:
         asset_id: UUID,
         new_status: AssetStatus,
     ) -> Asset:
-        asset = await self.asset_repository.get_by_id(asset_id)
+        asset = await self._get_asset_or_raise(asset_id)
 
-        if asset is None:
-            raise AssetNotFoundError()
-
-        self._validate_status_transition(
-            current_status=asset.status,
-            new_status=new_status,
-            allowed_map=MANUAL_STATUS_TRANSITIONS,
-        )
-
-        await self.asset_repository.change_status(
-            asset=asset,
-            new_status=new_status,
-        )
-
-        await self.session.commit()
+        try:
+            await self._change_asset_status(asset, new_status)
+            await self.session.commit()
+        except Exception:
+            await self.session.rollback()
+            raise
 
         return asset
 

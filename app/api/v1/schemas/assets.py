@@ -89,6 +89,8 @@ class AssetUpdate(BaseModel):
     purchase_date: date | None = None
     warranty_expiry: date | None = None
     serial_number: str | None = None
+    status: AssetStatus | None = None
+    user_id: UUID | None = None
 
     @field_validator("type", "purchase_date", "serial_number", mode="before")
     @classmethod

@@ -385,6 +385,244 @@ async def test_update_asset_type_generates_new_tag(
     mock_session.commit.assert_awaited_once()
     assert result is asset
 
+@pytest.mark.asyncio
+async def test_update_asset_status_only(mock_session) -> None:
+    service = AssetService(mock_session)
+
+    asset = Asset(
+        id=uuid7(),
+        asset_tag="IL-LAP-0001",
+        type=AssetType.LAPTOP,
+        serial_number="ABC12345",
+        status=AssetStatus.IN_STOCK,
+        purchase_date=date(2026, 1, 1),
+    )
+
+    service.asset_repository.get_by_id = AsyncMock(return_value=asset)
+    service.asset_repository.update = AsyncMock()
+    service.asset_repository.change_status = AsyncMock()
+
+    result = await service.update(
+        asset_id=asset.id,
+        update_data={"status": AssetStatus.REPAIR},
+    )
+
+    service.asset_repository.update.assert_not_awaited()
+
+    service.asset_repository.change_status.assert_awaited_once_with(
+        asset=asset,
+        new_status=AssetStatus.REPAIR,
+    )
+
+    mock_session.commit.assert_awaited_once()
+    assert result is asset
+
+@pytest.mark.asyncio
+async def test_update_asset_details_and_status(mock_session) -> None:
+    service = AssetService(mock_session)
+
+    asset = Asset(
+        id=uuid7(),
+        asset_tag="IL-LAP-0001",
+        type=AssetType.LAPTOP,
+        serial_number="ABC12345",
+        status=AssetStatus.IN_STOCK,
+        purchase_date=date(2026, 1, 1),
+    )
+
+    service.asset_repository.get_by_id = AsyncMock(return_value=asset)
+    service.asset_repository.update = AsyncMock()
+    service.asset_repository.change_status = AsyncMock()
+
+    result = await service.update(
+        asset_id=asset.id,
+        update_data={
+            "notes": "Updated notes",
+            "status": AssetStatus.REPAIR,
+        },
+    )
+
+    service.asset_repository.update.assert_awaited_once_with(
+        asset=asset,
+        update_data={"notes": "Updated notes"},
+    )
+
+    service.asset_repository.change_status.assert_awaited_once_with(
+        asset=asset,
+        new_status=AssetStatus.REPAIR,
+    )
+
+    mock_session.commit.assert_awaited_once()
+    assert result is asset
+
+@pytest.mark.asyncio
+async def test_update_asset_assigns_user(
+    mock_session,
+    created_user,
+) -> None:
+    service = AssetService(mock_session)
+
+    asset = Asset(
+        id=uuid7(),
+        asset_tag="IL-LAP-0001",
+        type=AssetType.LAPTOP,
+        serial_number="ABC12345",
+        status=AssetStatus.IN_STOCK,
+        purchase_date=date(2026, 1, 1),
+    )
+
+    service.asset_repository.get_by_id = AsyncMock(return_value=asset)
+    service.asset_repository.update = AsyncMock()
+    service.user_repository.get_by_id = AsyncMock(
+        return_value=created_user,
+    )
+    service.asset_repository.assign = AsyncMock()
+
+    result = await service.update(
+        asset_id=asset.id,
+        update_data={
+            "status": AssetStatus.ASSIGNED,
+            "user_id": created_user.id,
+        },
+    )
+
+    service.user_repository.get_by_id.assert_awaited_once_with(
+        created_user.id,
+    )
+
+    service.asset_repository.assign.assert_awaited_once_with(
+        asset=asset,
+        user_id=created_user.id,
+    )
+
+    service.asset_repository.update.assert_not_awaited()
+    mock_session.commit.assert_awaited_once()
+
+    assert result is asset
+
+@pytest.mark.asyncio
+async def test_update_asset_assign_without_user_id(mock_session) -> None:
+    service = AssetService(mock_session)
+
+    asset = Asset(
+        id=uuid7(),
+        asset_tag="IL-LAP-0001",
+        type=AssetType.LAPTOP,
+        serial_number="ABC12345",
+        status=AssetStatus.IN_STOCK,
+        purchase_date=date(2026, 1, 1),
+    )
+
+    service.asset_repository.get_by_id = AsyncMock(return_value=asset)
+    service.asset_repository.update = AsyncMock()
+    service.asset_repository.assign = AsyncMock()
+
+    with pytest.raises(AssetAssignmentUserNotFoundError):
+        await service.update(
+            asset_id=asset.id,
+            update_data={"status": AssetStatus.ASSIGNED},
+        )
+
+    service.asset_repository.assign.assert_not_awaited()
+    mock_session.commit.assert_not_awaited()
+    mock_session.rollback.assert_awaited_once()
+
+@pytest.mark.asyncio
+async def test_update_asset_unassigns_user(mock_session) -> None:
+    service = AssetService(mock_session)
+
+    asset = Asset(
+        id=uuid7(),
+        asset_tag="IL-LAP-0001",
+        type=AssetType.LAPTOP,
+        serial_number="ABC12345",
+        status=AssetStatus.ASSIGNED,
+        assigned_to=uuid7(),
+        purchase_date=date(2026, 1, 1),
+    )
+
+    service.asset_repository.get_by_id = AsyncMock(return_value=asset)
+    service.asset_repository.update = AsyncMock()
+    service.asset_repository.unassign = AsyncMock()
+
+    await service.update(
+        asset_id=asset.id,
+        update_data={"status": AssetStatus.IN_STOCK},
+    )
+
+    service.asset_repository.unassign.assert_awaited_once_with(
+        asset=asset,
+    )
+
+    service.asset_repository.update.assert_not_awaited()
+    mock_session.commit.assert_awaited_once()
+
+@pytest.mark.asyncio
+async def test_update_asset_assigned_to_repair(mock_session) -> None:
+    service = AssetService(mock_session)
+
+    asset = Asset(
+        id=uuid7(),
+        asset_tag="IL-LAP-0001",
+        type=AssetType.LAPTOP,
+        serial_number="ABC12345",
+        status=AssetStatus.ASSIGNED,
+        assigned_to=uuid7(),
+        purchase_date=date(2026, 1, 1),
+    )
+
+    service.asset_repository.get_by_id = AsyncMock(return_value=asset)
+    service.asset_repository.update = AsyncMock()
+    service.asset_repository.unassign = AsyncMock()
+    service.asset_repository.change_status = AsyncMock()
+
+    await service.update(
+        asset_id=asset.id,
+        update_data={"status": AssetStatus.REPAIR},
+    )
+
+    service.asset_repository.change_status.assert_awaited_once_with(
+        asset=asset,
+        new_status=AssetStatus.REPAIR,
+    )
+
+    service.asset_repository.unassign.assert_not_awaited()
+    mock_session.commit.assert_awaited_once()
+
+@pytest.mark.asyncio
+async def test_update_asset_invalid_status_transition_rolls_back(
+    mock_session,
+) -> None:
+    service = AssetService(mock_session)
+
+    asset = Asset(
+        id=uuid7(),
+        asset_tag="IL-LAP-0001",
+        type=AssetType.LAPTOP,
+        serial_number="ABC12345",
+        status=AssetStatus.RETIRED,
+        purchase_date=date(2026, 1, 1),
+    )
+
+    service.asset_repository.get_by_id = AsyncMock(return_value=asset)
+    service.asset_repository.update = AsyncMock()
+    service.asset_repository.change_status = AsyncMock()
+
+    with pytest.raises(InvalidAssetStatusTransitionError):
+        await service.update(
+            asset_id=asset.id,
+            update_data={
+                "notes": "This should be rolled back",
+                "status": AssetStatus.REPAIR,
+            },
+        )
+
+    service.asset_repository.update.assert_awaited_once()
+    service.asset_repository.change_status.assert_not_awaited()
+
+    mock_session.commit.assert_not_awaited()
+    mock_session.rollback.assert_awaited_once()
+
 
 @pytest.mark.asyncio
 async def test_delete_asset(
@@ -561,8 +799,8 @@ async def test_assign_asset(
     )
 
     service.asset_repository.assign.assert_awaited_once_with(
-        asset,
-        created_user.id,
+        asset=asset,
+        user_id=created_user.id,
     )
 
     mock_session.commit.assert_awaited_once()
@@ -723,7 +961,7 @@ async def test_unassign_asset(
     result = await service.unassign(asset.id)
 
     service.asset_repository.unassign.assert_awaited_once_with(
-        asset,
+        asset=asset,
     )
 
     mock_session.commit.assert_awaited_once()
