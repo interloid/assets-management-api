@@ -43,11 +43,15 @@ class AssetFileRepository:
     async def get_by_id(
         self,
         file_id: UUID,
+        *,
+        for_update: bool = False,
     ) -> AssetFiles | None:
-        result = await self.session.execute(
-            select(AssetFiles).where(AssetFiles.id == file_id)
-        )
+        statement = select(AssetFiles).where(AssetFiles.id == file_id)
 
+        if for_update:
+            statement = statement.with_for_update()
+
+        result = await self.session.execute(statement)
         return result.scalar_one_or_none()
 
     async def create(self, file: AssetFiles) -> AssetFiles:

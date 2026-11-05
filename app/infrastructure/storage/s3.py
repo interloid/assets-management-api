@@ -5,13 +5,20 @@ from app.core.config import settings
 
 
 def create_s3_client(endpoint_url: str | None):
+    credentials = {}
+
+    if settings.AWS_ACCESS_KEY_ID and settings.AWS_SECRET_ACCESS_KEY:
+        credentials = {
+            "aws_access_key_id": settings.AWS_ACCESS_KEY_ID,
+            "aws_secret_access_key": settings.AWS_SECRET_ACCESS_KEY,
+        }
+
     return boto3.client(
         "s3",
         region_name=settings.AWS_REGION,
         endpoint_url=endpoint_url,
-        aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-        aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
         config=Config(signature_version="s3v4"),
+        **credentials,
     )
 
 

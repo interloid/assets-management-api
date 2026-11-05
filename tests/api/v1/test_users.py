@@ -35,6 +35,7 @@ async def test_admin_list_users(
     assert user["email"] == integration_user.email
     assert user["full_name"] == integration_user.full_name
     assert user["role"] == integration_user.role.value
+    assert "assets_assigned" in user
 
     assert "password_hash" not in user
     assert "is_active" not in user

@@ -175,7 +175,10 @@ class AssetFileService:
         if asset is None:
             raise AssetNotFoundError()
 
-        file = await self.repository.get_by_id(file_id)
+        file = await self.repository.get_by_id(
+            file_id,
+            for_update=True,
+        )
 
         if file is None or file.asset_id != asset_id:
             raise AssetFileNotFoundError()
