@@ -223,7 +223,13 @@ jobs:
           echo "Running database migrations..."
 
           IMAGE_TAG="$NEW_IMAGE_TAG" \
-            docker compose -f docker-compose.prod.yml run --rm --no-deps api alembic upgrade head
+            docker compose -f docker-compose.prod.yml run \
+            --rm \
+            --no-deps \
+            -T \
+            --interactive=false \
+            api \
+            alembic upgrade head </dev/null
 
           echo "Starting new production version..."
 
