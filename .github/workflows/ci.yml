@@ -195,5 +195,19 @@ jobs:
           echo "Checking service status..."
           docker compose -f docker-compose.prod.yml ps
 
-          echo "Deployment completed."
+          echo "Checking production API readiness..."
+
+          for attempt in $(seq 1 12); do
+            if response=$(curl -fsS --max-time 3 http://127.0.0.1:8000/health/ready); then
+              echo "Production API is healthy."
+              echo "$response"
+              exit 0
+            fi
+
+            echo "Health check attempt $attempt/12 failed. Retrying in 5 seconds..."
+            sleep 5
+          done
+
+          echo "ERROR: Production API did not become healthy."
+          exit 1
           EOF
