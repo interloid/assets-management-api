@@ -1,6 +1,6 @@
 services:
   api:
-    image: madhavanselvaraj/assets-management-api-prod:latest
+    image: madhavanselvaraj/assets-management-api-prod:${IMAGE_TAG:-latest}
     env_file:
       - .env.production
     command:
@@ -19,7 +19,7 @@ services:
     mem_limit: 512m
 
   worker:
-    image: madhavanselvaraj/assets-management-api-prod:latest
+    image: madhavanselvaraj/assets-management-api-prod:${IMAGE_TAG:-latest}
     env_file:
       - .env.production
     command:
@@ -36,7 +36,7 @@ services:
     mem_limit: 512m
 
   beat:
-    image: madhavanselvaraj/assets-management-api-prod:latest
+    image: madhavanselvaraj/assets-management-api-prod:${IMAGE_TAG:-latest}
     env_file:
       - .env.production
     command:

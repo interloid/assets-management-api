@@ -130,6 +130,11 @@ jobs:
   deploy:
     name: Build and deploy to EC2
     runs-on: ubuntu-latest
+    concurrency:
+      group: production-deployment
+      cancel-in-progress: false
+
+    timeout-minutes: 15
     needs: [lint, test]
 
     if: github.event_name == 'push' && github.ref == 'refs/heads/phase2'
@@ -170,44 +175,116 @@ jobs:
           printf '%s\n' "$EC2_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
+
       - name: Deploy to EC2
         env:
           EC2_HOST: ${{ secrets.EC2_HOST }}
           EC2_USER: ${{ secrets.EC2_USER }}
+          NEW_IMAGE_TAG: ${{ github.sha }}
         run: |
+          set -euo pipefail
+
+          echo "Copying production Compose file to EC2..."
+
+          scp -i ~/.ssh/deploy_key \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            docker-compose.prod.yml \
+            "$EC2_USER@$EC2_HOST:~/assets-management-api/docker-compose.prod.yml"
+
+          echo "Deploying image: $NEW_IMAGE_TAG"
+
           ssh -i ~/.ssh/deploy_key \
             -o IdentitiesOnly=yes \
             -o StrictHostKeyChecking=yes \
-            "$EC2_USER@$EC2_HOST" 'bash -se' <<'EOF'
+            "$EC2_USER@$EC2_HOST" \
+            "NEW_IMAGE_TAG='$NEW_IMAGE_TAG' bash -se" <<'EOF'
+
           set -euo pipefail
 
           cd ~/assets-management-api
 
-          echo "Pulling Docker images..."
-          docker compose -f docker-compose.prod.yml pull
+          PREVIOUS_TAG_FILE=".deployed_image_tag"
+
+          if [ -s "$PREVIOUS_TAG_FILE" ]; then
+            PREVIOUS_TAG=$(cat "$PREVIOUS_TAG_FILE")
+          else
+            PREVIOUS_TAG="rollback-previous"
+          fi
+
+          echo "Previous production version: $PREVIOUS_TAG"
+          echo "New production version: $NEW_IMAGE_TAG"
+
+          echo "Pulling new Docker image..."
+
+          IMAGE_TAG="$NEW_IMAGE_TAG" \
+            docker compose -f docker-compose.prod.yml pull
 
           echo "Running database migrations..."
-          docker compose -f docker-compose.prod.yml run --rm --no-deps api alembic upgrade head
 
-          echo "Restarting production services..."
-          docker compose -f docker-compose.prod.yml up -d --remove-orphans
+          IMAGE_TAG="$NEW_IMAGE_TAG" \
+            docker compose -f docker-compose.prod.yml run --rm --no-deps api alembic upgrade head
 
-          echo "Checking service status..."
-          docker compose -f docker-compose.prod.yml ps
+          echo "Starting new production version..."
 
-          echo "Checking production API readiness..."
+          if IMAGE_TAG="$NEW_IMAGE_TAG" \
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans; then
+
+            echo "Checking production API readiness..."
+
+            for attempt in $(seq 1 12); do
+              if response=$(curl -fsS --max-time 3 http://127.0.0.1:8000/health/ready); then
+                echo "New production version is healthy."
+                echo "$response"
+
+                printf '%s\n' "$NEW_IMAGE_TAG" > "$PREVIOUS_TAG_FILE.tmp"
+                mv "$PREVIOUS_TAG_FILE.tmp" "$PREVIOUS_TAG_FILE"
+
+                echo "Deployment successful: $NEW_IMAGE_TAG"
+                exit 0
+              fi
+
+              if [ "$attempt" -lt 12 ]; then
+                echo "Health check $attempt/12 failed. Retrying in 5 seconds..."
+                sleep 5
+              fi
+            done
+          else
+            echo "New version failed to start."
+          fi
+
+          echo "ERROR: New deployment failed."
+          echo "Starting rollback to: $PREVIOUS_TAG"
+
+          if [ "$PREVIOUS_TAG" != "rollback-previous" ]; then
+            if ! IMAGE_TAG="$PREVIOUS_TAG" \
+              docker compose -f docker-compose.prod.yml pull; then
+              echo "ERROR: Could not pull previous production image."
+              exit 1
+            fi
+          fi
+
+          if ! IMAGE_TAG="$PREVIOUS_TAG" \
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans; then
+            echo "CRITICAL: Rollback failed to start."
+            exit 1
+          fi
+
+          echo "Checking rollback readiness..."
 
           for attempt in $(seq 1 12); do
             if response=$(curl -fsS --max-time 3 http://127.0.0.1:8000/health/ready); then
-              echo "Production API is healthy."
+              echo "Rollback successful. Previous version is healthy."
               echo "$response"
-              exit 0
+              exit 1
             fi
 
-            echo "Health check attempt $attempt/12 failed. Retrying in 5 seconds..."
-            sleep 5
+            if [ "$attempt" -lt 12 ]; then
+              echo "Rollback health check $attempt/12 failed. Retrying in 5 seconds..."
+              sleep 5
+            fi
           done
 
-          echo "ERROR: Production API did not become healthy."
+          echo "CRITICAL: Rollback version is also unhealthy."
           exit 1
           EOF
