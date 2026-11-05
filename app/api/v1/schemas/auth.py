@@ -1,7 +1,14 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, EmailStr, field_validator
+from pydantic import (
+    AliasChoices,
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    Field,
+    field_validator,
+)
 
 from app.modules.auth.validators.full_name import validate_full_name
 from app.modules.auth.validators.password import validate_password
@@ -25,6 +32,7 @@ class UserResponse(BaseModel):
     email: EmailStr
     full_name: str
     role: UserRole
+    status: bool = Field(validation_alias=AliasChoices("is_active", "status"))
     created_at: datetime
     updated_at: datetime
 
@@ -36,6 +44,8 @@ class UserListResponse(BaseModel):
     email: EmailStr
     full_name: str
     role: UserRole
+    status: bool = Field(validation_alias=AliasChoices("is_active", "status"))
+    assets_assigned: int
 
 
 class LoginRequest(BaseModel):

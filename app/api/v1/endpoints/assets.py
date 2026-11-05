@@ -5,7 +5,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Query, Request, status
 
-from app.api.deps import DBSession
+from app.api.deps import DBSession, RedisClient
 from app.api.v1.dependencies import AdminUser, CurrentUser
 from app.api.v1.responses import (
     CONFLICT_RESPONSE,
@@ -17,10 +17,12 @@ from app.api.v1.responses import (
 )
 from app.api.v1.schemas.assets import (
     AssetAssign,
+    AssetAssignmentHistoryListResponse,
     AssetCreate,
     AssetResponse,
     AssetStatsResponse,
     AssetStatusUpdate,
+    AssetTagHistoryListResponse,
     AssetUpdate,
 )
 from app.modules.asset.services import AssetService
@@ -51,9 +53,10 @@ async def create_asset(
     request: Request,
     data: AssetCreate,
     session: DBSession,
+    redis_client: RedisClient,
     _admin_user: AdminUser,
 ) -> SuccessResponse[AssetResponse]:
-    service = AssetService(session)
+    service = AssetService(session, redis_client)
 
     asset = await service.create(
         asset_type=data.type,
@@ -71,7 +74,7 @@ async def create_asset(
             asset,
         ),
         pagination_meta=None,
-        request_id=None,
+        request_id=request.state.request_id,
         timestamp=datetime.now(UTC),
         path=request.url.path,
     )
@@ -91,6 +94,7 @@ async def create_asset(
 async def list_assets(
     request: Request,
     session: DBSession,
+    redis_client: RedisClient,
     _admin_user: AdminUser,
     page: int = Query(default=1, ge=1, le=1000),
     size: int = Query(default=20, ge=1, le=100),
@@ -109,9 +113,9 @@ async def list_assets(
     ),
     order: Literal["asc", "desc"] = Query(default="desc"),
 ) -> SuccessResponse[list[AssetResponse]]:
-    service = AssetService(session)
+    service = AssetService(session, redis_client)
 
-    assets, total = await service.list(
+    assets, total = await service.list_assets(
         page=page,
         size=size,
         asset_type=asset_type,
@@ -141,7 +145,7 @@ async def list_assets(
         message="Assets retrieved successfully",
         data=data,
         pagination_meta=pagination,
-        request_id=None,
+        request_id=request.state.request_id,
         timestamp=datetime.now(UTC),
         path=request.url.path,
     )
@@ -160,9 +164,10 @@ async def list_assets(
 async def get_asset_stats(
     request: Request,
     session: DBSession,
+    redis_client: RedisClient,
     _admin_user: AdminUser,
 ) -> SuccessResponse[AssetStatsResponse]:
-    service = AssetService(session)
+    service = AssetService(session, redis_client)
 
     result = await service.stats()
 
@@ -172,7 +177,7 @@ async def get_asset_stats(
         message="Asset statistics retrieved successfully",
         data=result,
         pagination_meta=None,
-        request_id=None,
+        request_id=request.state.request_id,
         timestamp=datetime.now(UTC),
         path=request.url.path,
     )
@@ -193,9 +198,10 @@ async def get_by_id(
     request: Request,
     id: UUID,
     session: DBSession,
+    redis_client: RedisClient,
     current_user: CurrentUser,
 ) -> SuccessResponse[AssetResponse]:
-    service = AssetService(session)
+    service = AssetService(session, redis_client)
 
     asset = await service.get_by_id(
         asset_id=id,
@@ -210,7 +216,7 @@ async def get_by_id(
             asset,
         ),
         pagination_meta=None,
-        request_id=None,
+        request_id=request.state.request_id,
         timestamp=datetime.now(UTC),
         path=request.url.path,
     )
@@ -234,15 +240,17 @@ async def update_asset(
     id: UUID,
     data: AssetUpdate,
     session: DBSession,
-    _admin_user: AdminUser,
+    redis_client: RedisClient,
+    admin_user: AdminUser,
 ) -> SuccessResponse[AssetResponse]:
-    service = AssetService(session)
+    service = AssetService(session, redis_client)
 
     update_data = data.model_dump(exclude_unset=True)
 
     asset = await service.update(
         asset_id=id,
         update_data=update_data,
+        changed_by=admin_user.id,
     )
 
     return SuccessResponse(
@@ -253,7 +261,7 @@ async def update_asset(
             asset,
         ),
         pagination_meta=None,
-        request_id=None,
+        request_id=request.state.request_id,
         timestamp=datetime.now(UTC),
         path=request.url.path,
     )
@@ -276,8 +284,9 @@ async def delete_asset(
     id: UUID,
     _current_user: AdminUser,
     session: DBSession,
+    redis_client: RedisClient,
 ) -> None:
-    service = AssetService(session)
+    service = AssetService(session, redis_client)
 
     await service.delete(id)
 
@@ -300,13 +309,15 @@ async def assign_asset(
     id: UUID,
     data: AssetAssign,
     session: DBSession,
-    _admin_user: AdminUser,
+    redis_client: RedisClient,
+    admin_user: AdminUser,
 ) -> SuccessResponse[AssetResponse]:
-    service = AssetService(session)
+    service = AssetService(session, redis_client)
 
     asset = await service.assign(
         asset_id=id,
         user_id=data.user_id,
+        assigned_by=admin_user.id,
     )
 
     return SuccessResponse(
@@ -317,7 +328,7 @@ async def assign_asset(
             asset,
         ),
         pagination_meta=None,
-        request_id=None,
+        request_id=request.state.request_id,
         timestamp=datetime.now(UTC),
         path=request.url.path,
     )
@@ -340,11 +351,12 @@ async def unassign_asset(
     request: Request,
     id: UUID,
     session: DBSession,
-    _admin_user: AdminUser,
+    redis_client: RedisClient,
+    admin_user: AdminUser,
 ) -> SuccessResponse[AssetResponse]:
-    service = AssetService(session)
+    service = AssetService(session, redis_client)
 
-    asset = await service.unassign(id)
+    asset = await service.unassign(asset_id=id, unassigned_by=admin_user.id)
 
     return SuccessResponse(
         success=True,
@@ -354,7 +366,7 @@ async def unassign_asset(
             asset,
         ),
         pagination_meta=None,
-        request_id=None,
+        request_id=request.state.request_id,
         timestamp=datetime.now(UTC),
         path=request.url.path,
     )
@@ -378,13 +390,15 @@ async def change_status(
     id: UUID,
     data: AssetStatusUpdate,
     session: DBSession,
-    _admin_user: AdminUser,
+    redis_client: RedisClient,
+    admin_user: AdminUser,
 ) -> SuccessResponse[AssetResponse]:
-    service = AssetService(session)
+    service = AssetService(session, redis_client)
 
     asset = await service.change_status(
         id,
         data.status,
+        changed_by=admin_user.id,
     )
 
     return SuccessResponse(
@@ -395,7 +409,115 @@ async def change_status(
             asset,
         ),
         pagination_meta=None,
-        request_id=None,
+        request_id=request.state.request_id,
+        timestamp=datetime.now(UTC),
+        path=request.url.path,
+    )
+
+
+@router.get(
+    "/{id}/assignments",
+    tags=["Assets History"],
+    status_code=status.HTTP_200_OK,
+    responses={
+        **FORBIDDEN_RESPONSE,
+        **INTERNAL_SERVER_ERROR_RESPONSE,
+        **NOT_FOUND_RESPONSE,
+        **UNAUTHORIZED_RESPONSE,
+        **VALIDATION_RESPONSE,
+    },
+)
+async def get_asset_history(
+    request: Request,
+    id: UUID,
+    session: DBSession,
+    redis_client: RedisClient,
+    current_user: AdminUser,
+    page: int = Query(default=1, ge=1, le=1000),
+    size: int = Query(default=20, ge=1, le=100),
+    search: str | None = Query(default=None, max_length=100),
+) -> SuccessResponse[AssetAssignmentHistoryListResponse]:
+    service = AssetService(session, redis_client)
+
+    asset_id, asset_history, total = await service.get_history_by_asset(
+        asset_id=id,
+        page=page,
+        size=size,
+        search=search,
+    )
+
+    pagination = PaginationMeta(
+        items_on_page=len(asset_history),
+        page=page,
+        records_per_page=size,
+        total_items=total,
+        total_pages=ceil(total / size) if total else 0,
+    )
+
+    return SuccessResponse(
+        success=True,
+        status_code=status.HTTP_200_OK,
+        message="Asset history retrieved successfully",
+        data=AssetAssignmentHistoryListResponse(
+            asset_id=asset_id,
+            history=asset_history,
+        ),
+        pagination_meta=pagination,
+        request_id=request.state.request_id,
+        timestamp=datetime.now(UTC),
+        path=request.url.path,
+    )
+
+
+@router.get(
+    "/{id}/tag-history",
+    tags=["Asset Tag History"],
+    status_code=status.HTTP_200_OK,
+    responses={
+        **FORBIDDEN_RESPONSE,
+        **INTERNAL_SERVER_ERROR_RESPONSE,
+        **NOT_FOUND_RESPONSE,
+        **UNAUTHORIZED_RESPONSE,
+        **VALIDATION_RESPONSE,
+    },
+)
+async def get_tag_history(
+    request: Request,
+    id: UUID,
+    session: DBSession,
+    current_user: AdminUser,
+    redis_client: RedisClient,
+    page: int = Query(default=1, ge=1, le=1000),
+    size: int = Query(default=20, ge=1, le=100),
+    search: str | None = Query(default=None, max_length=100),
+) -> SuccessResponse[AssetTagHistoryListResponse]:
+    service = AssetService(session, redis_client)
+
+    tag_history, total = await service.get_tag_history(
+        asset_id=id,
+        page=page,
+        size=size,
+        search=search,
+    )
+
+    pagination = PaginationMeta(
+        items_on_page=len(tag_history),
+        page=page,
+        records_per_page=size,
+        total_items=total,
+        total_pages=ceil(total / size) if total else 0,
+    )
+
+    return SuccessResponse(
+        success=True,
+        status_code=status.HTTP_200_OK,
+        message="Asset tag history retrieved successfully",
+        data=AssetTagHistoryListResponse(
+            asset_id=id,
+            history=tag_history,
+        ),
+        pagination_meta=pagination,
+        request_id=request.state.request_id,
         timestamp=datetime.now(UTC),
         path=request.url.path,
     )

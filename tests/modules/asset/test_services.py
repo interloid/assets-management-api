@@ -1,4 +1,6 @@
+import json
 from datetime import UTC, date, datetime
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -19,7 +21,9 @@ from app.shared.models.enums import AssetStatus, AssetType, UserRole
 
 @pytest.mark.asyncio
 async def test_create_asset_success(mock_session) -> None:
-    service = AssetService(mock_session)
+    redis_client = AsyncMock()
+
+    service = AssetService(mock_session, redis_client)
 
     service.asset_tag_counter_repository.get_next_number = AsyncMock(
         return_value=1,
@@ -48,6 +52,7 @@ async def test_create_asset_success(mock_session) -> None:
         company_prefix="IL",
         asset_type=AssetType.LAPTOP,
     )
+    redis_client.delete.assert_awaited_once_with("assets:stats")
     service.asset_repository.create.assert_awaited_once()
     mock_session.commit.assert_awaited_once()
 
@@ -64,7 +69,9 @@ async def test_create_asset_success(mock_session) -> None:
 async def test_list_assets(
     mock_session,
 ) -> None:
-    service = AssetService(mock_session)
+    redis_client = AsyncMock()
+
+    service = AssetService(mock_session, redis_client)
 
     now = datetime.now(UTC)
 
@@ -81,16 +88,16 @@ async def test_list_assets(
         updated_at=now,
     )
 
-    service.asset_repository.list = AsyncMock(
+    service.asset_repository.list_assets = AsyncMock(
         return_value=([asset], 1),
     )
 
-    assets_result, total = await service.list(
+    assets_result, total = await service.list_assets(
         page=1,
         size=20,
     )
 
-    service.asset_repository.list.assert_awaited_once_with(
+    service.asset_repository.list_assets.assert_awaited_once_with(
         page=1,
         size=20,
         asset_type=None,
@@ -111,7 +118,8 @@ async def test_list_assets(
 async def test_list_assets_returns_total(
     mock_session,
 ) -> None:
-    service = AssetService(mock_session)
+    redis_client = AsyncMock()
+    service = AssetService(mock_session, redis_client)
 
     now = datetime.now(UTC)
 
@@ -131,11 +139,11 @@ async def test_list_assets_returns_total(
         for i in range(1, 3)
     ]
 
-    service.asset_repository.list = AsyncMock(
+    service.asset_repository.list_assets = AsyncMock(
         return_value=(assets, 25),
     )
 
-    assets_result, total = await service.list(
+    assets_result, total = await service.list_assets(
         page=2,
         size=10,
     )
@@ -148,13 +156,14 @@ async def test_list_assets_returns_total(
 async def test_list_assets_empty_result(
     mock_session,
 ) -> None:
-    service = AssetService(mock_session)
+    redis_client = AsyncMock()
+    service = AssetService(mock_session, redis_client)
 
-    service.asset_repository.list = AsyncMock(
+    service.asset_repository.list_assets = AsyncMock(
         return_value=([], 0),
     )
 
-    assets_result, total = await service.list(
+    assets_result, total = await service.list_assets(
         page=1,
         size=20,
     )
@@ -168,7 +177,8 @@ async def test_get_by_id_for_admin(
     mock_session,
     created_user,
 ) -> None:
-    service = AssetService(mock_session)
+    redis_client = AsyncMock()
+    service = AssetService(mock_session, redis_client)
 
     created_user.role = UserRole.ADMIN
 
@@ -202,7 +212,8 @@ async def test_get_by_id_for_assigned_user(
     mock_session,
     created_user,
 ) -> None:
-    service = AssetService(mock_session)
+    redis_client = AsyncMock()
+    service = AssetService(mock_session, redis_client)
 
     asset = Asset(
         id=uuid7(),
@@ -231,7 +242,8 @@ async def test_get_by_id_raises_when_asset_not_found(
     mock_session,
     created_user,
 ) -> None:
-    service = AssetService(mock_session)
+    redis_client = AsyncMock()
+    service = AssetService(mock_session, redis_client)
 
     service.asset_repository.get_by_id = AsyncMock(
         return_value=None,
@@ -251,7 +263,8 @@ async def test_get_by_id_raises_when_user_is_not_allowed(
     mock_session,
     created_user,
 ) -> None:
-    service = AssetService(mock_session)
+    redis_client = AsyncMock()
+    service = AssetService(mock_session, redis_client)
 
     asset = Asset(
         id=uuid7(),
@@ -276,7 +289,8 @@ async def test_get_by_id_raises_when_user_is_not_allowed(
 
 @pytest.mark.asyncio
 async def test_update_asset_success(mock_session) -> None:
-    service = AssetService(mock_session)
+    redis_client = AsyncMock()
+    service = AssetService(mock_session, redis_client)
 
     asset = Asset(
         id=uuid7(),
@@ -297,19 +311,22 @@ async def test_update_asset_success(mock_session) -> None:
     result = await service.update(
         asset_id=asset.id,
         update_data=update_data,
+        changed_by=uuid7(),
     )
 
     service.asset_repository.update.assert_awaited_once_with(
         asset=asset,
         update_data=update_data,
     )
+    redis_client.delete.assert_awaited_once_with("assets:stats")
     mock_session.commit.assert_awaited_once()
     assert result is asset
 
 
 @pytest.mark.asyncio
 async def test_update_asset_not_found(mock_session) -> None:
-    service = AssetService(mock_session)
+    redis_client = AsyncMock()
+    service = AssetService(mock_session, redis_client)
     asset_id = uuid7()
 
     service.asset_repository.get_by_id = AsyncMock(
@@ -321,6 +338,7 @@ async def test_update_asset_not_found(mock_session) -> None:
         await service.update(
             asset_id=asset_id,
             update_data={"notes": "Updated notes"},
+            changed_by=uuid7(),
         )
 
     service.asset_repository.update.assert_not_awaited()
@@ -331,7 +349,8 @@ async def test_update_asset_not_found(mock_session) -> None:
 async def test_update_asset_type_generates_new_tag(
     mock_session,
 ) -> None:
-    service = AssetService(mock_session)
+    redis_client = AsyncMock()
+    service = AssetService(mock_session, redis_client)
 
     asset = Asset(
         id=uuid7(),
@@ -365,6 +384,7 @@ async def test_update_asset_type_generates_new_tag(
         result = await service.update(
             asset_id=asset.id,
             update_data=update_data,
+            changed_by=uuid7(),
         )
 
     service.asset_tag_counter_repository.get_next_number.assert_awaited_once_with(
@@ -388,7 +408,8 @@ async def test_update_asset_type_generates_new_tag(
 
 @pytest.mark.asyncio
 async def test_update_asset_status_only(mock_session) -> None:
-    service = AssetService(mock_session)
+    redis_client = AsyncMock()
+    service = AssetService(mock_session, redis_client)
 
     asset = Asset(
         id=uuid7(),
@@ -406,6 +427,7 @@ async def test_update_asset_status_only(mock_session) -> None:
     result = await service.update(
         asset_id=asset.id,
         update_data={"status": AssetStatus.REPAIR},
+        changed_by=uuid7(),
     )
 
     service.asset_repository.update.assert_not_awaited()
@@ -421,7 +443,8 @@ async def test_update_asset_status_only(mock_session) -> None:
 
 @pytest.mark.asyncio
 async def test_update_asset_details_and_status(mock_session) -> None:
-    service = AssetService(mock_session)
+    redis_client = AsyncMock()
+    service = AssetService(mock_session, redis_client)
 
     asset = Asset(
         id=uuid7(),
@@ -442,6 +465,7 @@ async def test_update_asset_details_and_status(mock_session) -> None:
             "notes": "Updated notes",
             "status": AssetStatus.REPAIR,
         },
+        changed_by=uuid7(),
     )
 
     service.asset_repository.update.assert_awaited_once_with(
@@ -463,7 +487,8 @@ async def test_update_asset_assigns_user(
     mock_session,
     created_user,
 ) -> None:
-    service = AssetService(mock_session)
+    redis_client = AsyncMock()
+    service = AssetService(mock_session, redis_client)
 
     asset = Asset(
         id=uuid7(),
@@ -487,6 +512,7 @@ async def test_update_asset_assigns_user(
             "status": AssetStatus.ASSIGNED,
             "user_id": created_user.id,
         },
+        changed_by=uuid7(),
     )
 
     service.user_repository.get_by_id.assert_awaited_once_with(
@@ -506,7 +532,8 @@ async def test_update_asset_assigns_user(
 
 @pytest.mark.asyncio
 async def test_update_asset_assign_without_user_id(mock_session) -> None:
-    service = AssetService(mock_session)
+    redis_client = AsyncMock()
+    service = AssetService(mock_session, redis_client)
 
     asset = Asset(
         id=uuid7(),
@@ -525,6 +552,7 @@ async def test_update_asset_assign_without_user_id(mock_session) -> None:
         await service.update(
             asset_id=asset.id,
             update_data={"status": AssetStatus.ASSIGNED},
+            changed_by=uuid7(),
         )
 
     service.asset_repository.assign.assert_not_awaited()
@@ -534,7 +562,8 @@ async def test_update_asset_assign_without_user_id(mock_session) -> None:
 
 @pytest.mark.asyncio
 async def test_update_asset_unassigns_user(mock_session) -> None:
-    service = AssetService(mock_session)
+    redis_client = AsyncMock()
+    service = AssetService(mock_session, redis_client)
 
     asset = Asset(
         id=uuid7(),
@@ -546,18 +575,30 @@ async def test_update_asset_unassigns_user(mock_session) -> None:
         purchase_date=date(2026, 1, 1),
     )
 
+    asset_history = SimpleNamespace(
+        unassigned_by=None,
+        returned_at=None,
+    )
+
     service.asset_repository.get_by_id = AsyncMock(return_value=asset)
+    service.asset_repository.get_active_assignment_by_id = AsyncMock(
+        return_value=asset_history,
+    )
     service.asset_repository.update = AsyncMock()
     service.asset_repository.unassign = AsyncMock()
 
     await service.update(
         asset_id=asset.id,
         update_data={"status": AssetStatus.IN_STOCK},
+        changed_by=uuid7(),
     )
 
     service.asset_repository.unassign.assert_awaited_once_with(
         asset=asset,
     )
+
+    assert asset_history.unassigned_by is not None
+    assert asset_history.returned_at is not None
 
     service.asset_repository.update.assert_not_awaited()
     mock_session.commit.assert_awaited_once()
@@ -565,7 +606,8 @@ async def test_update_asset_unassigns_user(mock_session) -> None:
 
 @pytest.mark.asyncio
 async def test_update_asset_assigned_to_repair(mock_session) -> None:
-    service = AssetService(mock_session)
+    redis_client = AsyncMock()
+    service = AssetService(mock_session, redis_client)
 
     asset = Asset(
         id=uuid7(),
@@ -577,7 +619,15 @@ async def test_update_asset_assigned_to_repair(mock_session) -> None:
         purchase_date=date(2026, 1, 1),
     )
 
+    asset_history = SimpleNamespace(
+        unassigned_by=None,
+        returned_at=None,
+    )
+
     service.asset_repository.get_by_id = AsyncMock(return_value=asset)
+    service.asset_repository.get_active_assignment_by_id = AsyncMock(
+        return_value=asset_history,
+    )
     service.asset_repository.update = AsyncMock()
     service.asset_repository.unassign = AsyncMock()
     service.asset_repository.change_status = AsyncMock()
@@ -585,12 +635,16 @@ async def test_update_asset_assigned_to_repair(mock_session) -> None:
     await service.update(
         asset_id=asset.id,
         update_data={"status": AssetStatus.REPAIR},
+        changed_by=uuid7(),
     )
 
     service.asset_repository.change_status.assert_awaited_once_with(
         asset=asset,
         new_status=AssetStatus.REPAIR,
     )
+
+    assert asset_history.unassigned_by is not None
+    assert asset_history.returned_at is not None
 
     service.asset_repository.unassign.assert_not_awaited()
     mock_session.commit.assert_awaited_once()
@@ -600,7 +654,8 @@ async def test_update_asset_assigned_to_repair(mock_session) -> None:
 async def test_update_asset_invalid_status_transition_rolls_back(
     mock_session,
 ) -> None:
-    service = AssetService(mock_session)
+    redis_client = AsyncMock()
+    service = AssetService(mock_session, redis_client)
 
     asset = Asset(
         id=uuid7(),
@@ -622,6 +677,7 @@ async def test_update_asset_invalid_status_transition_rolls_back(
                 "notes": "This should be rolled back",
                 "status": AssetStatus.REPAIR,
             },
+            changed_by=uuid7(),
         )
 
     service.asset_repository.update.assert_awaited_once()
@@ -635,7 +691,8 @@ async def test_update_asset_invalid_status_transition_rolls_back(
 async def test_delete_asset(
     mock_session,
 ) -> None:
-    service = AssetService(mock_session)
+    redis_client = AsyncMock()
+    service = AssetService(mock_session, redis_client)
 
     asset = Asset(
         id=uuid7(),
@@ -653,7 +710,7 @@ async def test_delete_asset(
     service.asset_repository.delete = AsyncMock()
 
     await service.delete(asset.id)
-
+    redis_client.delete.assert_awaited_once_with("assets:stats")
     service.asset_repository.get_by_id_including_deleted.assert_awaited_once_with(
         asset.id,
     )
@@ -677,7 +734,8 @@ async def test_delete_asset_rejects_invalid_status(
     mock_session,
     status,
 ) -> None:
-    service = AssetService(mock_session)
+    redis_client = AsyncMock()
+    service = AssetService(mock_session, redis_client)
 
     asset = Asset(
         id=uuid7(),
@@ -703,7 +761,8 @@ async def test_delete_asset_rejects_invalid_status(
 
 @pytest.mark.asyncio
 async def test_delete_asset_not_found(mock_session) -> None:
-    service = AssetService(mock_session)
+    redis_client = AsyncMock()
+    service = AssetService(mock_session, redis_client)
     asset_id = uuid7()
 
     service.asset_repository.get_by_id_including_deleted = AsyncMock(
@@ -720,7 +779,8 @@ async def test_delete_asset_not_found(mock_session) -> None:
 
 @pytest.mark.asyncio
 async def test_delete_asset_already_deleted(mock_session) -> None:
-    service = AssetService(mock_session)
+    redis_client = AsyncMock()
+    service = AssetService(mock_session, redis_client)
 
     asset = Asset(
         id=uuid7(),
@@ -748,7 +808,8 @@ async def test_delete_asset_already_deleted(mock_session) -> None:
 
 @pytest.mark.asyncio
 async def test_delete_retired_asset(mock_session) -> None:
-    service = AssetService(mock_session)
+    redis_client = AsyncMock()
+    service = AssetService(mock_session, redis_client)
 
     asset = Asset(
         id=uuid7(),
@@ -775,7 +836,8 @@ async def test_assign_asset(
     mock_session,
     created_user,
 ) -> None:
-    service = AssetService(mock_session)
+    redis_client = AsyncMock()
+    service = AssetService(mock_session, redis_client)
 
     asset = Asset(
         id=uuid7(),
@@ -799,7 +861,9 @@ async def test_assign_asset(
     result = await service.assign(
         asset_id=asset.id,
         user_id=created_user.id,
+        assigned_by=uuid7(),
     )
+    redis_client.delete.assert_awaited_once_with("assets:stats")
 
     service.user_repository.get_by_id.assert_awaited_once_with(
         created_user.id,
@@ -819,7 +883,8 @@ async def test_assign_asset(
 async def test_assign_asset_user_not_found(
     mock_session,
 ) -> None:
-    service = AssetService(mock_session)
+    redis_client = AsyncMock()
+    service = AssetService(mock_session, redis_client)
 
     asset = Asset(
         id=uuid7(),
@@ -846,6 +911,7 @@ async def test_assign_asset_user_not_found(
         await service.assign(
             asset_id=asset.id,
             user_id=user_id,
+            assigned_by=uuid7(),
         )
 
     service.asset_repository.assign.assert_not_awaited()
@@ -857,7 +923,8 @@ async def test_assign_asset_user_inactive(
     mock_session,
     inactive_user,
 ) -> None:
-    service = AssetService(mock_session)
+    redis_client = AsyncMock()
+    service = AssetService(mock_session, redis_client)
 
     asset = Asset(
         id=uuid7(),
@@ -880,8 +947,7 @@ async def test_assign_asset_user_inactive(
 
     with pytest.raises(AssetAssignmentUserInactiveError):
         await service.assign(
-            asset_id=asset.id,
-            user_id=inactive_user.id,
+            asset_id=asset.id, user_id=inactive_user.id, assigned_by=uuid7()
         )
 
     service.asset_repository.assign.assert_not_awaited()
@@ -893,7 +959,8 @@ async def test_assign_asset_rejects_invalid_transition(
     mock_session,
     created_user,
 ) -> None:
-    service = AssetService(mock_session)
+    redis_client = AsyncMock()
+    service = AssetService(mock_session, redis_client)
 
     asset = Asset(
         id=uuid7(),
@@ -914,6 +981,7 @@ async def test_assign_asset_rejects_invalid_transition(
         await service.assign(
             asset_id=asset.id,
             user_id=created_user.id,
+            assigned_by=uuid7(),
         )
 
     service.user_repository.get_by_id.assert_not_awaited()
@@ -923,7 +991,8 @@ async def test_assign_asset_rejects_invalid_transition(
 
 @pytest.mark.asyncio
 async def test_assign_asset_not_found(mock_session) -> None:
-    service = AssetService(mock_session)
+    redis_client = AsyncMock()
+    service = AssetService(mock_session, redis_client)
     asset_id = uuid7()
     user_id = uuid7()
 
@@ -937,6 +1006,7 @@ async def test_assign_asset_not_found(mock_session) -> None:
         await service.assign(
             asset_id=asset_id,
             user_id=user_id,
+            assigned_by=uuid7(),
         )
 
     service.user_repository.get_by_id.assert_not_awaited()
@@ -948,7 +1018,8 @@ async def test_assign_asset_not_found(mock_session) -> None:
 async def test_unassign_asset(
     mock_session,
 ) -> None:
-    service = AssetService(mock_session)
+    redis_client = AsyncMock()
+    service = AssetService(mock_session, redis_client)
 
     asset = Asset(
         id=uuid7(),
@@ -959,13 +1030,27 @@ async def test_unassign_asset(
         purchase_date=date(2026, 1, 1),
     )
 
+    asset_history = SimpleNamespace(
+        asset_id=asset.id,
+        unassigned_by=None,
+        returned_at=None,
+    )
+
+    service.asset_repository.get_active_assignment_by_id = AsyncMock(
+        return_value=asset_history,
+    )
+
     service.asset_repository.get_by_id = AsyncMock(
         return_value=asset,
     )
 
     service.asset_repository.unassign = AsyncMock()
 
-    result = await service.unassign(asset.id)
+    result = await service.unassign(
+        asset_id=asset.id,
+        unassigned_by=uuid7(),
+    )
+    redis_client.delete.assert_awaited_once_with("assets:stats")
 
     service.asset_repository.unassign.assert_awaited_once_with(
         asset=asset,
@@ -978,7 +1063,8 @@ async def test_unassign_asset(
 
 @pytest.mark.asyncio
 async def test_unassign_asset_not_found(mock_session) -> None:
-    service = AssetService(mock_session)
+    redis_client = AsyncMock()
+    service = AssetService(mock_session, redis_client)
     asset_id = uuid7()
 
     service.asset_repository.get_by_id = AsyncMock(
@@ -987,7 +1073,10 @@ async def test_unassign_asset_not_found(mock_session) -> None:
     service.asset_repository.unassign = AsyncMock()
 
     with pytest.raises(AssetNotFoundError):
-        await service.unassign(asset_id)
+        await service.unassign(
+            asset_id=asset_id,
+            unassigned_by=uuid7(),
+        )
 
     service.asset_repository.unassign.assert_not_awaited()
     mock_session.commit.assert_not_awaited()
@@ -997,7 +1086,8 @@ async def test_unassign_asset_not_found(mock_session) -> None:
 async def test_unassign_asset_rejects_invalid_transition(
     mock_session,
 ) -> None:
-    service = AssetService(mock_session)
+    redis_client = AsyncMock()
+    service = AssetService(mock_session, redis_client)
 
     asset = Asset(
         id=uuid7(),
@@ -1015,7 +1105,10 @@ async def test_unassign_asset_rejects_invalid_transition(
     service.asset_repository.unassign = AsyncMock()
 
     with pytest.raises(InvalidAssetStatusTransitionError):
-        await service.unassign(asset.id)
+        await service.unassign(
+            asset_id=asset.id,
+            unassigned_by=uuid7(),
+        )
 
     service.asset_repository.unassign.assert_not_awaited()
     mock_session.commit.assert_not_awaited()
@@ -1025,7 +1118,8 @@ async def test_unassign_asset_rejects_invalid_transition(
 async def test_change_status(
     mock_session,
 ) -> None:
-    service = AssetService(mock_session)
+    redis_client = AsyncMock()
+    service = AssetService(mock_session, redis_client)
 
     asset = Asset(
         id=uuid7(),
@@ -1045,7 +1139,9 @@ async def test_change_status(
     result = await service.change_status(
         asset_id=asset.id,
         new_status=AssetStatus.REPAIR,
+        changed_by=uuid7(),
     )
+    redis_client.delete.assert_awaited_once_with("assets:stats")
 
     service.asset_repository.change_status.assert_awaited_once_with(
         asset=asset,
@@ -1059,7 +1155,8 @@ async def test_change_status(
 
 @pytest.mark.asyncio
 async def test_change_status_asset_not_found(mock_session) -> None:
-    service = AssetService(mock_session)
+    redis_client = AsyncMock()
+    service = AssetService(mock_session, redis_client)
     asset_id = uuid7()
 
     service.asset_repository.get_by_id = AsyncMock(
@@ -1071,6 +1168,7 @@ async def test_change_status_asset_not_found(mock_session) -> None:
         await service.change_status(
             asset_id=asset_id,
             new_status=AssetStatus.REPAIR,
+            changed_by=uuid7(),
         )
 
     service.asset_repository.change_status.assert_not_awaited()
@@ -1081,7 +1179,8 @@ async def test_change_status_asset_not_found(mock_session) -> None:
 async def test_change_status_rejects_assignment_transition(
     mock_session,
 ) -> None:
-    service = AssetService(mock_session)
+    redis_client = AsyncMock()
+    service = AssetService(mock_session, redis_client)
 
     asset = Asset(
         id=uuid7(),
@@ -1102,6 +1201,7 @@ async def test_change_status_rejects_assignment_transition(
         await service.change_status(
             asset_id=asset.id,
             new_status=AssetStatus.ASSIGNED,
+            changed_by=uuid7(),
         )
 
     service.asset_repository.change_status.assert_not_awaited()
@@ -1109,10 +1209,14 @@ async def test_change_status_rejects_assignment_transition(
 
 
 @pytest.mark.asyncio
-async def test_stats(
-    mock_session,
-) -> None:
-    service = AssetService(mock_session)
+async def test_stats_cache_miss(mock_session) -> None:
+    redis_client = AsyncMock()
+    redis_client.get.return_value = None
+
+    service = AssetService(
+        mock_session,
+        redis_client=redis_client,
+    )
 
     service.asset_repository.stats = AsyncMock(
         return_value={
@@ -1125,12 +1229,113 @@ async def test_stats(
 
     result = await service.stats()
 
-    service.asset_repository.stats.assert_awaited_once()
-
-    assert result == {
+    expected = {
         "total": 11,
         "in_stock": 5,
         "assigned": 3,
         "repair": 2,
         "retired": 1,
     }
+
+    assert result == expected
+    service.asset_repository.stats.assert_awaited_once()
+    redis_client.get.assert_awaited_once_with("assets:stats")
+    redis_client.set.assert_awaited_once_with(
+        "assets:stats",
+        json.dumps(expected),
+        ex=60,
+    )
+
+
+@pytest.mark.asyncio
+async def test_stats_cache_hit(mock_session) -> None:
+    cached_stats = {
+        "total": 11,
+        "in_stock": 5,
+        "assigned": 3,
+        "repair": 2,
+        "retired": 1,
+    }
+
+    redis_client = AsyncMock()
+    redis_client.get.return_value = json.dumps(cached_stats)
+
+    service = AssetService(
+        mock_session,
+        redis_client=redis_client,
+    )
+    service.asset_repository.stats = AsyncMock()
+
+    result = await service.stats()
+
+    assert result == cached_stats
+    redis_client.get.assert_awaited_once_with("assets:stats")
+    service.asset_repository.stats.assert_not_awaited()
+    redis_client.set.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_get_tag_history_returns_repository_records(
+    mock_session,
+) -> None:
+    redis_client = AsyncMock()
+    service = AssetService(mock_session, redis_client)
+
+    asset_id = uuid7()
+    asset = object()
+    history_records = [object(), object()]
+    total = 10
+
+    service.asset_repository.get_by_id = AsyncMock(
+        return_value=asset,
+    )
+
+    service.asset_repository.get_tag_history = AsyncMock(
+        return_value=(history_records, total),
+    )
+
+    result, result_total = await service.get_tag_history(
+        asset_id=asset_id,
+        page=2,
+        size=5,
+        search="IL-LAP",
+    )
+
+    service.asset_repository.get_by_id.assert_awaited_once_with(
+        asset_id,
+    )
+
+    service.asset_repository.get_tag_history.assert_awaited_once_with(
+        asset_id=asset_id,
+        page=2,
+        size=5,
+        search="IL-LAP",
+    )
+
+    assert result == history_records
+    assert result_total == total
+
+
+@pytest.mark.asyncio
+async def test_get_tag_history_raises_when_asset_does_not_exist(
+    mock_session,
+) -> None:
+    redis_client = AsyncMock()
+    service = AssetService(mock_session, redis_client)
+
+    asset_id = uuid7()
+
+    service.asset_repository.get_by_id = AsyncMock(
+        return_value=None,
+    )
+
+    service.asset_repository.get_tag_history = AsyncMock()
+
+    with pytest.raises(AssetNotFoundError):
+        await service.get_tag_history(asset_id=asset_id, size=5, page=1)
+
+    service.asset_repository.get_by_id.assert_awaited_once_with(
+        asset_id,
+    )
+
+    service.asset_repository.get_tag_history.assert_not_awaited()

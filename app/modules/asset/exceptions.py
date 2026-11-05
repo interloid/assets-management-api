@@ -23,6 +23,12 @@ class AssetNotFoundError(AppError):
     message = "Asset not found"
 
 
+class AssetHistoryNotFoundError(AppError):
+    status_code = 404
+    code = "ASSET_HISTORY_NOT_FOUND"
+    message = "Asset history not found"
+
+
 class InvalidAssetStatusTransitionError(AppError):
     status_code = 409
     code = "INVALID_ASSET_STATUS_TRANSITION"
