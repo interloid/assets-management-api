@@ -14,10 +14,10 @@ from app.api.v1.responses import (
     VALIDATION_RESPONSE,
 )
 from app.api.v1.schemas.assets import (
+    AssetFileBatchUploadRequest,
+    AssetFileBatchUploadResponse,
     AssetFileConfirmResponse,
     AssetFileResponse,
-    AssetFileUploadRequest,
-    AssetFileUploadResponse,
 )
 from app.modules.asset_files.service import AssetFileService
 from app.shared.schemas.common import SuccessResponse
@@ -40,27 +40,30 @@ router = APIRouter(
         **VALIDATION_RESPONSE,
     },
 )
-async def generate_upload_url(
+async def generate_upload_urls(
     request: Request,
     id: UUID,
-    data: AssetFileUploadRequest,
+    data: AssetFileBatchUploadRequest,
     session: DBSession,
     current_user: AdminUser,
-) -> SuccessResponse[AssetFileUploadResponse]:
-    service = AssetFileService(session)
+) -> SuccessResponse[AssetFileBatchUploadResponse]:
+    service = AssetFileService(
+        session,
+        redis=request.app.state.redis,
+    )
 
-    file = await service.create_upload(
+    files = [file.model_dump() for file in data.files]
+
+    result = await service.create_uploads(
         asset_id=id,
-        filename=data.filename,
-        content_type=data.content_type,
-        file_size=data.file_size,
+        files=files,
     )
 
     return SuccessResponse(
         success=True,
         status_code=status.HTTP_201_CREATED,
-        message="Upload URL generated successfully",
-        data=AssetFileUploadResponse.model_validate(file),
+        message="Upload URLs generated successfully",
+        data=AssetFileBatchUploadResponse.model_validate(result),
         request_id=request.state.request_id,
         timestamp=datetime.now(UTC),
         path=request.url.path,
@@ -83,7 +86,10 @@ async def confirm_upload(
     request: Request, id: UUID, file_id: UUID, session: DBSession, admin_user: AdminUser
 ) -> SuccessResponse[AssetFileConfirmResponse]:
 
-    service = AssetFileService(session)
+    service = AssetFileService(
+        session,
+        redis=request.app.state.redis,
+    )
 
     file = await service.confirm_upload(asset_id=id, file_id=file_id)
 
@@ -115,7 +121,10 @@ async def get_files(
     session: DBSession,
     current_user: CurrentUser,
 ) -> SuccessResponse[list[AssetFileResponse]]:
-    service = AssetFileService(session)
+    service = AssetFileService(
+        session,
+        redis=request.app.state.redis,
+    )
 
     files = await service.list_files(
         asset_id=id,
@@ -147,11 +156,15 @@ async def get_files(
     },
 )
 async def delete_file(
+    request: Request,
     id: UUID,
     file_id: UUID,
     session: DBSession,
     admin_user: AdminUser,
 ) -> None:
-    service = AssetFileService(session)
+    service = AssetFileService(
+        session,
+        redis=request.app.state.redis,
+    )
 
     await service.delete_file(asset_id=id, file_id=file_id)

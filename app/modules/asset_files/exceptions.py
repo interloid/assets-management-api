@@ -17,3 +17,9 @@ class AssetFileValidationError(AppError):
     status_code = 422
     code = "ASSET_FILE_VALIDATION_ERROR"
     message = "Validation failed"
+
+
+class DuplicateAssetFileError(AppError):
+    status_code = 409
+    code = "DUPLICATE_ASSET_FILE"
+    message = "This file has already been uploaded to this asset"

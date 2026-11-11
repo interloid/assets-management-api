@@ -16,6 +16,46 @@ from app.modules.asset.validators.serial_number import validate_serial_number
 from app.shared.models.enums import AssetStatus, AssetType, FileType, WarrantyExpiry
 
 
+class AssetFileUploadRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    filename: str
+    content_type: FileType
+    file_size: int
+    checksum_sha256: str = Field(
+        min_length=64,
+        max_length=64,
+        pattern=r"^[a-fA-F0-9]{64}$",
+    )
+
+    @field_validator("checksum_sha256")
+    @classmethod
+    def normalize_checksum(cls, value: str) -> str:
+        return value.lower()
+
+
+class AssetFileBatchUploadRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    files: list[AssetFileUploadRequest] = Field(
+        min_length=1,
+        max_length=5,
+    )
+
+    @field_validator("files")
+    @classmethod
+    def validate_unique_filenames(
+        cls,
+        files: list[AssetFileUploadRequest],
+    ) -> list[AssetFileUploadRequest]:
+        filenames = [file.filename.casefold() for file in files]
+
+        if len(filenames) != len(set(filenames)):
+            raise ValueError("Duplicate filenames are not allowed in the files list")
+
+        return files
+
+
 class AssetCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -24,10 +64,27 @@ class AssetCreate(BaseModel):
     purchase_date: date
     warranty_expiry: date | None = None
     notes: str | None = None
+    files: list[AssetFileUploadRequest] | None = None
 
     _validate_serial_number = field_validator(
         "serial_number",
     )(validate_serial_number)
+
+    @field_validator("files")
+    @classmethod
+    def validate_files(cls, files):
+        if not files:
+            return files
+
+        if len(files) > 5:
+            raise ValueError("The files list must contain between 1 and 5 files")
+
+        filenames = [file.filename.casefold() for file in files]
+
+        if len(filenames) != len(set(filenames)):
+            raise ValueError("Duplicate filenames are not allowed in the files list")
+
+        return files
 
     @model_validator(mode="after")
     def validate_warranty_expiry(self):
@@ -158,18 +215,19 @@ class AssetExportRequest(BaseModel):
     order: Literal["asc", "desc"] = "desc"
 
 
-class AssetFileUploadRequest(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
-
-    filename: str
-    content_type: FileType
-    file_size: int
-
-
 class AssetFileUploadResponse(BaseModel):
     file_id: UUID
     upload_url: str
     expires_in: int
+    headers: dict[str, str]
+
+
+class AssetCreatedResponse(AssetResponse):
+    files: list[AssetFileUploadResponse] = Field(default_factory=list)
+
+
+class AssetFileBatchUploadResponse(BaseModel):
+    files: list[AssetFileUploadResponse]
 
 
 class AssetFileConfirmResponse(BaseModel):

@@ -30,6 +30,7 @@ class S3Storage:
         self,
         object_key: str,
         content_type: str,
+        checksum_sha256: str,
     ) -> str:
         return self.presign_client.generate_presigned_url(
             ClientMethod="put_object",
@@ -37,6 +38,7 @@ class S3Storage:
                 "Bucket": self.bucket_name,
                 "Key": object_key,
                 "ContentType": content_type,
+                "ChecksumSHA256": checksum_sha256,
             },
             ExpiresIn=self.PUT_URL_EXPIRY_SECONDS,
             HttpMethod="PUT",
@@ -58,6 +60,7 @@ class S3Storage:
             response = self.client.head_object(
                 Bucket=self.bucket_name,
                 Key=object_key,
+                ChecksumMode="ENABLED",
             )
         except ClientError as exc:
             error_code = exc.response.get("Error", {}).get("Code", "")
@@ -73,6 +76,7 @@ class S3Storage:
             "content_length": response.get("ContentLength"),
             "etag": response.get("ETag"),
             "last_modified": response.get("LastModified"),
+            "checksum_sha256": response.get("ChecksumSHA256"),
             "metadata": response.get("Metadata", {}),
         }
 

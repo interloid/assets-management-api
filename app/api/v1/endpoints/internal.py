@@ -60,7 +60,10 @@ async def s3_upload_completed(
             detail="Unexpected S3 bucket",
         )
 
-    service = AssetFileService(session)
+    service = AssetFileService(
+        session,
+        redis=request.app.state.redis,
+    )
 
     file = await service.process_s3_upload_event(
         object_key=data.object_key,

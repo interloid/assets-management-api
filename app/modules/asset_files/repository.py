@@ -77,3 +77,18 @@ class AssetFileRepository:
     async def delete(self, file: AssetFiles) -> None:
         await self.session.delete(file)
         await self.session.flush()
+
+    async def get_by_asset_and_checksum(
+        self,
+        *,
+        asset_id: UUID,
+        checksum_sha256: str,
+    ) -> AssetFiles | None:
+        result = await self.session.execute(
+            select(AssetFiles).where(
+                AssetFiles.asset_id == asset_id,
+                AssetFiles.checksum_sha256 == checksum_sha256,
+            )
+        )
+
+        return result.scalar_one_or_none()

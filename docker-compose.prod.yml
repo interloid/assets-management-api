@@ -14,6 +14,7 @@ services:
       - "8000:8000"
     volumes:
       - exports_data:/app/exports
+      - /opt/assets-management/secrets/cloudfront-private-key.pem:/run/secrets/cloudfront-private-key.pem:ro
     restart: unless-stopped
     init: true
     mem_limit: 512m

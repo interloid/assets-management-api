@@ -19,6 +19,7 @@ from app.api.v1.schemas.assets import (
     AssetAssign,
     AssetAssignmentHistoryListResponse,
     AssetCreate,
+    AssetCreatedResponse,
     AssetResponse,
     AssetStatsResponse,
     AssetStatusUpdate,
@@ -55,24 +56,30 @@ async def create_asset(
     session: DBSession,
     redis_client: RedisClient,
     _admin_user: AdminUser,
-) -> SuccessResponse[AssetResponse]:
+) -> SuccessResponse[AssetCreatedResponse]:
     service = AssetService(session, redis_client)
 
-    asset = await service.create(
+    asset, upload_result = await service.create(
         asset_type=data.type,
         serial_number=data.serial_number,
         purchase_date=data.purchase_date,
         warranty_expiry=data.warranty_expiry,
         notes=data.notes,
+        files=[file.model_dump() for file in (data.files or [])],
+    )
+
+    asset_response = AssetResponse.model_validate(asset)
+
+    response_data = AssetCreatedResponse(
+        **asset_response.model_dump(),
+        files=upload_result["files"],
     )
 
     return SuccessResponse(
         success=True,
         status_code=status.HTTP_201_CREATED,
         message="Asset created successfully",
-        data=AssetResponse.model_validate(
-            asset,
-        ),
+        data=response_data,
         pagination_meta=None,
         request_id=request.state.request_id,
         timestamp=datetime.now(UTC),

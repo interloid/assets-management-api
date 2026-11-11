@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String
+from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -41,6 +41,12 @@ class AssetFiles(
 
     file_size: Mapped[int] = mapped_column(Integer, nullable=False)
 
+    checksum_sha256: Mapped[str | None] = mapped_column(
+        String(64),
+        nullable=True,
+        default=None,
+    )
+
     s3_object_key: Mapped[str] = mapped_column(
         String(1024), unique=True, nullable=False
     )
@@ -68,3 +74,11 @@ class AssetFiles(
     )
 
     asset: Mapped["Asset"] = relationship("Asset", back_populates="asset_files")
+
+    __table_args__ = (
+        UniqueConstraint(
+            "asset_id",
+            "checksum_sha256",
+            name="uq_asset_files_asset_id_checksum_sha256",
+        ),
+    )

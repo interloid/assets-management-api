@@ -45,7 +45,24 @@ A REST API for managing organizational assets with secure authentication, role-b
 | Ruff | Linting and formatting |
 | uv | Dependency and project management |
 | Docker Compose | Local development infrastructure |
-| FastAPI Cloud | Production API hosting |
+| AWS EC2 | Production API hosting |
+
+## Production Infrastructure
+
+| Component | Technology |
+|---|---|
+| Cloud hosting | AWS EC2 |
+| Reverse proxy | Nginx |
+| Application server | Uvicorn |
+| Containerization | Docker |
+| Container orchestration | Docker Compose |
+| Container registry | Docker Hub |
+| Database | Neon PostgreSQL |
+| Cache and message broker | Redis |
+| Background processing | Celery |
+| Scheduled tasks | Celery Beat |
+| File storage | AWS S3 |
+| CI/CD | GitHub Actions |
 
 ## Architecture
 
@@ -160,7 +177,7 @@ assets-management-api/
 ├── .env.example
 ├── .gitignore
 ├── alembic.ini
-├── compose.yaml
+├── compose.yml
 ├── Dockerfile
 ├── pyproject.toml
 ├── README.md
@@ -586,7 +603,7 @@ When running the application directly on your host, use the host-accessible data
 
 ### 4. Start the local environment
 
-Start the services defined in `compose.yaml`:
+Start the services defined in `compose.yml`:
 
 ```bash
 docker compose up -d --build
@@ -662,7 +679,7 @@ http://localhost:8000/redoc
 
 ### Docker Compose
 
-When running the API in Docker Compose, use the API service's published port from `compose.yaml` to access the application.
+When running the API in Docker Compose, use the API service's published port from `compose.yml` to access the application.
 
 Useful commands:
 
@@ -823,21 +840,128 @@ uv run ruff format .
 uv run ruff format --check .
 ```
 
-## Deployment[PHASE-1]
+## Deployment
 
-The existing production API is hosted on FastAPI Cloud.
+The application is deployed to AWS EC2 using Docker Compose. GitHub Actions automates the production deployment after successful linting and testing.
 
-### Production API
+### Production Deployment Architecture
 
-https://ams-api.fieldops.shop
+```text
+Developer
+   |
+   v
+GitHub Repository
+   |
+   v
+GitHub Actions
+   |
+   +-- Ruff checks
+   |
+   +-- Automated tests
+   |      |
+   |      +-- PostgreSQL service
+   |      +-- Redis service
+   |
+   v
+Build Docker Image
+   |
+   v
+Push Image to Docker Hub
+   |
+   v
+SSH into AWS EC2
+   |
+   +-- Pull new image
+   |
+   +-- Run Alembic migrations
+   |
+   +-- Start Docker Compose services
+   |
+   +-- Check application readiness
+   |
+   +-- Roll back application image on failure
+   |
+   v
+Production Application
+   |
+   +-- Nginx
+   +-- FastAPI API
+   +-- Celery Worker
+   +-- Celery Beat
+   |
+   +-- Neon PostgreSQL
+   +-- Redis
+   +-- AWS S3
+```
 
-### API documentation
+### Production Services
 
-- Swagger UI: https://ams-api.fieldops.shop/docs
-- ReDoc: https://ams-api.fieldops.shop/redoc
+The production Docker Compose configuration runs three application services:
 
+| Service | Responsibility |
+|---|---|
+| API | Handles HTTP requests and API operations |
+| Worker | Executes asynchronous Celery tasks |
+| Beat | Schedules periodic background tasks |
 
-Production deployment requires appropriate configuration for secrets, database connectivity, Redis, migrations, CORS, and any enabled background workers or storage integrations.
+PostgreSQL, Redis, and S3 are managed through their respective external services.
+
+### Continuous Integration and Deployment
+
+The GitHub Actions workflow is configured to run on pushes and pull requests targeting the `phase2` branch.
+
+**CI pipeline:**
+
+1. Check out the repository.
+2. Install Python dependencies using `uv`.
+3. Run Ruff lint checks.
+4. Verify code formatting.
+5. Start PostgreSQL and Redis service containers.
+6. Apply database migrations.
+7. Run automated tests.
+
+**CD pipeline:**
+
+Deployment runs automatically after successful CI checks on pushes to `phase2`.
+
+1. Build the production Docker image.
+2. Tag the image with `latest` and the Git commit SHA.
+3. Push both tags to Docker Hub.
+4. Connect to EC2 using SSH.
+5. Copy the production Docker Compose configuration.
+6. Pull the new image.
+7. Run Alembic database migrations.
+8. Start the API, worker, and Beat services.
+9. Verify the `/health/ready` endpoint.
+10. Record the deployed commit SHA after successful readiness verification.
+
+### Deployment Rollback
+
+The deployment workflow includes application-level rollback protection.
+
+If the new application version fails to start or fails its readiness checks:
+
+- The previous application image is restored.
+- Docker Compose starts the previous application version.
+- The readiness endpoint verifies the restored version.
+- GitHub Actions reports the deployment as failed, even when rollback succeeds.
+
+Database migrations are not automatically reversed during application rollback. Production migrations should therefore remain backward-compatible with the previous application version.
+
+### Production Health Checks
+
+The application exposes two health-check endpoints:
+
+| Endpoint | Purpose |
+|---|---|
+| `/health` | Application liveness |
+| `/health/ready` | Application readiness, including database and Redis connectivity |
+
+Production readiness can be checked from the EC2 instance:
+
+```bash
+curl -i http://127.0.0.1:8000/health/ready
+```
 
 ## Security Considerations
 

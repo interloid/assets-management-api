@@ -24,6 +24,8 @@ from app.modules.asset.repositories import AssetRepository
 from app.modules.asset.tag.asset_tag_history import AssetTagHistory
 from app.modules.asset.tag.generator import build_asset_tag, get_company_prefix
 from app.modules.asset.tag.repository import AssetTagCounterRepository
+from app.modules.asset_files.exceptions import DuplicateAssetFileError
+from app.modules.asset_files.service import AssetFileService
 from app.modules.auth.exceptions import AuthorizationError
 from app.modules.user.models import User
 from app.modules.user.repositories import UserRepository
@@ -79,6 +81,7 @@ class AssetService:
         self.session = session
         self.asset_repository = AssetRepository(session)
         self.asset_tag_counter_repository = AssetTagCounterRepository(session)
+        self.asset_file_service = AssetFileService(session)
         self.user_repository = UserRepository(session)
         self.redis_client = redis_client
 
@@ -300,37 +303,47 @@ class AssetService:
         purchase_date: date,
         warranty_expiry: date | None,
         notes: str | None,
-    ) -> Asset:
+        files: list[dict] | None = None,
+    ) -> tuple[Asset, dict]:
         self.validate_warranty_expiry(
             purchase_date=purchase_date,
             warranty_expiry=warranty_expiry,
         )
 
-        company_prefix = get_company_prefix()
-
-        number = await self.asset_tag_counter_repository.get_next_number(
-            company_prefix=company_prefix,
-            asset_type=asset_type,
-        )
-
-        asset_tag = build_asset_tag(
-            asset_type=asset_type,
-            number=number,
-        )
-
-        asset = Asset(
-            asset_tag=asset_tag,
-            type=asset_type,
-            serial_number=serial_number,
-            status=AssetStatus.IN_STOCK,
-            assigned_to=None,
-            purchase_date=purchase_date,
-            warranty_expiry=warranty_expiry,
-            notes=notes,
-        )
-
         try:
+            company_prefix = get_company_prefix()
+
+            number = await self.asset_tag_counter_repository.get_next_number(
+                company_prefix=company_prefix,
+                asset_type=asset_type,
+            )
+
+            asset_tag = build_asset_tag(
+                asset_type=asset_type,
+                number=number,
+            )
+
+            asset = Asset(
+                asset_tag=asset_tag,
+                type=asset_type,
+                serial_number=serial_number,
+                status=AssetStatus.IN_STOCK,
+                assigned_to=None,
+                purchase_date=purchase_date,
+                warranty_expiry=warranty_expiry,
+                notes=notes,
+            )
+
             await self.asset_repository.create(asset)
+
+            upload_result = {"files": []}
+
+            if files:
+                upload_result = await self.asset_file_service.prepare_uploads(
+                    asset_id=asset.id,
+                    files=files,
+                )
+
             await self.session.commit()
 
         except IntegrityError as exc:
@@ -344,10 +357,18 @@ class AssetService:
             if constraint_name == "assets_asset_tag_key":
                 raise AssetTagAlreadyExistsError() from exc
 
+            if constraint_name == "uq_asset_files_asset_id_checksum_sha256":
+                raise DuplicateAssetFileError() from exc
+
+            raise
+
+        except Exception:
+            await self.session.rollback()
             raise
 
         await self.redis_client.delete(ASSET_STATS_CACHE_KEY)
-        return asset
+
+        return asset, upload_result
 
     async def list_assets(
         self,
