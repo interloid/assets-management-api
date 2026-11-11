@@ -41,11 +41,16 @@ async def test_presign_upload_returns_created_response(
     file_id = uuid4()
 
     service = MagicMock()
-    service.create_upload = AsyncMock(
+    service.create_uploads = AsyncMock(
         return_value={
-            "file_id": file_id,
-            "upload_url": "https://example.test/upload",
-            "expires_in": 300,
+            "files": [
+                {
+                    "file_id": file_id,
+                    "upload_url": "https://example.test/upload",
+                    "expires_in": 300,
+                    "headers": {},
+                }
+            ]
         }
     )
 
@@ -57,19 +62,29 @@ async def test_presign_upload_returns_created_response(
         response = await integration_client.post(
             f"/api/v1/assets/{asset_id}/files/presign",
             json={
-                "filename": "report.pdf",
-                "content_type": "application/pdf",
-                "file_size": 1024,
+                "files": [
+                    {
+                        "filename": "report.pdf",
+                        "content_type": "application/pdf",
+                        "file_size": 1024,
+                        "checksum_sha256": "a" * 64,
+                    }
+                ]
             },
         )
 
     assert response.status_code == 201
+
     body = response.json()
     assert body["success"] is True
-    assert body["data"]["file_id"] == str(file_id)
-    assert body["data"]["upload_url"] == "https://example.test/upload"
-    assert body["data"]["expires_in"] == 300
-    service.create_upload.assert_awaited_once()
+
+    uploaded_file = body["data"]["files"][0]
+    assert uploaded_file["file_id"] == str(file_id)
+    assert uploaded_file["upload_url"] == "https://example.test/upload"
+    assert uploaded_file["expires_in"] == 300
+    assert uploaded_file["headers"] == {}
+
+    service.create_uploads.assert_awaited_once()
 
 
 @pytest.mark.asyncio

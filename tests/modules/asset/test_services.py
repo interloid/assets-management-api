@@ -40,7 +40,7 @@ async def test_create_asset_success(mock_session) -> None:
             return_value="IL-LAP-0001",
         ),
     ):
-        result = await service.create(
+        asset, upload_result = await service.create(
             asset_type=AssetType.LAPTOP,
             serial_number="ABC12345",
             purchase_date=date(2026, 1, 1),
@@ -56,13 +56,14 @@ async def test_create_asset_success(mock_session) -> None:
     service.asset_repository.create.assert_awaited_once()
     mock_session.commit.assert_awaited_once()
 
-    assert result.asset_tag == "IL-LAP-0001"
-    assert result.type == AssetType.LAPTOP
-    assert result.serial_number == "ABC12345"
-    assert result.status == AssetStatus.IN_STOCK
-    assert result.assigned_to is None
-    assert result.warranty_expiry is None
-    assert result.notes == "Test laptop"
+    assert asset.asset_tag == "IL-LAP-0001"
+    assert asset.type == AssetType.LAPTOP
+    assert asset.serial_number == "ABC12345"
+    assert asset.status == AssetStatus.IN_STOCK
+    assert asset.assigned_to is None
+    assert asset.warranty_expiry is None
+    assert asset.notes == "Test laptop"
+    assert upload_result == {"files": []}
 
 
 @pytest.mark.asyncio

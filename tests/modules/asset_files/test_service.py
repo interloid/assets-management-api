@@ -55,6 +55,7 @@ def pending_file(asset):
         original_file_name="report.pdf",
         content_type=FileType.PDF,
         file_size=1024,
+        checksum_sha256="a" * 64,
         s3_object_key=f"assets/{asset.id}/test-report.pdf",
         status=FileUploadStatus.PENDING,
         uploaded_at=None,
@@ -65,12 +66,18 @@ def pending_file(asset):
 @pytest.mark.asyncio
 async def test_create_upload_success(service, asset, storage):
     service.asset_repository.get_by_id.return_value = asset
+    service.repository.get_by_asset_and_checksum.return_value = None
 
-    result = await service.create_upload(
+    result = await service.create_uploads(
         asset_id=asset.id,
-        filename="report.pdf",
-        content_type="application/pdf",
-        file_size=1024,
+        files=[
+            {
+                "filename": "report.pdf",
+                "content_type": "application/pdf",
+                "file_size": 1024,
+                "checksum_sha256": "a" * 64,
+            }
+        ],
     )
 
     created_file = service.repository.create.await_args.args[0]
@@ -85,11 +92,16 @@ async def test_create_upload_success(service, asset, storage):
 
     storage.generate_presigned_put_url.assert_called_once_with(
         object_key=created_file.s3_object_key,
-        content_type=FileType.PDF,
+        content_type=FileType.PDF.value,
+        checksum_sha256="qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqo=",
     )
     service.session.commit.assert_awaited_once()
-    assert result["upload_url"] == "https://example.test/upload"
-    assert result["expires_in"] == 300
+    assert result["files"][0]["upload_url"] == "https://example.test/upload"
+    assert result["files"][0]["expires_in"] == 300
+    assert result["files"][0]["headers"]["Content-Type"] == "application/pdf"
+    assert result["files"][0]["headers"]["x-amz-checksum-sha256"] == (
+        "qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqo="
+    )
 
 
 @pytest.mark.asyncio
@@ -97,11 +109,16 @@ async def test_create_upload_rejects_missing_asset(service, asset):
     service.asset_repository.get_by_id.return_value = None
 
     with pytest.raises(AssetNotFoundError):
-        await service.create_upload(
+        await service.create_uploads(
             asset_id=asset.id,
-            filename="report.pdf",
-            content_type="application/pdf",
-            file_size=1024,
+            files=[
+                {
+                    "filename": "report.pdf",
+                    "content_type": "application/pdf",
+                    "file_size": 1024,
+                    "checksum_sha256": "a" * 64,
+                }
+            ],
         )
 
     service.repository.create.assert_not_awaited()
@@ -111,13 +128,19 @@ async def test_create_upload_rejects_missing_asset(service, asset):
 @pytest.mark.asyncio
 async def test_create_upload_rejects_invalid_file_type(service, asset, storage):
     service.asset_repository.get_by_id.return_value = asset
+    service.repository.get_by_asset_and_checksum.return_value = None
 
     with pytest.raises(AssetFileValidationError):
-        await service.create_upload(
+        await service.create_uploads(
             asset_id=asset.id,
-            filename="program.exe",
-            content_type="application/octet-stream",
-            file_size=1024,
+            files=[
+                {
+                    "filename": "program.exe",
+                    "content_type": "application/pdf",
+                    "file_size": 1024,
+                    "checksum_sha256": "a" * 64,
+                }
+            ],
         )
 
     service.repository.create.assert_not_awaited()
@@ -135,6 +158,7 @@ async def test_confirm_upload_success(service, asset, pending_file, storage):
         "etag": '"test-etag"',
         "last_modified": None,
         "metadata": {},
+        "checksum_sha256": "qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqo=",
     }
 
     result = await service.confirm_upload(

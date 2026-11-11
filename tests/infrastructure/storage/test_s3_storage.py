@@ -40,6 +40,7 @@ def test_generate_presigned_put_url(s3_storage):
     url = s3_storage.generate_presigned_put_url(
         object_key=object_key,
         content_type=content_type,
+        checksum_sha256="a" * 64,
     )
 
     parsed_url = urlparse(url)
