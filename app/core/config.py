@@ -41,7 +41,11 @@ class Settings(BaseSettings):
 
     AWS_ACCESS_KEY_ID: str | None = None
     AWS_SECRET_ACCESS_KEY: str | None = None
-
+    # CloudFront
+    CLOUDFRONT_DOMAIN: str | None = None
+    CLOUDFRONT_KEY_PAIR_ID: str | None = None
+    CLOUDFRONT_PRIVATE_KEY_PATH: str | None = None
+    CLOUDFRONT_URL_EXPIRY_SECONDS: PositiveInt = 900
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", extra="ignore"
     )

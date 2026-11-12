@@ -1,7 +1,14 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import (
+    DateTime,
+    Enum,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+)
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -76,9 +83,11 @@ class AssetFiles(
     asset: Mapped["Asset"] = relationship("Asset", back_populates="asset_files")
 
     __table_args__ = (
-        UniqueConstraint(
+        Index(
+            "uq_asset_files_asset_id_checksum_sha256",
             "asset_id",
             "checksum_sha256",
-            name="uq_asset_files_asset_id_checksum_sha256",
+            unique=True,
+            postgresql_where=deleted_at.is_(None),
         ),
     )

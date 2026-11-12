@@ -88,6 +88,7 @@ class AssetFileRepository:
             select(AssetFiles).where(
                 AssetFiles.asset_id == asset_id,
                 AssetFiles.checksum_sha256 == checksum_sha256,
+                AssetFiles.deleted_at.is_(None),
             )
         )
 

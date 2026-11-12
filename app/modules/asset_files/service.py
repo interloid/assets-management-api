@@ -426,7 +426,7 @@ class AssetFileService:
                 "download_url": self.storage.generate_presigned_get_url(
                     file.s3_object_key
                 ),
-                "expires_in": 900,
+                "expires_in": self.storage.GET_URL_EXPIRY_SECONDS,
             }
             for file in files
         ]

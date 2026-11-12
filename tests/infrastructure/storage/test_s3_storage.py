@@ -1,3 +1,4 @@
+from unittest.mock import Mock
 from urllib.parse import parse_qs, urlparse
 
 import boto3
@@ -13,8 +14,21 @@ REGION = "us-east-1"
 
 
 @pytest.fixture
-def s3_storage():
+def s3_storage(monkeypatch):
     """Create an isolated, mocked S3 bucket for each test."""
+    monkeypatch.setattr(
+        "app.infrastructure.storage.s3_storage.settings.CLOUDFRONT_DOMAIN",
+        "",
+    )
+    monkeypatch.setattr(
+        "app.infrastructure.storage.s3_storage.settings.CLOUDFRONT_KEY_PAIR_ID",
+        "",
+    )
+    monkeypatch.setattr(
+        "app.infrastructure.storage.s3_storage.settings.CLOUDFRONT_PRIVATE_KEY_PATH",
+        "",
+    )
+
     with mock_aws():
         client = boto3.client(
             "s3",
@@ -64,7 +78,7 @@ def test_generate_presigned_get_url(s3_storage):
     assert parsed_url.scheme == "https"
     assert parsed_url.netloc.startswith(f"{BUCKET_NAME}.")
     assert parsed_url.path.endswith(object_key)
-    assert query["X-Amz-Expires"] == [str(S3Storage.GET_URL_EXPIRY_SECONDS)]
+    assert query["X-Amz-Expires"] == [str(s3_storage.GET_URL_EXPIRY_SECONDS)]
     assert "X-Amz-Signature" in query
 
 
@@ -148,3 +162,67 @@ def test_delete_object_is_idempotent_for_missing_object(s3_storage):
     s3_storage.delete_object(object_key)
 
     assert s3_storage.get_object_metadata(object_key) is None
+
+
+def test_generate_cloudfront_view_url(monkeypatch):
+    signer = Mock()
+    signer.generate_signed_url.return_value = (
+        "https://cdn.example.com/assets/test-asset/file.pdf"
+    )
+
+    monkeypatch.setattr(
+        "app.infrastructure.storage.s3_storage.settings.ENVIRONMENT",
+        "development",
+    )
+
+    storage = S3Storage(
+        client=Mock(),
+        presign_client=Mock(),
+        bucket_name=BUCKET_NAME,
+        cloudfront_signer=signer,
+    )
+
+    object_key = "assets/test-asset/file.pdf"
+
+    url = storage.generate_presigned_get_url(object_key)
+
+    assert url == signer.generate_signed_url.return_value
+    signer.generate_signed_url.assert_called_once_with(
+        object_key,
+        download=False,
+        filename=None,
+    )
+
+
+def test_generate_cloudfront_download_url(monkeypatch):
+    signer = Mock()
+    signer.generate_signed_url.return_value = (
+        "https://cdn.example.com/assets/test-asset/file.pdf"
+    )
+
+    monkeypatch.setattr(
+        "app.infrastructure.storage.s3_storage.settings.ENVIRONMENT",
+        "development",
+    )
+
+    storage = S3Storage(
+        client=Mock(),
+        presign_client=Mock(),
+        bucket_name=BUCKET_NAME,
+        cloudfront_signer=signer,
+    )
+
+    object_key = "assets/test-asset/file.pdf"
+
+    url = storage.generate_presigned_get_url(
+        object_key,
+        download=True,
+        filename="document.pdf",
+    )
+
+    assert url == signer.generate_signed_url.return_value
+    signer.generate_signed_url.assert_called_once_with(
+        object_key,
+        download=True,
+        filename="document.pdf",
+    )
