@@ -1,6 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.user.models import User
 from app.modules.user.repositories import UserRepository
 
 
@@ -14,7 +13,7 @@ class UserService:
         page: int,
         size: int,
         search: str | None = None,
-    ) -> tuple[list[User], int]:
+    ) -> tuple[list[dict], int]:
 
         return await self.user_repository.list_users(
             page=page,

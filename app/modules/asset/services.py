@@ -1,14 +1,19 @@
-from datetime import date
+import json
+import logging
+from datetime import UTC, date, datetime
 from typing import Literal
 from uuid import UUID
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.deps import RedisClient
+from app.modules.asset.asset_assignment import AssetAssignment
 from app.modules.asset.exceptions import (
     AssetAssignmentUserInactiveError,
     AssetAssignmentUserNotFoundError,
     AssetDeleteConflictError,
+    AssetHistoryNotFoundError,
     AssetNotFoundError,
     AssetTagAlreadyExistsError,
     InvalidAssetStatusTransitionError,
@@ -17,13 +22,19 @@ from app.modules.asset.exceptions import (
 )
 from app.modules.asset.models import Asset
 from app.modules.asset.repositories import AssetRepository
+from app.modules.asset.tag.asset_tag_history import AssetTagHistory
 from app.modules.asset.tag.generator import build_asset_tag, get_company_prefix
 from app.modules.asset.tag.repository import AssetTagCounterRepository
+from app.modules.asset_files.exceptions import DuplicateAssetFileError
+from app.modules.asset_files.service import AssetFileService
 from app.modules.auth.exceptions import AuthorizationError
 from app.modules.user.models import User
 from app.modules.user.repositories import UserRepository
 from app.shared.models.enums import AssetStatus, AssetType, UserRole
 
+logger = logging.getLogger(__name__)
+ASSET_STATS_CACHE_KEY = "assets:stats"
+ASSET_STATS_CACHE_TTL = 60
 ALLOWED_STATUS_TRANSITIONS: dict[AssetStatus, set[AssetStatus]] = {
     AssetStatus.IN_STOCK: {
         AssetStatus.ASSIGNED,
@@ -68,11 +79,22 @@ def get_constraint_name(exc: IntegrityError) -> str | None:
 
 
 class AssetService:
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(self, session: AsyncSession, redis_client: RedisClient) -> None:
         self.session = session
         self.asset_repository = AssetRepository(session)
         self.asset_tag_counter_repository = AssetTagCounterRepository(session)
+        self.asset_file_service = AssetFileService(session)
         self.user_repository = UserRepository(session)
+        self.redis_client = redis_client
+
+    async def _invalidate_stats_cache(self) -> None:
+        try:
+            await self.redis_client.delete(ASSET_STATS_CACHE_KEY)
+        except Exception:
+            logger.exception(
+                "Failed to invalidate asset statistics cache",
+                extra={"cache_key": ASSET_STATS_CACHE_KEY},
+            )
 
     def validate_warranty_expiry(
         self,
@@ -151,6 +173,7 @@ class AssetService:
         self,
         asset: Asset,
         user_id: UUID,
+        assigned_by: UUID,
     ) -> None:
         self._validate_status_transition(
             current_status=asset.status,
@@ -166,11 +189,25 @@ class AssetService:
         if not user.is_active:
             raise AssetAssignmentUserInactiveError()
 
-        await self.asset_repository.assign(asset=asset, user_id=user_id)
+        asset_history = AssetAssignment(
+            asset_id=asset.id,
+            user_id=user_id,
+            assigned_by=assigned_by,
+            unassigned_by=None,
+            assigned_at=datetime.now(UTC),
+            returned_at=None,
+        )
+
+        await self.asset_repository.assign(
+            asset=asset,
+            user_id=user_id,
+        )
+        await self.asset_repository.add_history(asset_history)
 
     async def _unassign_asset(
         self,
         asset: Asset,
+        unassigned_by: UUID,
     ) -> None:
         self._validate_status_transition(
             current_status=asset.status,
@@ -178,12 +215,23 @@ class AssetService:
             allowed_map=ALLOWED_STATUS_TRANSITIONS,
         )
 
+        asset_history = await self.asset_repository.get_active_assignment_by_id(
+            asset.id
+        )
+
+        if asset_history is None:
+            raise AssetHistoryNotFoundError()
+
+        asset_history.unassigned_by = unassigned_by
+        asset_history.returned_at = datetime.now(UTC)
+
         await self.asset_repository.unassign(asset=asset)
 
     async def _change_asset_status(
         self,
         asset: Asset,
         new_status: AssetStatus,
+        changed_by: UUID,
     ) -> None:
         self._validate_status_transition(
             current_status=asset.status,
@@ -191,10 +239,28 @@ class AssetService:
             allowed_map=MANUAL_STATUS_TRANSITIONS,
         )
 
-        await self.asset_repository.change_status(asset=asset, new_status=new_status)
+        if asset.status == AssetStatus.ASSIGNED and new_status == AssetStatus.REPAIR:
+            asset_history = await self.asset_repository.get_active_assignment_by_id(
+                asset.id
+            )
+
+            if asset_history is None:
+                raise AssetHistoryNotFoundError()
+
+            asset_history.returned_at = datetime.now(UTC)
+            asset_history.unassigned_by = changed_by
+
+        await self.asset_repository.change_status(
+            asset=asset,
+            new_status=new_status,
+        )
 
     async def _apply_status_transition(
-        self, asset: Asset, new_status: AssetStatus, user_id: UUID | None = None
+        self,
+        asset: Asset,
+        new_status: AssetStatus,
+        user_id: UUID | None,
+        changed_by: UUID,
     ) -> None:
         if asset.status == new_status:
             if (
@@ -213,17 +279,32 @@ class AssetService:
             if user_id is None:
                 raise AssetAssignmentUserNotFoundError()
 
-            await self._assign_asset(asset=asset, user_id=user_id)
+            await self._assign_asset(
+                asset=asset,
+                user_id=user_id,
+                assigned_by=changed_by,
+            )
             return
 
         if new_status == AssetStatus.IN_STOCK:
             if asset.status == AssetStatus.ASSIGNED:
-                await self._unassign_asset(asset=asset)
+                await self._unassign_asset(
+                    asset=asset,
+                    unassigned_by=changed_by,
+                )
             else:
-                await self._change_asset_status(asset=asset, new_status=new_status)
+                await self._change_asset_status(
+                    asset=asset,
+                    new_status=new_status,
+                    changed_by=changed_by,
+                )
             return
 
-        await self._change_asset_status(asset=asset, new_status=new_status)
+        await self._change_asset_status(
+            asset=asset,
+            new_status=new_status,
+            changed_by=changed_by,
+        )
 
     async def create(
         self,
@@ -233,37 +314,47 @@ class AssetService:
         purchase_date: date,
         warranty_expiry: date | None,
         notes: str | None,
-    ) -> Asset:
+        files: list[dict] | None = None,
+    ) -> tuple[Asset, dict]:
         self.validate_warranty_expiry(
             purchase_date=purchase_date,
             warranty_expiry=warranty_expiry,
         )
 
-        company_prefix = get_company_prefix()
-
-        number = await self.asset_tag_counter_repository.get_next_number(
-            company_prefix=company_prefix,
-            asset_type=asset_type,
-        )
-
-        asset_tag = build_asset_tag(
-            asset_type=asset_type,
-            number=number,
-        )
-
-        asset = Asset(
-            asset_tag=asset_tag,
-            type=asset_type,
-            serial_number=serial_number,
-            status=AssetStatus.IN_STOCK,
-            assigned_to=None,
-            purchase_date=purchase_date,
-            warranty_expiry=warranty_expiry,
-            notes=notes,
-        )
-
         try:
+            company_prefix = get_company_prefix()
+
+            number = await self.asset_tag_counter_repository.get_next_number(
+                company_prefix=company_prefix,
+                asset_type=asset_type,
+            )
+
+            asset_tag = build_asset_tag(
+                asset_type=asset_type,
+                number=number,
+            )
+
+            asset = Asset(
+                asset_tag=asset_tag,
+                type=asset_type,
+                serial_number=serial_number,
+                status=AssetStatus.IN_STOCK,
+                assigned_to=None,
+                purchase_date=purchase_date,
+                warranty_expiry=warranty_expiry,
+                notes=notes,
+            )
+
             await self.asset_repository.create(asset)
+
+            upload_result = {"files": []}
+
+            if files:
+                upload_result = await self.asset_file_service.prepare_uploads(
+                    asset_id=asset.id,
+                    files=files,
+                )
+
             await self.session.commit()
 
         except IntegrityError as exc:
@@ -277,11 +368,20 @@ class AssetService:
             if constraint_name == "assets_asset_tag_key":
                 raise AssetTagAlreadyExistsError() from exc
 
+            if constraint_name == "uq_asset_files_asset_id_checksum_sha256":
+                raise DuplicateAssetFileError() from exc
+
             raise
 
-        return asset
+        except Exception:
+            await self.session.rollback()
+            raise
 
-    async def list(
+        await self._invalidate_stats_cache()
+
+        return asset, upload_result
+
+    async def list_assets(
         self,
         *,
         page: int,
@@ -296,7 +396,7 @@ class AssetService:
         ] = "created_at",
         order: Literal["asc", "desc"] = "desc",
     ) -> tuple[list[Asset], int]:
-        assets, total = await self.asset_repository.list(
+        assets, total = await self.asset_repository.list_assets(
             page=page,
             size=size,
             asset_type=asset_type,
@@ -333,23 +433,41 @@ class AssetService:
         self,
         asset_id: UUID,
         update_data: dict,
+        changed_by: UUID,
     ) -> Asset:
         asset = await self._get_asset_or_raise(asset_id)
 
         update_data = update_data.copy()
-
         new_status = update_data.pop("status", None)
-
         user_id = update_data.pop("user_id", None)
 
+        old_asset_tag = asset.asset_tag
+        old_asset_type = asset.type
+
         try:
-            await self._update_asset_details(asset=asset, update_data=update_data)
+            await self._update_asset_details(
+                asset=asset,
+                update_data=update_data,
+            )
+
+            if "type" in update_data and update_data["type"] != old_asset_type:
+                history = AssetTagHistory(
+                    asset_id=asset.id,
+                    old_asset_tag=old_asset_tag,
+                    old_asset_type=old_asset_type,
+                    new_asset_tag=asset.asset_tag,
+                    new_asset_type=update_data["type"],
+                    changed_by=changed_by,
+                )
+
+                self.session.add(history)
 
             if new_status is not None:
                 await self._apply_status_transition(
                     asset=asset,
                     new_status=new_status,
                     user_id=user_id,
+                    changed_by=changed_by,
                 )
 
             await self.session.commit()
@@ -371,6 +489,8 @@ class AssetService:
             await self.session.rollback()
             raise
 
+        await self._invalidate_stats_cache()
+
         return asset
 
     async def delete(self, asset_id: UUID) -> None:
@@ -391,28 +511,51 @@ class AssetService:
         await self.asset_repository.delete(asset)
 
         await self.session.commit()
+        await self._invalidate_stats_cache()
 
-    async def assign(self, asset_id: UUID, user_id: UUID) -> Asset:
+    async def assign(
+        self,
+        asset_id: UUID,
+        user_id: UUID,
+        assigned_by: UUID,
+    ) -> Asset:
         asset = await self._get_asset_or_raise(asset_id)
 
         try:
-            await self._assign_asset(asset, user_id)
+            await self._assign_asset(
+                asset=asset,
+                user_id=user_id,
+                assigned_by=assigned_by,
+            )
             await self.session.commit()
+
         except Exception:
             await self.session.rollback()
             raise
+
+        await self._invalidate_stats_cache()
 
         return asset
 
-    async def unassign(self, asset_id: UUID) -> Asset:
+    async def unassign(
+        self,
+        asset_id: UUID,
+        unassigned_by: UUID,
+    ) -> Asset:
         asset = await self._get_asset_or_raise(asset_id)
 
         try:
-            await self._unassign_asset(asset)
+            await self._unassign_asset(
+                asset=asset,
+                unassigned_by=unassigned_by,
+            )
             await self.session.commit()
+
         except Exception:
             await self.session.rollback()
             raise
+
+        await self._invalidate_stats_cache()
 
         return asset
 
@@ -420,19 +563,46 @@ class AssetService:
         self,
         asset_id: UUID,
         new_status: AssetStatus,
+        changed_by: UUID,
     ) -> Asset:
         asset = await self._get_asset_or_raise(asset_id)
 
         try:
-            await self._change_asset_status(asset, new_status)
+            await self._change_asset_status(
+                asset=asset,
+                new_status=new_status,
+                changed_by=changed_by,
+            )
             await self.session.commit()
+
         except Exception:
             await self.session.rollback()
             raise
 
+        await self._invalidate_stats_cache()
+
         return asset
 
     async def stats(self) -> dict[str, int]:
+        cached = None
+
+        try:
+            cached = await self.redis_client.get(ASSET_STATS_CACHE_KEY)
+        except Exception:
+            logger.exception(
+                "Failed to read asset statistics cache",
+                extra={"cache_key": ASSET_STATS_CACHE_KEY},
+            )
+
+        if cached is not None:
+            try:
+                return json.loads(cached)
+            except (json.JSONDecodeError, TypeError):
+                logger.exception(
+                    "Invalid asset statistics cache data",
+                    extra={"cache_key": ASSET_STATS_CACHE_KEY},
+                )
+
         counts = await self.asset_repository.stats()
 
         in_stock = counts.get(AssetStatus.IN_STOCK, 0)
@@ -440,10 +610,91 @@ class AssetService:
         repair = counts.get(AssetStatus.REPAIR, 0)
         retired = counts.get(AssetStatus.RETIRED, 0)
 
-        return {
+        result = {
             "total": in_stock + assigned + repair + retired,
             "in_stock": in_stock,
             "assigned": assigned,
             "repair": repair,
             "retired": retired,
         }
+
+        try:
+            await self.redis_client.set(
+                ASSET_STATS_CACHE_KEY,
+                json.dumps(result),
+                ex=ASSET_STATS_CACHE_TTL,
+            )
+        except Exception:
+            logger.exception(
+                "Failed to write asset statistics cache",
+                extra={"cache_key": ASSET_STATS_CACHE_KEY},
+            )
+
+        return result
+
+    async def get_history_by_asset(
+        self,
+        asset_id: UUID,
+        page: int,
+        size: int,
+        search: str | None = None,
+    ):
+        asset = await self.asset_repository.get_by_id(asset_id)
+
+        if asset is None:
+            raise AssetNotFoundError()
+
+        history, total = await self.asset_repository.get_history_by_asset_id(
+            asset_id=asset_id,
+            page=page,
+            size=size,
+            search=search,
+        )
+
+        return asset_id, history, total
+
+    async def get_history_by_user(
+        self,
+        user_id: UUID,
+        current_user: User,
+        page: int,
+        size: int,
+        search: str | None = None,
+    ):
+        user = await self.user_repository.get_by_id(user_id=user_id)
+
+        if user is None:
+            raise AssetAssignmentUserNotFoundError()
+
+        if current_user.role != UserRole.ADMIN and current_user.id != user_id:
+            raise AuthorizationError()
+
+        history, total = await self.asset_repository.get_history_by_user_id(
+            user_id=user_id,
+            page=page,
+            size=size,
+            search=search,
+        )
+
+        return history, total
+
+    async def get_tag_history(
+        self,
+        asset_id: UUID,
+        page: int,
+        size: int,
+        search: str | None = None,
+    ):
+        asset = await self.asset_repository.get_by_id(asset_id)
+
+        if asset is None:
+            raise AssetNotFoundError()
+
+        history, total = await self.asset_repository.get_tag_history(
+            asset_id=asset_id,
+            page=page,
+            size=size,
+            search=search,
+        )
+
+        return history, total

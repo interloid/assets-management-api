@@ -22,6 +22,29 @@ class Settings(BaseSettings):
 
     CORS_ORIGINS: str
 
+    CELERY_BROKER_URL: str | None = None
+    CELERY_RESULT_BACKEND: str | None = None
+
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str
+    SMTP_PASSWORD: str
+
+    MAIL_FROM_EMAIL: str
+    MAIL_FROM_NAME: str = "Assets Management API"
+
+    AWS_REGION: str
+    S3_BUCKET_NAME: str
+    S3_ENDPOINT_URL: str | None = None
+    S3_PRESIGNED_URL_ENDPOINT: str | None = None
+    S3_UPLOAD_CALLBACK_SECRET: str = Field(min_length=32)
+
+    AWS_ACCESS_KEY_ID: str | None = None
+    AWS_SECRET_ACCESS_KEY: str | None = None
+    CLOUDFRONT_DOMAIN: str | None = None
+    CLOUDFRONT_KEY_PAIR_ID: str | None = None
+    CLOUDFRONT_PRIVATE_KEY_PATH: str | None = None
+    CLOUDFRONT_URL_EXPIRY_SECONDS: PositiveInt = 900
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", extra="ignore"
     )

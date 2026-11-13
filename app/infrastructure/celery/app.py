@@ -1,0 +1,72 @@
+from celery import Celery
+from celery.schedules import crontab
+from celery.signals import setup_logging
+
+from app.core.config import settings
+from app.core.logging import configure_logging
+
+celery_app = Celery(
+    "assets_management",
+    broker=str(settings.CELERY_BROKER_URL or settings.REDIS_URL),
+    backend=str(settings.CELERY_RESULT_BACKEND or settings.REDIS_URL),
+    include=[
+        "app.infrastructure.celery.tasks.warranty_tasks",
+        "app.infrastructure.celery.tasks.csv_export_tasks",
+        "app.infrastructure.celery.tasks.weekly_tasks",
+        "app.infrastructure.celery.tasks.asset_file_cleanup_tasks",
+        "app.infrastructure.celery.tasks.refresh_token_cleanup_tasks",
+        "app.infrastructure.celery.tasks.background_job_cleanup_tasks",
+        "app.infrastructure.celery.tasks.csv_export_cleanup_tasks",
+    ],
+)
+
+
+@setup_logging.connect
+def configure_celery_logging(**kwargs) -> None:
+    configure_logging()
+
+
+celery_app.conf.update(
+    task_serializer="json",
+    accept_content=["json"],
+    request_serializer="json",
+    timezone="UTC",
+    enable_utc=True,
+    task_trace_started=True,
+    beat_schedule={
+        "daily-warranty-expiry-reminders": {
+            "task": "app.infrastructure.celery.tasks.warranty_tasks.send_warranty_reminders",
+            "schedule": crontab(hour=4, minute=30),
+        },
+        "weekly-asset-management-summary": {
+            "task": "app.infrastructure.celery.tasks.weekly_tasks.send_weekly_summary",
+            "schedule": crontab(hour=4, minute=35, day_of_week="monday"),
+        },
+        "daily-expired-asset-file-cleanup": {
+            "task": (
+                "app.infrastructure.celery.tasks.asset_file_cleanup_tasks.cleanup_expired_asset_files"
+            ),
+            "schedule": crontab(hour=4, minute=40),
+        },
+        "daily-expired-refresh-token-cleanup": {
+            "task": (
+                "app.infrastructure.celery.tasks.refresh_token_cleanup_tasks.cleanup_expired_refresh_tokens"
+            ),
+            "schedule": crontab(hour=4, minute=45),
+        },
+        "daily-expired-background-job-cleanup": {
+            "task": (
+                "app.infrastructure.celery.tasks.background_job_cleanup_tasks."
+                "cleanup_expired_background_jobs"
+            ),
+            "schedule": crontab(hour=4, minute=50),
+        },
+        "daily-expired-csv-export-cleanup": {
+            "task": (
+                "app.infrastructure.celery.tasks.csv_export_cleanup_tasks."
+                "cleanup_expired_csv_exports"
+            ),
+            "schedule": crontab(hour=4, minute=55),
+        },
+    },
+)

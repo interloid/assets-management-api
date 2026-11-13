@@ -1,0 +1,296 @@
+
+name: Assets Management CI
+
+on:
+  push:
+    branches:
+      - phase2
+  pull_request:
+    branches:
+      - phase2
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Ruff checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Install dependencies
+        run: uv sync --locked --group dev
+
+      - name: Run Ruff lint
+        run: uv run ruff check .
+
+      - name: Check formatting
+        run: uv run ruff format --check .
+
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: assets_management_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d assets_management_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      ENVIRONMENT: test
+
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/assets_management_test
+      ALEMBIC_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/assets_management_test
+      TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/assets_management_test
+
+      REDIS_URL: redis://localhost:6379/0
+      CELERY_BROKER_URL: redis://localhost:6379/1
+      CELERY_RESULT_BACKEND: redis://localhost:6379/2
+
+      JWT_SECRET_KEY: ci-only-jwt-secret-key-not-for-production-123456
+      JWT_ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: "15"
+      REFRESH_TOKEN_EXPIRE_DAYS: "7"
+
+      ASSET_TAG_COMPANY_PREFIX: IL
+      SEED_USER_PASSWORD: "CI-Test-User-Password123!"
+      SEED_ADMIN_PASSWORD: "CI-Test-Admin-Password123!"
+
+      CORS_ORIGINS: http://localhost:3000
+
+      SMTP_USERNAME: ci@example.com
+      SMTP_PASSWORD: ci-only-password
+      MAIL_FROM_EMAIL: ci@example.com
+
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_EC2_METADATA_DISABLED: "true"
+      S3_BUCKET_NAME: ci-test-bucket
+      S3_UPLOAD_CALLBACK_SECRET: ci-only-s3-callback-secret-not-for-production-123
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Install dependencies
+        run: uv sync --locked --group dev
+
+      - name: Run database migrations
+        run: uv run alembic upgrade head
+
+      - name: Run tests
+        run: uv run pytest
+
+  deploy:
+    name: Build and deploy to EC2
+    runs-on: ubuntu-latest
+    concurrency:
+      group: production-deployment
+      cancel-in-progress: false
+
+    timeout-minutes: 15
+    needs: [lint, test]
+
+    if: github.event_name == 'push' && github.ref == 'refs/heads/phase2'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            madhavanselvaraj/assets-management-api-prod:latest
+            madhavanselvaraj/assets-management-api-prod:${{ github.sha }}
+
+      - name: Configure SSH
+        env:
+          EC2_SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          EC2_KNOWN_HOSTS: ${{ secrets.EC2_KNOWN_HOSTS }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+
+          printf '%s\n' "$EC2_SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          printf '%s\n' "$EC2_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+
+      - name: Deploy to EC2
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          NEW_IMAGE_TAG: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          echo "Copying production Compose file to EC2..."
+
+          scp -i ~/.ssh/deploy_key \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            docker-compose.prod.yml \
+            "$EC2_USER@$EC2_HOST:~/assets-management-api/docker-compose.prod.yml"
+
+          echo "Deploying image: $NEW_IMAGE_TAG"
+
+          ssh -i ~/.ssh/deploy_key \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            "$EC2_USER@$EC2_HOST" \
+            "NEW_IMAGE_TAG='$NEW_IMAGE_TAG' bash -se" <<'EOF'
+
+          set -euo pipefail
+
+          cd ~/assets-management-api
+
+          PREVIOUS_TAG_FILE=".deployed_image_tag"
+
+          if [ -s "$PREVIOUS_TAG_FILE" ]; then
+            PREVIOUS_TAG=$(cat "$PREVIOUS_TAG_FILE")
+          else
+            PREVIOUS_TAG="rollback-previous"
+          fi
+
+          echo "Previous production version: $PREVIOUS_TAG"
+          echo "New production version: $NEW_IMAGE_TAG"
+
+          echo "Pulling new Docker image..."
+
+          IMAGE_TAG="$NEW_IMAGE_TAG" \
+            docker compose -f docker-compose.prod.yml pull
+
+          echo "Running database migrations..."
+
+          IMAGE_TAG="$NEW_IMAGE_TAG" \
+            docker compose -f docker-compose.prod.yml run \
+            --rm \
+            --no-deps \
+            -T \
+            --interactive=false \
+            api \
+            alembic upgrade head </dev/null
+
+          echo "Starting new production version..."
+
+          if IMAGE_TAG="$NEW_IMAGE_TAG" \
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans; then
+
+            echo "Checking production API readiness..."
+
+            for attempt in $(seq 1 12); do
+              if response=$(curl -fsS --max-time 3 http://127.0.0.1:8000/health/ready); then
+                echo "New production version is healthy."
+                echo "$response"
+
+                printf '%s\n' "$NEW_IMAGE_TAG" > "$PREVIOUS_TAG_FILE.tmp"
+                mv "$PREVIOUS_TAG_FILE.tmp" "$PREVIOUS_TAG_FILE"
+
+                echo "Deployment successful: $NEW_IMAGE_TAG"
+                exit 0
+              fi
+
+              if [ "$attempt" -lt 12 ]; then
+                echo "Health check $attempt/12 failed. Retrying in 5 seconds..."
+                sleep 5
+              fi
+            done
+          else
+            echo "New version failed to start."
+          fi
+
+          echo "ERROR: New deployment failed."
+          echo "Starting rollback to: $PREVIOUS_TAG"
+
+          if [ "$PREVIOUS_TAG" != "rollback-previous" ]; then
+            if ! IMAGE_TAG="$PREVIOUS_TAG" \
+              docker compose -f docker-compose.prod.yml pull; then
+              echo "ERROR: Could not pull previous production image."
+              exit 1
+            fi
+          fi
+
+          if ! IMAGE_TAG="$PREVIOUS_TAG" \
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans; then
+            echo "CRITICAL: Rollback failed to start."
+            exit 1
+          fi
+
+          echo "Checking rollback readiness..."
+
+          for attempt in $(seq 1 12); do
+            if response=$(curl -fsS --max-time 3 http://127.0.0.1:8000/health/ready); then
+              echo "Rollback successful. Previous version is healthy."
+              echo "$response"
+              exit 1
+            fi
+
+            if [ "$attempt" -lt 12 ]; then
+              echo "Rollback health check $attempt/12 failed. Retrying in 5 seconds..."
+              sleep 5
+            fi
+          done
+
+          echo "CRITICAL: Rollback version is also unhealthy."
+          exit 1
+          EOF

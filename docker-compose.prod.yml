@@ -1,0 +1,54 @@
+services:
+  api:
+    image: madhavanselvaraj/assets-management-api-prod:${IMAGE_TAG:-latest}
+    env_file:
+      - .env.production
+    command:
+      - uvicorn
+      - app.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+    ports:
+      - "8000:8000"
+    volumes:
+      - exports_data:/app/exports
+      - /opt/assets-management/secrets/cloudfront-private-key.pem:/run/secrets/cloudfront-private-key.pem:ro
+    restart: unless-stopped
+    init: true
+    mem_limit: 512m
+
+  worker:
+    image: madhavanselvaraj/assets-management-api-prod:${IMAGE_TAG:-latest}
+    env_file:
+      - .env.production
+    command:
+      - celery
+      - -A
+      - app.infrastructure.celery.app:celery_app
+      - worker
+      - --loglevel=info
+      - --concurrency=2
+    volumes:
+      - exports_data:/app/exports
+    restart: unless-stopped
+    init: true
+    mem_limit: 512m
+
+  beat:
+    image: madhavanselvaraj/assets-management-api-prod:${IMAGE_TAG:-latest}
+    env_file:
+      - .env.production
+    command:
+      - celery
+      - -A
+      - app.infrastructure.celery.app:celery_app
+      - beat
+      - --loglevel=info
+    restart: unless-stopped
+    init: true
+    mem_limit: 256m
+
+volumes:
+  exports_data:

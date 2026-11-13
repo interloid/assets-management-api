@@ -13,6 +13,7 @@ from app.api.v1.responses import (
     CONFLICT_RESPONSE,
     INTERNAL_SERVER_ERROR_RESPONSE,
     LOGOUT_UNAUTHORIZED_RESPONSE,
+    TOO_MANY_REQUESTS_RESPONSE,
     UNAUTHORIZED_RESPONSE,
     VALIDATION_RESPONSE,
 )
@@ -21,6 +22,7 @@ from app.api.v1.schemas.auth import (
     RegisterRequest,
     UserResponse,
 )
+from app.infrastructure.rate_limiter import limiter
 from app.modules.auth.services import AuthService
 from app.shared.schemas.common import SuccessResponse
 
@@ -37,10 +39,13 @@ router = APIRouter(
         **CONFLICT_RESPONSE,
         **INTERNAL_SERVER_ERROR_RESPONSE,
         **VALIDATION_RESPONSE,
+        **TOO_MANY_REQUESTS_RESPONSE,
     },
 )
+@limiter.limit("3/minute")
 async def register(
     request: Request,
+    response: Response,
     data: RegisterRequest,
     session: DBSession,
 ) -> SuccessResponse[UserResponse]:
@@ -58,7 +63,7 @@ async def register(
         message="User registered successfully",
         data=UserResponse.model_validate(user),
         pagination_meta=None,
-        request_id=None,
+        request_id=request.state.request_id,
         timestamp=datetime.now(UTC),
         path=request.url.path,
     )
@@ -71,8 +76,10 @@ async def register(
         **INTERNAL_SERVER_ERROR_RESPONSE,
         **UNAUTHORIZED_RESPONSE,
         **VALIDATION_RESPONSE,
+        **TOO_MANY_REQUESTS_RESPONSE,
     },
 )
+@limiter.limit("5/minute")
 async def login(
     request: Request,
     response: Response,
@@ -98,7 +105,7 @@ async def login(
         message="Login successful",
         data=None,
         pagination_meta=None,
-        request_id=None,
+        request_id=request.state.request_id,
         timestamp=datetime.now(UTC),
         path=request.url.path,
     )
@@ -135,7 +142,7 @@ async def refresh(
         message="Access and refresh tokens renewed successfully",
         data=None,
         pagination_meta=None,
-        request_id=None,
+        request_id=request.state.request_id,
         timestamp=datetime.now(UTC),
         path=request.url.path,
     )

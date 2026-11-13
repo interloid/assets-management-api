@@ -1,4 +1,5 @@
 from datetime import UTC, date, datetime
+from typing import Annotated, Literal
 from uuid import UUID
 
 from pydantic import (
@@ -12,7 +13,41 @@ from pydantic import (
 
 from app.modules.asset.exceptions import InvalidWarrantyExpiryError
 from app.modules.asset.validators.serial_number import validate_serial_number
-from app.shared.models.enums import AssetStatus, AssetType
+from app.shared.models.enums import AssetStatus, AssetType, FileType, WarrantyExpiry
+
+
+class AssetFileUploadRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    filename: str
+    content_type: FileType
+    file_size: int
+    checksum_sha256: str = Field(
+        min_length=64,
+        max_length=64,
+        pattern=r"^[a-fA-F0-9]{64}$",
+    )
+
+    @field_validator("checksum_sha256")
+    @classmethod
+    def normalize_checksum(cls, value: str) -> str:
+        return value.lower()
+
+
+class AssetFileBatchItemRequest(BaseModel):
+    filename: str
+    content_type: str
+    file_size: int
+    checksum_sha256: str
+
+
+class AssetFileBatchUploadRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    files: list[AssetFileBatchItemRequest] = Field(
+        min_length=1,
+        max_length=5,
+    )
 
 
 class AssetCreate(BaseModel):
@@ -23,6 +58,10 @@ class AssetCreate(BaseModel):
     purchase_date: date
     warranty_expiry: date | None = None
     notes: str | None = None
+    files: list[AssetFileBatchItemRequest] | None = Field(
+        default=None,
+        max_length=5,
+    )
 
     _validate_serial_number = field_validator(
         "serial_number",
@@ -141,3 +180,142 @@ class AssetStatsResponse(BaseModel):
     assigned: int
     repair: int
     retired: int
+
+
+class AssetExportRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    asset_type: AssetType | None = Field(default=None, alias="type")
+    asset_status: AssetStatus | None = Field(default=None, alias="status")
+    assigned_to: UUID | None = None
+    warranty_expiry: WarrantyExpiry | None = None
+    search: str | None = None
+    sort: Literal["created_at", "purchase_date", "asset_tag", "warranty_expiry"] = (
+        "created_at"
+    )
+    order: Literal["asc", "desc"] = "desc"
+
+
+class AssetFileUploadResponse(BaseModel):
+    file_id: UUID
+    upload_url: str
+    expires_in: int
+    headers: dict[str, str]
+
+
+class AssetFileBatchUploadSuccessResponse(BaseModel):
+    filename: str
+    file_id: UUID
+    status: Literal["pending"]
+    upload_url: str
+    expires_in: int
+    headers: dict[str, str]
+
+
+class AssetFileBatchUploadFailureResponse(BaseModel):
+    filename: str
+    status: Literal["failed"]
+    error_code: str
+    message: str
+
+
+class AssetCreatedResponse(AssetResponse):
+    files: list[
+        Annotated[
+            AssetFileBatchUploadSuccessResponse | AssetFileBatchUploadFailureResponse,
+            Field(discriminator="status"),
+        ]
+    ] = Field(default_factory=list)
+
+
+class AssetFileBatchUploadResponse(BaseModel):
+    files: list[
+        Annotated[
+            AssetFileBatchUploadSuccessResponse | AssetFileBatchUploadFailureResponse,
+            Field(discriminator="status"),
+        ]
+    ]
+
+
+class AssetFileConfirmResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    file_id: UUID = Field(validation_alias="id")
+    asset_id: UUID
+    original_file_name: str
+    content_type: str
+    file_size: int
+    status: str
+    uploaded_at: datetime | None = None
+
+
+class AssetFileResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    file_id: UUID
+    asset_id: UUID
+    original_file_name: str
+    content_type: str
+    file_size: int
+    status: str
+    uploaded_at: datetime | None = None
+    download_url: str
+    expires_in: int
+
+
+class AssetAssignmentHistoryResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    assignee: AssignedUserResponse = Field(validation_alias="user")
+    assigned_by: AssignedUserResponse | None = Field(
+        default=None,
+        validation_alias="assigner",
+    )
+    assigned_at: datetime
+    unassigned_by: AssignedUserResponse | None = Field(
+        default=None,
+        validation_alias="un_assigner",
+    )
+    returned_at: datetime | None = None
+
+
+class UserAssetHistoryResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    asset_id: UUID
+    assigned_by: AssignedUserResponse | None = Field(
+        default=None,
+        validation_alias="assigner",
+    )
+    assigned_at: datetime
+    unassigned_by: AssignedUserResponse | None = Field(
+        default=None,
+        validation_alias="un_assigner",
+    )
+    returned_at: datetime | None = None
+
+
+class AssetAssignmentHistoryListResponse(BaseModel):
+    asset_id: UUID
+    history: list[AssetAssignmentHistoryResponse]
+
+
+class UserAssetHistoryListResponse(BaseModel):
+    user_id: UUID
+    assets: list[UserAssetHistoryResponse]
+
+
+class AssetTagHistoryResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    old_asset_tag: str
+    old_asset_type: AssetType
+    new_asset_tag: str
+    new_asset_type: AssetType
+    changed_by_user: AssignedUserResponse | None = None
+
+
+class AssetTagHistoryListResponse(BaseModel):
+    asset_id: UUID
+    history: list[AssetTagHistoryResponse]

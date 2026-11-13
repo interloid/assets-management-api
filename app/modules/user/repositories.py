@@ -3,6 +3,7 @@ from uuid import UUID
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.asset.models import Asset
 from app.modules.user.models import User
 from app.shared.utils.query import escape_like
 
@@ -72,7 +73,7 @@ class UserRepository:
         page: int,
         size: int,
         search: str | None = None,
-    ) -> tuple[list[User], int]:
+    ) -> tuple[list[dict], int]:
         filters = []
         if search:
             search = search.strip()
@@ -86,11 +87,20 @@ class UserRepository:
             )
 
         offset = (page - 1) * size
-
+        asset_count = (
+            select(func.count(Asset.id))
+            .where(
+                Asset.assigned_to == User.id,
+                Asset.deleted_at.is_(None),
+            )
+            .correlate(User)
+            .scalar_subquery()
+        )
         stmt = (
             select(
                 User,
                 func.count().over().label("total_count"),
+                asset_count.label("assets_assigned"),
             )
             .where(*filters)
             .order_by(User.created_at.desc(), User.id.asc())
@@ -109,7 +119,18 @@ class UserRepository:
 
             return [], total
 
-        users = [row[0] for row in rows]
+        users = [
+            {
+                "id": row[0].id,
+                "email": row[0].email,
+                "full_name": row[0].full_name,
+                "role": row[0].role,
+                "is_active": row[0].is_active,
+                "assets_assigned": row.assets_assigned,
+            }
+            for row in rows
+        ]
+
         total = rows[0].total_count
 
         return users, total
