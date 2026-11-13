@@ -1,4 +1,5 @@
 import json
+import logging
 from datetime import UTC, date, datetime
 from typing import Literal
 from uuid import UUID
@@ -31,6 +32,7 @@ from app.modules.user.models import User
 from app.modules.user.repositories import UserRepository
 from app.shared.models.enums import AssetStatus, AssetType, UserRole
 
+logger = logging.getLogger(__name__)
 ASSET_STATS_CACHE_KEY = "assets:stats"
 ASSET_STATS_CACHE_TTL = 60
 ALLOWED_STATUS_TRANSITIONS: dict[AssetStatus, set[AssetStatus]] = {
@@ -84,6 +86,15 @@ class AssetService:
         self.asset_file_service = AssetFileService(session)
         self.user_repository = UserRepository(session)
         self.redis_client = redis_client
+
+    async def _invalidate_stats_cache(self) -> None:
+        try:
+            await self.redis_client.delete(ASSET_STATS_CACHE_KEY)
+        except Exception:
+            logger.exception(
+                "Failed to invalidate asset statistics cache",
+                extra={"cache_key": ASSET_STATS_CACHE_KEY},
+            )
 
     def validate_warranty_expiry(
         self,
@@ -366,7 +377,7 @@ class AssetService:
             await self.session.rollback()
             raise
 
-        await self.redis_client.delete(ASSET_STATS_CACHE_KEY)
+        await self._invalidate_stats_cache()
 
         return asset, upload_result
 
@@ -478,7 +489,7 @@ class AssetService:
             await self.session.rollback()
             raise
 
-        await self.redis_client.delete(ASSET_STATS_CACHE_KEY)
+        await self._invalidate_stats_cache()
 
         return asset
 
@@ -500,7 +511,7 @@ class AssetService:
         await self.asset_repository.delete(asset)
 
         await self.session.commit()
-        await self.redis_client.delete(ASSET_STATS_CACHE_KEY)
+        await self._invalidate_stats_cache()
 
     async def assign(
         self,
@@ -522,7 +533,7 @@ class AssetService:
             await self.session.rollback()
             raise
 
-        await self.redis_client.delete(ASSET_STATS_CACHE_KEY)
+        await self._invalidate_stats_cache()
 
         return asset
 
@@ -544,7 +555,7 @@ class AssetService:
             await self.session.rollback()
             raise
 
-        await self.redis_client.delete(ASSET_STATS_CACHE_KEY)
+        await self._invalidate_stats_cache()
 
         return asset
 
@@ -568,15 +579,29 @@ class AssetService:
             await self.session.rollback()
             raise
 
-        await self.redis_client.delete(ASSET_STATS_CACHE_KEY)
+        await self._invalidate_stats_cache()
 
         return asset
 
     async def stats(self) -> dict[str, int]:
-        cached = await self.redis_client.get(ASSET_STATS_CACHE_KEY)
+        cached = None
+
+        try:
+            cached = await self.redis_client.get(ASSET_STATS_CACHE_KEY)
+        except Exception:
+            logger.exception(
+                "Failed to read asset statistics cache",
+                extra={"cache_key": ASSET_STATS_CACHE_KEY},
+            )
 
         if cached is not None:
-            return json.loads(cached)
+            try:
+                return json.loads(cached)
+            except (json.JSONDecodeError, TypeError):
+                logger.exception(
+                    "Invalid asset statistics cache data",
+                    extra={"cache_key": ASSET_STATS_CACHE_KEY},
+                )
 
         counts = await self.asset_repository.stats()
 
@@ -593,11 +618,17 @@ class AssetService:
             "retired": retired,
         }
 
-        await self.redis_client.set(
-            ASSET_STATS_CACHE_KEY,
-            json.dumps(result),
-            ex=ASSET_STATS_CACHE_TTL,
-        )
+        try:
+            await self.redis_client.set(
+                ASSET_STATS_CACHE_KEY,
+                json.dumps(result),
+                ex=ASSET_STATS_CACHE_TTL,
+            )
+        except Exception:
+            logger.exception(
+                "Failed to write asset statistics cache",
+                extra={"cache_key": ASSET_STATS_CACHE_KEY},
+            )
 
         return result
 

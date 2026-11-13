@@ -114,7 +114,6 @@ def test_write_csv_file_writes_header_and_rows(tmp_path: Path):
     assert count == 1
     assert file_path.exists()
 
-    # utf-8-sig adds a BOM, so use utf-8-sig when reading.
     with file_path.open(encoding="utf-8-sig", newline="") as csv_file:
         reader = csv.DictReader(csv_file)
         exported_rows = list(reader)

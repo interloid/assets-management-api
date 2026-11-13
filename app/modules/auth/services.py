@@ -252,11 +252,9 @@ class AuthService:
         current_user: User,
         access_token_version: int,
     ) -> None:
-        # Stale token: already invalidated by a newer token version.
         if access_token_version < current_user.token_version:
             return
 
-        # Future token version: inconsistent with server state, so reject it.
         if access_token_version > current_user.token_version:
             raise InvalidAccessTokenError()
 

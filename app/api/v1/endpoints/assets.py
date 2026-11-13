@@ -3,7 +3,7 @@ from math import ceil
 from typing import Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Query, Request, status
+from fastapi import APIRouter, Query, Request, Response, status
 
 from app.api.deps import DBSession, RedisClient
 from app.api.v1.dependencies import AdminUser, CurrentUser
@@ -43,6 +43,10 @@ router = APIRouter(
     tags=["Assets"],
     status_code=status.HTTP_201_CREATED,
     responses={
+        status.HTTP_207_MULTI_STATUS: {
+            "model": SuccessResponse[AssetCreatedResponse],
+            "description": "Asset created with one or more attachment failures",
+        },
         **CONFLICT_RESPONSE,
         **FORBIDDEN_RESPONSE,
         **INTERNAL_SERVER_ERROR_RESPONSE,
@@ -52,6 +56,7 @@ router = APIRouter(
 )
 async def create_asset(
     request: Request,
+    response: Response,
     data: AssetCreate,
     session: DBSession,
     redis_client: RedisClient,
@@ -68,6 +73,16 @@ async def create_asset(
         files=[file.model_dump() for file in (data.files or [])],
     )
 
+    has_failures = any(
+        file_result["status"] == "failed" for file_result in upload_result["files"]
+    )
+
+    response_status = (
+        status.HTTP_207_MULTI_STATUS if has_failures else status.HTTP_201_CREATED
+    )
+
+    response.status_code = response_status
+
     asset_response = AssetResponse.model_validate(asset)
 
     response_data = AssetCreatedResponse(
@@ -77,8 +92,12 @@ async def create_asset(
 
     return SuccessResponse(
         success=True,
-        status_code=status.HTTP_201_CREATED,
-        message="Asset created successfully",
+        status_code=response_status,
+        message=(
+            "Asset created successfully with some attachment failures"
+            if has_failures
+            else "Asset created successfully"
+        ),
         data=response_data,
         pagination_meta=None,
         request_id=request.state.request_id,

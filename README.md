@@ -14,7 +14,8 @@ A REST API for managing organizational assets with secure authentication, role-b
 - Warranty-expiry filtering and asset statistics
 - Asynchronous CSV export jobs
 - Celery background workers and scheduled tasks
-- S3-compatible asset file storage using presigned URLs
+- Direct-to-S3 asset file uploads using presigned URLs
+- Event-driven upload completion processing through S3 notifications and AWS Lambda
 - Automatic cleanup of expired pending uploads
 - Consistent API responses and exception handling
 - Automated API and service-level tests
@@ -38,6 +39,7 @@ A REST API for managing organizational assets with secure authentication, role-b
 | Celery | Background task processing |
 | Celery Beat | Scheduled task execution |
 | boto3 | S3-compatible object storage integration |
+| AWS Lambda | Processes S3 object-created notifications |
 | pytest | Automated testing |
 | pytest-asyncio | Asynchronous test support |
 | HTTPX | API integration testing |
@@ -62,6 +64,7 @@ A REST API for managing organizational assets with secure authentication, role-b
 | Background processing | Celery |
 | Scheduled tasks | Celery Beat |
 | File storage | AWS S3 |
+| Storage event processing | AWS Lambda |
 | CI/CD | GitHub Actions |
 
 ## Architecture
@@ -448,11 +451,12 @@ Maximum upload size: **5 MB**.
 ### Upload workflow
 
 1. An authorized administrator requests a presigned upload URL.
-2. The API validates the filename, content type, and file size.
-3. The API creates file metadata and returns the presigned PUT URL and file identifier.
-4. The client uploads the file directly to S3-compatible storage.
-5. The storage service can notify the configured event handler when an object is created.
-6. The file metadata can be checked against the stored object.
+2. The API validates the filename, content type, and file size, then creates a pending file record.
+3. The API generates a short-lived presigned S3 PUT URL. The request is bound to the expected content type and SHA-256 checksum.
+4. The client uploads the file directly to the S3 bucket; the file contents do not pass through the API server.
+5. An S3 `ObjectCreated` event invokes the configured AWS Lambda function.
+6. The Lambda function calls the internal API endpoint `POST /api/v1/internal/s3-upload-completed`.
+7. The API validates the uploaded object and updates the corresponding file metadata/status.
 
 Object keys follow this general pattern:
 
@@ -468,64 +472,40 @@ assets/{asset_id}/{uuid}-{filename}
 - Administrators can delete asset files.
 - Pending uploads that remain incomplete beyond the configured expiry period can be cleaned up by a scheduled task.
 
-The file metadata and object storage are separate systems. Deletion and cleanup workflows must account for failures in either the database or object storage, with retries for unsuccessful object deletion.
+The database stores file metadata while S3 stores the file contents. The S3 event callback is used to reconcile a completed object upload with its pending database record. Deletion and cleanup workflows must account for failures in either system.
 
 ### Local S3 testing
 
-The storage integration can be tested using Moto for isolated tests and a local S3-compatible environment for integration workflows. The local environment should be configured with the correct endpoint, bucket, credentials, and region.
+The S3 integration is covered by automated tests using Moto to mock S3 operations. Configure the bucket, region, and AWS credentials through environment settings for non-mocked integration testing.
 
 ## API Response Format
 
-Use the application's response schemas as the source of truth for the exact response structure.
+The API uses a consistent response envelope. The response schemas in the application are the source of truth for the complete structure.
 
 ### Successful response
 
-A non-paginated response uses the application's standard success envelope. A simplified example is:
+A successful response includes the following standard metadata fields:
 
 ```json
 {
-  "data": {}
+  "success": true,
+  "status_code": 200,
+  "message": "Request completed successfully",
+  "data": {},
+  "pagination_meta": null,
+  "request_id": "request-id",
+  "timestamp": "2026-01-01T00:00:00Z",
+  "path": "/api/v1/resource"
 }
 ```
 
 ### Paginated response
 
-```json
-{
-  "data": [],
-  "pagination": {
-    "page": 1,
-    "size": 20,
-    "total_items": 100,
-    "total_pages": 5
-  }
-}
-```
+For endpoints that support pagination, `pagination_meta` contains the pagination information alongside the response data. The exact metadata schema is defined by the application's response models.
 
-Paginated resources include asset and user listings and the current user's assigned-asset listing, where pagination is supported by the endpoint.
+### Error responses
 
-### Error response
-
-```json
-{
-  "error": {
-    "code": "ERROR_CODE",
-    "message": "Human-readable error message"
-  }
-}
-```
-
-Validation errors may include additional details:
-
-```json
-{
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "Request validation failed",
-    "details": []
-  }
-}
-```
+Error responses use the standard error handling structure and include an `error_code` identifying the failure. Validation and domain errors may provide additional details. Refer to the application's exception handlers and response schemas for the exact fields rather than relying on a simplified example.
 
 Common HTTP status codes include:
 
@@ -539,8 +519,6 @@ Common HTTP status codes include:
 | `422` | Unprocessable Content |
 | `500` | Internal Server Error |
 | `503` | Service Unavailable |
-
-Refer to the configured response schemas for the complete envelope and metadata fields.
 
 ## Project Setup
 
@@ -557,7 +535,7 @@ The Docker Compose environment provides the local PostgreSQL and Redis services 
 ### 1. Clone the repository
 
 ```bash
-git clone <repository-url>
+git clone \<repository-url>
 cd assets-management-api
 ```
 
@@ -580,12 +558,10 @@ Configure the required settings for your environment. Example values:
 ```env
 DATABASE_URL=postgresql+asyncpg://username:password@localhost:5432/assets_management_dev
 REDIS_URL=redis://localhost:6379/0
-
 JWT_SECRET_KEY=replace-with-a-secure-secret-of-at-least-32-characters
 JWT_ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=15
 REFRESH_TOKEN_EXPIRE_DAYS=7
-
 ASSET_TAG_COMPANY_PREFIX=IL
 ```
 
@@ -737,16 +713,16 @@ uv run pytest tests/modules/auth/test_services.py -v
 ### Run a specific test
 
 ```bash
-uv run pytest \
-  tests/modules/auth/test_services.py::test_valid_registration \
+uv run pytest \\
+  tests/modules/auth/test_services.py::test_valid_registration \\
   -v
 ```
 
 ### Run tests by keyword
 
 ```bash
-uv run pytest tests/api/v1/test_assets.py \
-  -k "duplicate_serial or duplicate_asset_tag" \
+uv run pytest tests/api/v1/test_assets.py \\
+  -k "duplicate_serial or duplicate_asset_tag" \\
   -v
 ```
 
@@ -977,5 +953,3 @@ curl -i http://127.0.0.1:8000/health/ready
 - Run automated tests against a dedicated test database.
 - Review migrations before production deployment.
 - Ensure failed object-storage cleanup operations can be retried.
-
-

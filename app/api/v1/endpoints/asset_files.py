@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 from uuid import UUID
 
-from fastapi import APIRouter, Request, status
+from fastapi import APIRouter, Request, Response, status
 
 from app.api.deps import DBSession
 from app.api.v1.dependencies import AdminUser, CurrentUser
@@ -32,6 +32,10 @@ router = APIRouter(
     "/{id}/files/presign",
     status_code=status.HTTP_201_CREATED,
     responses={
+        status.HTTP_207_MULTI_STATUS: {
+            "model": SuccessResponse[AssetFileBatchUploadResponse],
+            "description": "Batch processed with one or more file failures",
+        },
         **CONFLICT_RESPONSE,
         **FORBIDDEN_RESPONSE,
         **INTERNAL_SERVER_ERROR_RESPONSE,
@@ -42,6 +46,7 @@ router = APIRouter(
 )
 async def generate_upload_urls(
     request: Request,
+    response: Response,
     id: UUID,
     data: AssetFileBatchUploadRequest,
     session: DBSession,
@@ -49,7 +54,6 @@ async def generate_upload_urls(
 ) -> SuccessResponse[AssetFileBatchUploadResponse]:
     service = AssetFileService(
         session,
-        redis=request.app.state.redis,
     )
 
     files = [file.model_dump() for file in data.files]
@@ -59,10 +63,24 @@ async def generate_upload_urls(
         files=files,
     )
 
+    has_failures = any(
+        file_result["status"] == "failed" for file_result in result["files"]
+    )
+
+    response_status = (
+        status.HTTP_207_MULTI_STATUS if has_failures else status.HTTP_201_CREATED
+    )
+
+    response.status_code = response_status
+
     return SuccessResponse(
         success=True,
-        status_code=status.HTTP_201_CREATED,
-        message="Upload URLs generated successfully",
+        status_code=response_status,
+        message=(
+            "Upload URLs generated with some file failures"
+            if has_failures
+            else "Upload URLs generated successfully"
+        ),
         data=AssetFileBatchUploadResponse.model_validate(result),
         request_id=request.state.request_id,
         timestamp=datetime.now(UTC),
@@ -88,7 +106,6 @@ async def confirm_upload(
 
     service = AssetFileService(
         session,
-        redis=request.app.state.redis,
     )
 
     file = await service.confirm_upload(asset_id=id, file_id=file_id)
@@ -123,7 +140,6 @@ async def get_files(
 ) -> SuccessResponse[list[AssetFileResponse]]:
     service = AssetFileService(
         session,
-        redis=request.app.state.redis,
     )
 
     files = await service.list_files(
@@ -164,7 +180,6 @@ async def delete_file(
 ) -> None:
     service = AssetFileService(
         session,
-        redis=request.app.state.redis,
     )
 
     await service.delete_file(asset_id=id, file_id=file_id)

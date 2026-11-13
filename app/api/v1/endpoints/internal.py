@@ -2,7 +2,7 @@ import hmac
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Header, HTTPException, Request, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.api.deps import DBSession
 from app.api.v1.responses import (
@@ -23,6 +23,8 @@ router = APIRouter(
 
 
 class S3UploadCompletedRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     bucket: str = Field(min_length=1)
     object_key: str = Field(min_length=1)
     event_size: int = Field(ge=0)
@@ -60,13 +62,11 @@ async def s3_upload_completed(
             detail="Unexpected S3 bucket",
         )
 
-    service = AssetFileService(
-        session,
-        redis=request.app.state.redis,
-    )
+    service = AssetFileService(session)
 
     file = await service.process_s3_upload_event(
         object_key=data.object_key,
+        event_size=data.event_size,
     )
 
     return SuccessResponse(

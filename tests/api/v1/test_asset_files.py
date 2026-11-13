@@ -45,7 +45,9 @@ async def test_presign_upload_returns_created_response(
         return_value={
             "files": [
                 {
+                    "filename": "report.pdf",
                     "file_id": file_id,
+                    "status": "pending",
                     "upload_url": "https://example.test/upload",
                     "expires_in": 300,
                     "headers": {},
@@ -79,7 +81,9 @@ async def test_presign_upload_returns_created_response(
     assert body["success"] is True
 
     uploaded_file = body["data"]["files"][0]
+    assert uploaded_file["filename"] == "report.pdf"
     assert uploaded_file["file_id"] == str(file_id)
+    assert uploaded_file["status"] == "pending"
     assert uploaded_file["upload_url"] == "https://example.test/upload"
     assert uploaded_file["expires_in"] == 300
     assert uploaded_file["headers"] == {}

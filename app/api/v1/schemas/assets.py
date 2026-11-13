@@ -1,5 +1,5 @@
 from datetime import UTC, date, datetime
-from typing import Literal
+from typing import Annotated, Literal
 from uuid import UUID
 
 from pydantic import (
@@ -34,26 +34,20 @@ class AssetFileUploadRequest(BaseModel):
         return value.lower()
 
 
+class AssetFileBatchItemRequest(BaseModel):
+    filename: str
+    content_type: str
+    file_size: int
+    checksum_sha256: str
+
+
 class AssetFileBatchUploadRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    files: list[AssetFileUploadRequest] = Field(
+    files: list[AssetFileBatchItemRequest] = Field(
         min_length=1,
         max_length=5,
     )
-
-    @field_validator("files")
-    @classmethod
-    def validate_unique_filenames(
-        cls,
-        files: list[AssetFileUploadRequest],
-    ) -> list[AssetFileUploadRequest]:
-        filenames = [file.filename.casefold() for file in files]
-
-        if len(filenames) != len(set(filenames)):
-            raise ValueError("Duplicate filenames are not allowed in the files list")
-
-        return files
 
 
 class AssetCreate(BaseModel):
@@ -64,27 +58,14 @@ class AssetCreate(BaseModel):
     purchase_date: date
     warranty_expiry: date | None = None
     notes: str | None = None
-    files: list[AssetFileUploadRequest] | None = None
+    files: list[AssetFileBatchItemRequest] | None = Field(
+        default=None,
+        max_length=5,
+    )
 
     _validate_serial_number = field_validator(
         "serial_number",
     )(validate_serial_number)
-
-    @field_validator("files")
-    @classmethod
-    def validate_files(cls, files):
-        if not files:
-            return files
-
-        if len(files) > 5:
-            raise ValueError("The files list must contain between 1 and 5 files")
-
-        filenames = [file.filename.casefold() for file in files]
-
-        if len(filenames) != len(set(filenames)):
-            raise ValueError("Duplicate filenames are not allowed in the files list")
-
-        return files
 
     @model_validator(mode="after")
     def validate_warranty_expiry(self):
@@ -222,12 +203,38 @@ class AssetFileUploadResponse(BaseModel):
     headers: dict[str, str]
 
 
+class AssetFileBatchUploadSuccessResponse(BaseModel):
+    filename: str
+    file_id: UUID
+    status: Literal["pending"]
+    upload_url: str
+    expires_in: int
+    headers: dict[str, str]
+
+
+class AssetFileBatchUploadFailureResponse(BaseModel):
+    filename: str
+    status: Literal["failed"]
+    error_code: str
+    message: str
+
+
 class AssetCreatedResponse(AssetResponse):
-    files: list[AssetFileUploadResponse] = Field(default_factory=list)
+    files: list[
+        Annotated[
+            AssetFileBatchUploadSuccessResponse | AssetFileBatchUploadFailureResponse,
+            Field(discriminator="status"),
+        ]
+    ] = Field(default_factory=list)
 
 
 class AssetFileBatchUploadResponse(BaseModel):
-    files: list[AssetFileUploadResponse]
+    files: list[
+        Annotated[
+            AssetFileBatchUploadSuccessResponse | AssetFileBatchUploadFailureResponse,
+            Field(discriminator="status"),
+        ]
+    ]
 
 
 class AssetFileConfirmResponse(BaseModel):

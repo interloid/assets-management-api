@@ -4,11 +4,9 @@ import logging
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
-from redis.asyncio import Redis
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.infrastructure.redis_pubsub import RedisEventPublisher
 from app.infrastructure.storage.s3_storage import S3Storage
 from app.modules.asset.exceptions import AssetNotFoundError
 from app.modules.asset.repositories import AssetRepository
@@ -42,13 +40,11 @@ class AssetFileService:
         self,
         session: AsyncSession,
         storage: S3Storage | None = None,
-        redis: Redis | None = None,
     ) -> None:
         self.session = session
         self.asset_repository = AssetRepository(session)
         self.repository = AssetFileRepository(session)
         self.storage = storage or S3Storage()
-        self.event_publisher = RedisEventPublisher(redis) if redis is not None else None
 
     async def cleanup_s3(self, object_key: str) -> None:
         await asyncio.to_thread(
@@ -56,54 +52,21 @@ class AssetFileService:
             object_key,
         )
 
-    async def publish_file_event(
-        self,
-        *,
-        event: str,
-        asset_id: UUID,
-        file_id: UUID,
-        file_status: FileUploadStatus,
-    ) -> None:
-        if self.event_publisher is None:
-            return
-
-        try:
-            await self.event_publisher.publish(
-                event=event,
-                data={
-                    "asset_id": str(asset_id),
-                    "file_id": str(file_id),
-                    "status": file_status.value,
-                },
-            )
-        except Exception:
-            logger.exception(
-                "Failed to publish asset file event",
-                extra={
-                    "asset_id": str(asset_id),
-                    "file_id": str(file_id),
-                    "event": event,
-                },
-            )
-
     async def reject_upload(
         self,
         file: AssetFiles,
         message: str,
     ) -> None:
+        await self.cleanup_s3(file.s3_object_key)
 
         file.status = FileUploadStatus.FAILED
         file.updated_at = datetime.now(UTC)
-        await self.session.commit()
 
-        await self.publish_file_event(
-            event="asset_file_failed",
-            asset_id=file.asset_id,
-            file_id=file.id,
-            file_status=file.status,
-        )
-
-        await self.cleanup_s3(file.s3_object_key)
+        try:
+            await self.session.commit()
+        except Exception:
+            await self.session.rollback()
+            raise
 
         raise AssetFileValidationError(message)
 
@@ -111,6 +74,7 @@ class AssetFileService:
         self,
         *,
         object_key: str,
+        event_size: int,
     ) -> AssetFiles:
         file = await self.repository.get_by_object_key(object_key)
 
@@ -120,6 +84,8 @@ class AssetFileService:
         return await self.confirm_upload(
             asset_id=file.asset_id,
             file_id=file.id,
+            allow_terminal_status=True,
+            event_size=event_size,
         )
 
     async def cleanup_expired_pending_uploads(
@@ -128,7 +94,6 @@ class AssetFileService:
         cutoff = datetime.now(UTC) - max_age
         expired_files = await self.repository.list_expired_pending(cutoff=cutoff)
 
-        # Keep plain values so a rollback cannot expire attributes we still need.
         candidates = [(file.id, file.s3_object_key) for file in expired_files]
 
         cleaned = 0
@@ -136,9 +101,10 @@ class AssetFileService:
 
         for file_id, object_key in candidates:
             try:
-                # Re-fetch the record because its state may have changed since
-                # the initial expired-files query.
-                file = await self.repository.get_by_id(file_id)
+                file = await self.repository.get_by_id(
+                    file_id,
+                    for_update=True,
+                )
 
                 if (
                     file is None
@@ -147,7 +113,6 @@ class AssetFileService:
                 ):
                     continue
 
-                # Delete the S3 object only after confirming the record is eligible.
                 await asyncio.to_thread(
                     self.storage.delete_object,
                     object_key,
@@ -177,20 +142,78 @@ class AssetFileService:
         asset_id: UUID,
         files: list[dict],
     ) -> dict:
-        """Create pending file records and generate URLs without committing."""
+        """Prepare individual uploads and collect per-file results."""
 
+        upload_results = []
         validated_files = []
         seen_checksums = set()
+        seen_filenames = set()
 
-        # Validate all files and check for duplicates before creating records.
         for file_data in files:
             filename = file_data["filename"]
-            content_type = FileType(file_data["content_type"])
+            filename_key = filename.casefold()
+
+            if filename_key in seen_filenames:
+                upload_results.append(
+                    {
+                        "filename": filename,
+                        "status": "failed",
+                        "error_code": "DUPLICATE_FILENAME",
+                        "message": f"Duplicate filename in batch: {filename}",
+                    }
+                )
+                continue
+
+            seen_filenames.add(filename_key)
+
+            content_type = file_data["content_type"]
             file_size = file_data["file_size"]
-            checksum_sha256 = file_data["checksum_sha256"].lower()
+            checksum_sha256 = file_data["checksum_sha256"]
+
+            if (
+                not isinstance(checksum_sha256, str)
+                or len(checksum_sha256) != 64
+                or any(char not in "0123456789abcdefABCDEF" for char in checksum_sha256)
+            ):
+                upload_results.append(
+                    {
+                        "filename": filename,
+                        "status": "failed",
+                        "error_code": "INVALID_CHECKSUM",
+                        "message": f"Invalid SHA-256 checksum for file: {filename}",
+                    }
+                )
+                continue
+
+            checksum_sha256 = checksum_sha256.lower()
+
+            try:
+                validate_file(
+                    filename,
+                    content_type,
+                    file_size,
+                )
+            except ValueError as exc:
+                upload_results.append(
+                    {
+                        "filename": filename,
+                        "status": "failed",
+                        "error_code": "INVALID_FILE",
+                        "message": str(exc),
+                    }
+                )
+                continue
 
             if checksum_sha256 in seen_checksums:
-                raise DuplicateAssetFileError()
+                upload_results.append(
+                    {
+                        "filename": filename,
+                        "status": "failed",
+                        "error_code": "DUPLICATE_ASSET_FILE",
+                        "message": "This file has a duplicate checksum in the batch",
+                    }
+                )
+                continue
 
             existing_file = await self.repository.get_by_asset_and_checksum(
                 asset_id=asset_id,
@@ -198,36 +221,63 @@ class AssetFileService:
             )
 
             if existing_file is not None:
-                raise DuplicateAssetFileError()
-
-            seen_checksums.add(checksum_sha256)
-
-            try:
-                validate_file(
-                    filename,
-                    content_type.value,
-                    file_size,
+                upload_results.append(
+                    {
+                        "filename": filename,
+                        "status": "failed",
+                        "error_code": "DUPLICATE_ASSET_FILE",
+                        "message": "This file has already been uploaded to this asset",
+                    }
                 )
-            except ValueError as exc:
-                raise AssetFileValidationError(str(exc)) from exc
+                continue
+
+            content_type_enum = FileType(content_type)
+            seen_checksums.add(checksum_sha256)
 
             validated_files.append(
                 {
                     "filename": filename,
-                    "content_type": content_type,
+                    "content_type": content_type_enum,
                     "file_size": file_size,
                     "checksum_sha256": checksum_sha256,
                 }
             )
 
-        pending_files = []
-
         for file_data in validated_files:
-            object_key = f"assets/{asset_id}/{uuid4()}-{file_data['filename']}"
+            filename = file_data["filename"]
+            object_key = f"assets/{asset_id}/{uuid4()}-{filename}"
+
+            checksum_bytes = bytes.fromhex(file_data["checksum_sha256"])
+            checksum_base64 = base64.b64encode(checksum_bytes).decode("ascii")
+
+            try:
+                upload_url = self.storage.generate_presigned_put_url(
+                    object_key=object_key,
+                    content_type=file_data["content_type"].value,
+                    checksum_sha256=checksum_base64,
+                )
+            except Exception:
+                logger.exception(
+                    "Failed to generate presigned upload URL",
+                    extra={
+                        "asset_id": str(asset_id),
+                        "file_name": filename,
+                    },
+                )
+
+                upload_results.append(
+                    {
+                        "filename": filename,
+                        "status": "failed",
+                        "error_code": "UPLOAD_URL_GENERATION_FAILED",
+                        "message": "Failed to generate upload URL for this file",
+                    }
+                )
+                continue
 
             file = AssetFiles(
                 asset_id=asset_id,
-                original_file_name=file_data["filename"],
+                original_file_name=filename,
                 content_type=file_data["content_type"],
                 file_size=file_data["file_size"],
                 checksum_sha256=file_data["checksum_sha256"],
@@ -235,24 +285,31 @@ class AssetFileService:
                 status=FileUploadStatus.PENDING,
             )
 
-            await self.repository.create(file)
-            pending_files.append(file)
+            try:
+                async with self.session.begin_nested():
+                    await self.repository.create(file)
 
-        upload_results = []
+            except IntegrityError as exc:
+                constraint_name = get_constraint_name(exc)
 
-        for file in pending_files:
-            checksum_bytes = bytes.fromhex(file.checksum_sha256)
-            checksum_base64 = base64.b64encode(checksum_bytes).decode("ascii")
+                if constraint_name == "uq_asset_files_asset_id_checksum_sha256":
+                    upload_results.append(
+                        {
+                            "filename": filename,
+                            "status": "failed",
+                            "error_code": "DUPLICATE_ASSET_FILE",
+                            "message": "This file has already been uploaded to this asset",
+                        }
+                    )
+                    continue
 
-            upload_url = self.storage.generate_presigned_put_url(
-                object_key=file.s3_object_key,
-                content_type=file.content_type.value,
-                checksum_sha256=checksum_base64,
-            )
+                raise
 
             upload_results.append(
                 {
+                    "filename": filename,
                     "file_id": file.id,
+                    "status": "pending",
                     "upload_url": upload_url,
                     "expires_in": self.storage.PUT_URL_EXPIRY_SECONDS,
                     "headers": {
@@ -303,6 +360,8 @@ class AssetFileService:
         *,
         asset_id: UUID,
         file_id: UUID,
+        allow_terminal_status: bool = False,
+        event_size: int | None = None,
     ) -> AssetFiles:
         asset = await self.asset_repository.get_by_id(asset_id)
 
@@ -320,6 +379,12 @@ class AssetFileService:
         if file.status == FileUploadStatus.UPLOADED:
             return file
 
+        if allow_terminal_status and file.status in {
+            FileUploadStatus.FAILED,
+            FileUploadStatus.DELETED,
+        }:
+            return file
+
         if file.status != FileUploadStatus.PENDING:
             raise AssetFileValidationError()
 
@@ -333,6 +398,12 @@ class AssetFileService:
 
         actual_size = metadata["content_length"]
         actual_content_type = metadata["content_type"]
+
+        if event_size is not None and event_size != actual_size:
+            await self.reject_upload(
+                file=file,
+                message="S3 event size does not match actual object size",
+            )
 
         if actual_size is None or actual_size <= 0:
             await self.reject_upload(file=file, message="Uploaded file is empty")
@@ -386,15 +457,13 @@ class AssetFileService:
         file.uploaded_at = datetime.now(UTC)
         file.updated_at = datetime.now(UTC)
 
-        await self.session.commit()
-        await self.session.refresh(file)
+        try:
+            await self.session.commit()
+        except Exception:
+            await self.session.rollback()
+            raise
 
-        await self.publish_file_event(
-            event="asset_file_uploaded",
-            asset_id=file.asset_id,
-            file_id=file.id,
-            file_status=file.status,
-        )
+        await self.session.refresh(file)
 
         return file
 
@@ -442,7 +511,10 @@ class AssetFileService:
         if asset is None:
             raise AssetNotFoundError()
 
-        file = await self.repository.get_by_id(file_id)
+        file = await self.repository.get_by_id(
+            file_id,
+            for_update=True,
+        )
 
         if file is None or file.asset_id != asset_id:
             raise AssetFileNotFoundError()
@@ -450,17 +522,15 @@ class AssetFileService:
         if file.status == FileUploadStatus.DELETED:
             return
 
+        await self.cleanup_s3(file.s3_object_key)
+
+        now = datetime.now(UTC)
         file.status = FileUploadStatus.DELETED
-        file.deleted_at = datetime.now(UTC)
-        file.updated_at = datetime.now(UTC)
+        file.deleted_at = now
+        file.updated_at = now
 
         try:
             await self.session.commit()
         except Exception:
             await self.session.rollback()
             raise
-
-        await asyncio.to_thread(
-            self.storage.delete_object,
-            file.s3_object_key,
-        )

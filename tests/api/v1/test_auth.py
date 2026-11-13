@@ -26,7 +26,6 @@ async def test_register_then_login(
     assert register_data["email"] == user_payload["email"]
     assert register_data["full_name"] == user_payload["full_name"]
     assert register_data["role"] == "user"
-    # assert register_data["is_active"] is True
 
     user_id = register_data["id"]
 
@@ -48,15 +47,9 @@ async def test_register_then_login(
 
     assert login_response.status_code == 200
 
-    # login_body = login_response.json()
-
-    # assert "access_token" not in login_body
-
     assert "access_token" in login_response.cookies
 
     assert login_response.cookies["access_token"]
-
-    # assert "refresh_token" not in login_body
 
     assert "refresh_token" in login_response.cookies
 
@@ -85,7 +78,6 @@ async def test_login_rate_limit(
     integration_client,
     user_payload,
 ) -> None:
-    # Create a valid user so requests can reach the login logic.
     register_response = await integration_client.post(
         "/api/v1/auth/register",
         json=user_payload,
@@ -97,7 +89,6 @@ async def test_login_rate_limit(
         "password": user_payload["password"],
     }
 
-    # Five requests are allowed.
     for _ in range(5):
         response = await integration_client.post(
             "/api/v1/auth/login",
@@ -105,7 +96,6 @@ async def test_login_rate_limit(
         )
         assert response.status_code == 200
 
-    # The sixth request should be throttled.
     response = await integration_client.post(
         "/api/v1/auth/login",
         json=payload,
@@ -120,7 +110,6 @@ async def test_register_rate_limit(
     integration_client,
     user_payload,
 ) -> None:
-    # Three requests are allowed by the assumed policy.
     for index in range(3):
         payload = {
             **user_payload,
@@ -134,7 +123,6 @@ async def test_register_rate_limit(
 
         assert response.status_code == 201
 
-    # The fourth request should be throttled.
     payload = {
         **user_payload,
         "email": f"ratelimit-blocked-{user_payload['email']}",
@@ -450,7 +438,6 @@ async def test_logout_rejects_refresh_token_from_different_user(
 
     assert body["error_code"] == "INVALID_ACCESS_TOKEN"
 
-    # integration_client.headers.pop("Authorization", None)
     integration_client.cookies.set(
         "refresh_token",
         refresh_token_2,
@@ -486,8 +473,6 @@ async def test_logout_all_sessions_rejected(
 
     assert login_response_1.status_code == 200
 
-    # login_body_1 = login_response_1.json()
-
     access_token_1 = login_response_1.cookies["access_token"]
     refresh_token_1 = login_response_1.cookies["refresh_token"]
 
@@ -500,8 +485,6 @@ async def test_logout_all_sessions_rejected(
     )
 
     assert login_response_2.status_code == 200
-
-    # login_body_2 = login_response_2.json()
 
     access_token_2 = login_response_2.cookies["access_token"]
     refresh_token_2 = login_response_2.cookies["refresh_token"]
@@ -666,11 +649,6 @@ async def test_change_password_revokes_all_sessions(
     )
 
     assert new_login_response.status_code == 200
-
-    # new_login_body = new_login_response.json()
-
-    # assert new_login_body["data"]["access_token"]
-    # assert new_login_body["data"]["token_type"] == "bearer"
 
     old_login_response = await integration_client.post(
         "/api/v1/auth/login",
